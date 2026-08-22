@@ -81,6 +81,7 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
     <meta name="description" content="Formulir Pendaftaran Layanan CBN - Internet Fiber Cepat & TV Berlangganan. Registrasi resmi PT. Sinergi Emas Perdana.">
     <title>Formulir Pendaftaran Layanan CBN - <?= htmlspecialchars($salesName ? $salesName . ' (' . $salesCode . ')' : 'PT. SEP') ?></title>
     <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
@@ -380,12 +381,20 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
 
                     <!-- Titik Koordinat GPS -->
                     <div class="form-group">
-                        <label class="form-label" for="tikor">Titik Koordinat GPS (Opsional)</label>
-                        <div class="input-with-btn">
-                            <input type="text" id="tikor" name="tikor" class="form-input"
-                                placeholder="Klik tombol GPS"
+                        <label class="form-label" for="tikor">Titik Koordinat GPS Lokasi Pemasangan</label>
+                        <div class="input-with-btn" style="display:flex;gap:6px;flex-wrap:wrap;">
+                            <input type="text" id="tikor" name="tikor" class="form-input" style="flex:1;min-width:180px;"
+                                placeholder="Contoh: 3.5952, 98.6722"
                                 value="<?= htmlspecialchars($old['tikor'] ?? '') ?>">
-                            <button type="button" id="tikor-gps-btn" class="btn-gps">Deteksi GPS</button>
+                            <button type="button" id="tikor-gps-btn" class="btn-gps" style="padding:0 14px;height:42px;display:inline-flex;align-items:center;gap:4px;">
+                                📍 Deteksi GPS
+                            </button>
+                            <button type="button" id="tikor-map-btn" class="btn-gps" style="background:linear-gradient(135deg, #059669, #10b981);padding:0 14px;height:42px;display:inline-flex;align-items:center;gap:4px;">
+                                🗺️ Pilih di Peta
+                            </button>
+                        </div>
+                        <div id="tikor-helper-text" style="font-size:11.5px;color:#94a3b8;margin-top:5px;line-height:1.4;">
+                            💡 Tekan <strong>Deteksi GPS</strong> untuk lokasi otomatis HP, atau <strong>Pilih di Peta</strong> untuk geser pin merah tepat ke atap rumah Anda.
                         </div>
                     </div>
                 </div>
@@ -577,6 +586,31 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
 
 </main>
 
+<!-- MODAL INTERACTIVE MAP PICKER (LEAFLET) -->
+<div id="map-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;padding:12px;">
+    <div style="background:#111c38;border:1px solid rgba(0,160,223,0.35);border-radius:14px;width:100%;max-width:640px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);display:flex;flex-direction:column;max-height:90vh;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0d162c;border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div style="font-weight:800;color:#fff;font-size:14px;display:flex;align-items:center;gap:6px;">
+                🗺️ Pilih Titik Lokasi Pemasangan di Peta
+            </div>
+            <button type="button" id="close-map-btn" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;line-height:1;padding:0 4px;">&times;</button>
+        </div>
+        <div style="padding:9px 14px;background:rgba(0,160,223,0.12);font-size:11.5px;color:#67e8f9;line-height:1.4;">
+            📌 <strong>Petunjuk:</strong> Geser pin merah atau ketuk pada peta untuk menentukan posisi rumah/gedung Anda.
+        </div>
+        <div id="leaflet-map-container" style="height:350px;width:100%;background:#0a1128;"></div>
+        <div style="padding:12px 16px;background:#0d162c;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="font-size:12px;color:#cbd5e1;">
+                Koordinat: <strong id="map-selected-coords" style="color:#38bdf8;font-family:monospace;font-size:12.5px;">-</strong>
+            </div>
+            <button type="button" id="use-map-coords-btn" class="btn-gps" style="background:linear-gradient(135deg, #005696, #00a0df);padding:9px 18px;font-size:13px;border-radius:8px;font-weight:700;">
+                ✅ Gunakan Titik Ini
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="<?= $baseUrl ?>/assets/js/main.js"></script>
 </body>
 </html>

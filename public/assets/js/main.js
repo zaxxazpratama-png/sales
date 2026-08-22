@@ -201,39 +201,171 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================================
-    // 4. GPS GEOLOCATION HELPER
+    // 4. GPS GEOLOCATION & INTERACTIVE MAP PICKER (LEAFLET)
     // ========================================================
-    const gpsBtn = document.getElementById('tikor-gps-btn');
-    const tikorInput = document.getElementById('tikor');
+    const gpsBtn        = document.getElementById('tikor-gps-btn');
+    const mapBtn        = document.getElementById('tikor-map-btn');
+    const tikorInput    = document.getElementById('tikor');
+    const mapModal      = document.getElementById('map-modal');
+    const closeMapBtn   = document.getElementById('close-map-btn');
+    const useCoordsBtn  = document.getElementById('use-map-coords-btn');
+    const coordsDisplay = document.getElementById('map-selected-coords');
 
+    let leafletMap      = null;
+    let leafletMarker   = null;
+    let currentMapLat   = 3.595196;
+    let currentMapLng   = 98.672223; // Default Medan
+
+    // ---- A. DETEKSI GPS OTOMATIS (SMART MOBILE FALLBACK) ----
     if (gpsBtn && tikorInput) {
         gpsBtn.addEventListener('click', () => {
             if (!navigator.geolocation) {
-                alert('Browser Anda tidak mendukung Geolocation.');
+                alert('Browser Anda tidak mendukung deteksi lokasi otomatis. Silakan gunakan tombol "Pilih di Peta".');
                 return;
             }
-            gpsBtn.textContent = '⏳ Mencari...';
+
+            gpsBtn.textContent = '⏳ Mencari GPS...';
             gpsBtn.disabled = true;
+
+            const applyCoords = (lat, lng) => {
+                const latFormatted = parseFloat(lat).toFixed(6);
+                const lngFormatted = parseFloat(lng).toFixed(6);
+                tikorInput.value = `${latFormatted}, ${lngFormatted}`;
+                currentMapLat = parseFloat(latFormatted);
+                currentMapLng = parseFloat(lngFormatted);
+                gpsBtn.textContent = '✅ GPS Ditemukan';
+                setTimeout(() => {
+                    gpsBtn.textContent = '📍 Deteksi GPS';
+                    gpsBtn.disabled = false;
+                }, 3000);
+            };
+
+            const handleGpsError = (err) => {
+                // Coba fallback dengan low accuracy jika high accuracy gagal/timeout
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        applyCoords(pos.coords.latitude, pos.coords.longitude);
+                    },
+                    err2 => {
+                        gpsBtn.textContent = '📍 Deteksi GPS';
+                        gpsBtn.disabled = false;
+                        
+                        let helpMsg = 'Gagal mendeteksi lokasi GPS otomatis.';
+                        if (err2.code === 1) {
+                            helpMsg = 'Izin lokasi ditolak. Silakan aktifkan izin lokasi/GPS pada pengaturan browser HP Anda.';
+                        } else if (err2.code === 2) {
+                            helpMsg = 'Lokasi tidak terdeteksi. Pastikan fitur GPS di HP Anda sudah aktif.';
+                        } else if (err2.code === 3) {
+                            helpMsg = 'Waktu pencarian GPS habis. Anda dapat menggunakan tombol "Pilih di Peta" untuk menentukan lokasi langsung.';
+                        }
+                        alert(helpMsg);
+                    },
+                    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+                );
+            };
 
             navigator.geolocation.getCurrentPosition(
                 pos => {
-                    const lat = pos.coords.latitude.toFixed(6);
-                    const lng = pos.coords.longitude.toFixed(6);
-                    tikorInput.value = `${lat}, ${lng}`;
-                    gpsBtn.textContent = '✅ Berhasil';
-                    setTimeout(() => {
-                        gpsBtn.textContent = '📍 GPS';
-                        gpsBtn.disabled = false;
-                    }, 2500);
+                    applyCoords(pos.coords.latitude, pos.coords.longitude);
                 },
-                err => {
-                    alert('Gagal mengambil lokasi GPS: ' + err.message);
-                    gpsBtn.textContent = '📍 GPS';
-                    gpsBtn.disabled = false;
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
+                handleGpsError,
+                { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
             );
         });
+    }
+
+    // ---- B. INTERACTIVE MAP PICKER MODAL (LEAFLET) ----
+    if (mapBtn && mapModal) {
+        mapBtn.addEventListener('click', () => {
+            // Periksa apakah input sudah ada koordinat
+            if (tikorInput && tikorInput.value) {
+                const parts = tikorInput.value.split(',');
+                if (parts.length === 2) {
+                    const pLat = parseFloat(parts[0].trim());
+                    const pLng = parseFloat(parts[1].trim());
+                    if (!isNaN(pLat) && !isNaN(pLng)) {
+                        currentMapLat = pLat;
+                        currentMapLng = pLng;
+                    }
+                }
+            }
+
+            mapModal.style.display = 'flex';
+
+            // Inisialisasi Peta Leaflet
+            setTimeout(() => {
+                if (!leafletMap && typeof L !== 'undefined') {
+                    leafletMap = L.map('leaflet-map-container').setView([currentMapLat, currentMapLng], 15);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(leafletMap);
+
+                    leafletMarker = L.marker([currentMapLat, currentMapLng], {
+                        draggable: true
+                    }).addTo(leafletMap);
+
+                    const updateCoordsFromMarker = (lat, lng) => {
+                        currentMapLat = parseFloat(lat).toFixed(6);
+                        currentMapLng = parseFloat(lng).toFixed(6);
+                        if (coordsDisplay) {
+                            coordsDisplay.textContent = `${currentMapLat}, ${currentMapLng}`;
+                        }
+                    };
+
+                    leafletMarker.on('dragend', (e) => {
+                        const pos = e.target.getLatLng();
+                        updateCoordsFromMarker(pos.lat, pos.lng);
+                    });
+
+                    leafletMap.on('click', (e) => {
+                        leafletMarker.setLatLng(e.latlng);
+                        updateCoordsFromMarker(e.latlng.lat, e.latlng.lng);
+                    });
+
+                    updateCoordsFromMarker(currentMapLat, currentMapLng);
+                } else if (leafletMap) {
+                    leafletMap.invalidateSize();
+                    leafletMap.setView([currentMapLat, currentMapLng], 15);
+                    if (leafletMarker) {
+                        leafletMarker.setLatLng([currentMapLat, currentMapLng]);
+                    }
+                    if (coordsDisplay) {
+                        coordsDisplay.textContent = `${parseFloat(currentMapLat).toFixed(6)}, ${parseFloat(currentMapLng).toFixed(6)}`;
+                    }
+                }
+            }, 200);
+        });
+
+        // Tutup Modal
+        if (closeMapBtn) {
+            closeMapBtn.addEventListener('click', () => {
+                mapModal.style.display = 'none';
+            });
+        }
+        mapModal.addEventListener('click', (e) => {
+            if (e.target === mapModal) {
+                mapModal.style.display = 'none';
+            }
+        });
+
+        // Gunakan Titik Koordinat dari Peta
+        if (useCoordsBtn && tikorInput) {
+            useCoordsBtn.addEventListener('click', () => {
+                const latStr = parseFloat(currentMapLat).toFixed(6);
+                const lngStr = parseFloat(currentMapLng).toFixed(6);
+                tikorInput.value = `${latStr}, ${lngStr}`;
+                mapModal.style.display = 'none';
+
+                if (gpsBtn) {
+                    gpsBtn.textContent = '✅ Titik Disimpan';
+                    setTimeout(() => {
+                        gpsBtn.textContent = '📍 Deteksi GPS';
+                    }, 2500);
+                }
+            });
+        }
     }
 
 
