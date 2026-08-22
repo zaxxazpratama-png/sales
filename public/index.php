@@ -68,6 +68,10 @@ if (!$activeSales || ($activeSales['status'] ?? 'active') !== 'active') {
 $settings = SettingsManager::get();
 $packages = $settings['packages'] ?? [];
 $selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
+
+$baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== false) 
+    ? '/ALATTEMPUR/FORMGOOGLE' 
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -76,7 +80,7 @@ $selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Formulir Pendaftaran Layanan CBN - Internet Fiber Cepat & TV Berlangganan. Registrasi resmi PT. Sinergi Emas Perdana.">
     <title>Formulir Pendaftaran Layanan CBN - <?= htmlspecialchars($salesName ? $salesName . ' (' . $salesCode . ')' : 'PT. SEP') ?></title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/style.css">
 </head>
 <body>
 
@@ -560,7 +564,7 @@ $selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
 
             <!-- ================= FOOTER SUBMIT ================= -->
             <div class="form-footer">
-                <a href="preview_cbn.php" target="_blank" class="btn-preview-live">
+                <a href="<?= $baseUrl ?>/preview_cbn.php" target="_blank" class="btn-preview-live">
                     Pratinjau Template Surat CBN
                 </a>
                 <button type="submit" id="submit-btn" class="btn-submit">
@@ -573,6 +577,6 @@ $selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
 
 </main>
 
-<script src="assets/js/main.js"></script>
+<script src="<?= $baseUrl ?>/assets/js/main.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 <?php
 /**
  * FORMGOOGLE - Root Router
- * Memproses direct access, railway, ngrok, clean URL path /KODE_SALES, dan rute Admin Dashboard
+ * Memproses direct access, railway, ngrok, clean URL path /KODE_SALES, dan static asset loader
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -17,6 +17,31 @@ if ($scriptName !== '/' && $scriptName !== '\\' && strpos($path, $scriptName) ==
     $path = substr($path, strlen($scriptName));
 }
 $path = trim($path, '/');
+
+// 0. Static Asset Loader (CSS, JS, Fonts, Images)
+if (preg_match('#^(public/)?assets/(.+)$#', $path, $matches)) {
+    $assetFile = __DIR__ . '/public/assets/' . $matches[2];
+    if (file_exists($assetFile)) {
+        $ext = strtolower(pathinfo($assetFile, PATHINFO_EXTENSION));
+        $mimes = [
+            'css'   => 'text/css; charset=UTF-8',
+            'js'    => 'application/javascript; charset=UTF-8',
+            'png'   => 'image/png',
+            'jpg'   => 'image/jpeg',
+            'jpeg'  => 'image/jpeg',
+            'gif'   => 'image/gif',
+            'svg'   => 'image/svg+xml',
+            'ico'   => 'image/x-icon',
+            'woff'  => 'font/woff',
+            'woff2' => 'font/woff2',
+            'ttf'   => 'font/ttf',
+        ];
+        header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
+        header('Cache-Control: public, max-age=86400');
+        readfile($assetFile);
+        exit;
+    }
+}
 
 // 1. Jika rute admin atau dashboard
 if ($path === 'admin' || strpos($path, 'admin/') === 0 || $path === 'dashboard.php' || $path === 'dashboard') {
