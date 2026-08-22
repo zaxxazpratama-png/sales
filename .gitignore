@@ -1,0 +1,21 @@
+# Dependencies
+/vendor/
+
+# Environment file (SENSITIVE)
+.env
+
+# Uploads & Logs
+/uploads/*
+!/uploads/.gitkeep
+/logs/*
+!/logs/.gitkeep
+
+# Credentials & Sensitive JSON
+/credentials/*.json
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log

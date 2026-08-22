@@ -1,0 +1,102 @@
+[
+    {
+        "id": "1",
+        "sales_code": "SEP-001",
+        "nama_sales": "Puja Pangestu",
+        "no_wa": "081265753141",
+        "email": "puja.pangestu@gmail.com",
+        "tl_code": "TL-MEDAN-01",
+        "status": "active",
+        "created_at": "2026-08-20 10:00:00"
+    },
+    {
+        "id": "2",
+        "sales_code": "SEP-002",
+        "nama_sales": "Budi Santoso",
+        "no_wa": "081234567801",
+        "email": "budi.santoso@gmail.com",
+        "tl_code": "TL-MEDAN-01",
+        "status": "active",
+        "created_at": "2026-08-20 10:30:00"
+    },
+    {
+        "id": "3",
+        "sales_code": "SEP-003",
+        "nama_sales": "Dimas Pratama",
+        "no_wa": "081234567802",
+        "email": "dimas.pratama@gmail.com",
+        "tl_code": "TL-MEDAN-01",
+        "status": "active",
+        "created_at": "2026-08-20 11:00:00"
+    },
+    {
+        "id": "4",
+        "sales_code": "SEP-004",
+        "nama_sales": "Rian Hidayat",
+        "no_wa": "081234567803",
+        "email": "rian.hidayat@gmail.com",
+        "tl_code": "TL-MEDAN-02",
+        "status": "active",
+        "created_at": "2026-08-20 11:30:00"
+    },
+    {
+        "id": "5",
+        "sales_code": "SEP-005",
+        "nama_sales": "Siti Rahma",
+        "no_wa": "081234567804",
+        "email": "siti.rahma@gmail.com",
+        "tl_code": "TL-MEDAN-02",
+        "status": "active",
+        "created_at": "2026-08-20 12:00:00"
+    },
+    {
+        "id": "6",
+        "sales_code": "SEP-006",
+        "nama_sales": "Andi Wijaya",
+        "no_wa": "081234567805",
+        "email": "andi.wijaya@gmail.com",
+        "tl_code": "TL-MEDAN-02",
+        "status": "active",
+        "created_at": "2026-08-20 12:30:00"
+    },
+    {
+        "id": "7",
+        "sales_code": "SEP-007",
+        "nama_sales": "Dewi Lestari",
+        "no_wa": "081234567806",
+        "email": "dewi.lestari@gmail.com",
+        "tl_code": "TL-MEDAN-03",
+        "status": "active",
+        "created_at": "2026-08-20 13:00:00"
+    },
+    {
+        "id": "8",
+        "sales_code": "SEP-008",
+        "nama_sales": "Fajar Ramadhan",
+        "no_wa": "081234567807",
+        "email": "fajar.ramadhan@gmail.com",
+        "tl_code": "TL-MEDAN-03",
+        "status": "active",
+        "created_at": "2026-08-20 13:30:00"
+    },
+    {
+        "id": "9",
+        "sales_code": "SEP-009",
+        "nama_sales": "Eko Prasetyo",
+        "no_wa": "081234567808",
+        "email": "eko.prasetyo@gmail.com",
+        "tl_code": "TL-MEDAN-03",
+        "status": "active",
+        "created_at": "2026-08-20 14:00:00"
+    },
+    {
+        "id": "10",
+        "sales_code": "SEP-010",
+        "nama_sales": "Mega Putri",
+        "no_wa": "081234567809",
+        "email": "mega.putri@gmail.com",
+        "tl_code": "TL-MEDAN-03",
+        "status": "active",
+        "created_at": "2026-08-20 14:30:00"
+    }
+]

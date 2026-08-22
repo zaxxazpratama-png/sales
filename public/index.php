@@ -1,0 +1,578 @@
+<?php
+/**
+ * FORMGOOGLE - Formulir Pendaftaran Layanan CBN
+ * PT. Sinergi Emas Perdana
+ * 
+ * Otomatisasi Input Form -> Simpan ke Spreadsheet -> Generate PDF Formulir Resmi CBN -> Kirim ke Email
+ */
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+use App\SalesManager;
+use App\SettingsManager;
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$success = $_SESSION['success'] ?? null;
+$errors  = $_SESSION['errors']  ?? [];
+$old     = $_SESSION['old']     ?? [];
+unset($_SESSION['success'], $_SESSION['errors'], $_SESSION['old']);
+
+// Generate CSRF token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// 1. Cek parameter Sales dari URL
+$paramSales = trim($_GET['sales'] ?? $_GET['s'] ?? $_GET['code'] ?? '');
+
+// 2. Jika ada di URL, cari dan simpan ke Session
+if (!empty($paramSales) && $paramSales !== 'index.php') {
+    $foundSales = SalesManager::findByCode($paramSales);
+    if ($foundSales) {
+        $_SESSION['sales_code']   = $foundSales['sales_code'];
+        $_SESSION['active_sales'] = $foundSales;
+    } else {
+        $_SESSION['sales_code']   = strtoupper($paramSales);
+        $_SESSION['active_sales'] = null;
+    }
+}
+
+// 3. Ambil dari Session jika tidak ada di URL (persistent saat refresh / kembali ke form)
+$salesCode   = $_SESSION['sales_code']   ?? ($old['sales_code'] ?? '');
+$activeSales = $_SESSION['active_sales'] ?? null;
+$salesName   = '';
+$tlCode      = 'TL-MEDAN-01';
+
+if ($activeSales) {
+    $salesCode = $activeSales['sales_code'];
+    $salesName = $activeSales['nama_sales'];
+    $tlCode    = $activeSales['tl_code'] ?: 'TL-MEDAN-01';
+} elseif (!empty($salesCode)) {
+    $found = SalesManager::findByCode($salesCode);
+    if ($found) {
+        $activeSales = $found;
+        $_SESSION['active_sales'] = $found;
+        $salesName   = $found['nama_sales'];
+        $tlCode      = $found['tl_code'] ?: 'TL-MEDAN-01';
+    }
+}
+
+// JIKA TIDAK ADA SALES CODE ATAU KODE TIDAK VALID -> TAMPILKAN 404 NOT FOUND
+if (!$activeSales || ($activeSales['status'] ?? 'active') !== 'active') {
+    require __DIR__ . '/404.php';
+    exit;
+}
+
+// Ambil paket dan pengaturan dinamis
+$settings = SettingsManager::get();
+$packages = $settings['packages'] ?? [];
+$selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Formulir Pendaftaran Layanan CBN - Internet Fiber Cepat & TV Berlangganan. Registrasi resmi PT. Sinergi Emas Perdana.">
+    <title>Formulir Pendaftaran Layanan CBN - <?= htmlspecialchars($salesName ? $salesName . ' (' . $salesCode . ')' : 'PT. SEP') ?></title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<!-- ============ HEADER ============ -->
+<header class="site-header">
+    <div class="header-inner">
+        <div class="logo-wrap">
+            <div class="cbn-brand-logo">cbn<span>.</span></div>
+            <div class="header-title">
+                <h1><?= htmlspecialchars($settings['app_title'] ?? 'FORMULIR PENDAFTARAN LAYANAN CBN') ?></h1>
+                <p><?= htmlspecialchars($settings['app_subtitle'] ?? 'CBN Service Application Form • Mitra Resmi: PT. Sinergi Emas Perdana') ?></p>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="preview_cbn.php" target="_blank" class="btn-preview-live" style="padding:7px 14px;font-size:12px;">
+                Contoh Surat
+            </a>
+            <div class="badge-callcenter">
+                <span>Call Center: <?= htmlspecialchars($settings['call_center'] ?? '1500 780') ?></span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ============ MAIN WRAPPER ============ -->
+<main class="main-wrapper">
+
+    <!-- Banner Verifikasi Sales Khusus (Persistent & Terkunci) -->
+    <?php if ($activeSales): ?>
+    <div style="background: linear-gradient(135deg, rgba(0, 86, 150, 0.35), rgba(0, 160, 223, 0.2)); border: 1px solid rgba(0, 160, 223, 0.45); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 15px rgba(0, 160, 223, 0.2);">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div style="background: #00a0df; color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0;">SLS</div>
+            <div>
+                <div style="font-size: 14px; font-weight: 800; color: #fff;">
+                    Pendaftaran Resmi Melalui Sales: <?= htmlspecialchars($activeSales['nama_sales']) ?>
+                </div>
+                <div style="font-size: 12px; color: #cbd5e1;">
+                    Kode Sales: <strong style="color: #67e8f9;"><?= htmlspecialchars($activeSales['sales_code']) ?></strong> 
+                    <?php if (!empty($activeSales['no_wa'])): ?>
+                        &bull; WhatsApp: <a href="https://wa.me/<?= preg_replace('/\D/', '', $activeSales['no_wa']) ?>" target="_blank" style="color:#67e8f9;text-decoration:underline;"><?= htmlspecialchars($activeSales['no_wa']) ?></a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <span style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 20px; letter-spacing: 0.5px;">VERIFIED SALES</span>
+    </div>
+    <?php endif; ?>
+
+    <!-- Alert Notifikasi Sukses / Error -->
+    <?php if ($success): ?>
+    <div class="alert alert-success" role="alert" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); padding: 18px 22px; border-radius: 12px; display: flex; gap: 14px; align-items: flex-start; margin-bottom: 24px;">
+        <div style="background: #10b981; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">V</div>
+        <div>
+            <strong style="font-size: 15px; color: #fff; display: block; margin-bottom: 4px;">Pendaftaran Berhasil Dikirim!</strong>
+            <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.6; margin: 0;">
+                Terima kasih <strong><?= htmlspecialchars(is_array($success) ? ($success['nama'] ?? 'Pelanggan') : $success) ?></strong>, data pendaftaran Anda telah berhasil kami terima. 
+                Salinan resmi formulir pendaftaran berformat PDF telah dikirimkan ke email Anda 
+                <?php if (is_array($success) && !empty($success['email'])): ?>
+                    (<strong><?= htmlspecialchars($success['email']) ?></strong>).
+                <?php else: ?>
+                    .
+                <?php endif; ?>
+                Tim teknisi kami akan segera menghubungi Anda untuk konfirmasi jadwal pemasangan.
+            </p>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($errors)): ?>
+    <div class="alert alert-error" role="alert">
+        <span class="alert-icon">[!]</span>
+        <div>
+            <strong>Mohon lengkapi dan perbaiki data berikut:</strong>
+            <ul style="margin-top:4px;padding-left:18px;">
+                <?php foreach ($errors as $msg): ?>
+                    <li><?= htmlspecialchars(is_array($msg) ? implode(', ', $msg) : $msg) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- FORM CARD -->
+    <div class="form-card">
+
+        <!-- Progress Indicator -->
+        <div class="form-progress">
+            <div class="progress-step active">
+                <div class="progress-dot">1</div>
+                <span class="progress-label">Data Pelanggan</span>
+            </div>
+            <div class="progress-line"></div>
+            <div class="progress-step active">
+                <div class="progress-dot">2</div>
+                <span class="progress-label">Alamat Pemasangan</span>
+            </div>
+            <div class="progress-line"></div>
+            <div class="progress-step active">
+                <div class="progress-dot">3</div>
+                <span class="progress-label">Paket & Add-On</span>
+            </div>
+            <div class="progress-line"></div>
+            <div class="progress-step active">
+                <div class="progress-dot">4</div>
+                <span class="progress-label">Jadwal & TTD</span>
+            </div>
+        </div>
+
+        <form id="cbn-form" method="POST" action="submit.php" enctype="multipart/form-data" novalidate>
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+
+            <!-- Field SO & Hidden Values -->
+            <input type="hidden" name="vendor"          value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA') ?>">
+            <input type="hidden" name="so_date"         value="<?= date('d/m/Y') ?>">
+            <input type="hidden" name="tl_code"         value="<?= htmlspecialchars($tlCode) ?>">
+            <input type="hidden" name="ae_name"         value="<?= htmlspecialchars($salesName ?: $salesCode) ?>">
+            <input type="hidden" name="home_id"         value="PENDING">
+            <input type="hidden" id="service"           name="service" value="<?= htmlspecialchars($selectedService) ?>">
+            <input type="hidden" id="signature_data"    name="signature_data" value="">
+            <input type="hidden" id="biaya_pasang"      name="biaya_pasang" value="Rp 0 (Promo Gratis)">
+            <input type="hidden" id="biaya_paket"       name="biaya_paket" value="Rp 299.000">
+            <input type="hidden" id="biaya_addon"       name="biaya_addon" value="Rp 0">
+            <input type="hidden" id="biaya_ppn"         name="biaya_ppn" value="Rp 32.890">
+            <input type="hidden" id="biaya_total"       name="biaya_total" value="Rp 331.890">
+
+            <!-- ================= SEKSI 1: DATA PELANGGAN ================= -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-icon">1</div>
+                    <div>
+                        <div class="section-title">1. DATA PELANGGAN / CUSTOMER DATA</div>
+                        <div class="section-subtitle">Isi data pemohon sesuai kartu identitas resmi (KTP / Paspor)</div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Sales Code (Terkunci & Persistent) -->
+                    <div class="form-group">
+                        <label class="form-label" for="sales_code">Sales Code (Kode Sales)</label>
+                        <input type="text" id="sales_code" name="sales_code" class="form-input"
+                            placeholder="Contoh: SEP-001"
+                            value="<?= htmlspecialchars($salesCode) ?>"
+                            <?= $activeSales ? 'readonly style="background:rgba(0,160,223,0.1);border-color:#00a0df;font-weight:bold;color:#67e8f9;"' : '' ?>>
+                    </div>
+
+                    <!-- Nama Lengkap -->
+                    <div class="form-group">
+                        <label class="form-label" for="nama_pelanggan">Nama Lengkap Pelanggan <span class="req">*</span></label>
+                        <input type="text" id="nama_pelanggan" name="nama_pelanggan"
+                            class="form-input <?= isset($errors['nama_pelanggan']) ? 'error' : '' ?>"
+                            placeholder="Sesuai KTP"
+                            value="<?= htmlspecialchars($old['nama_pelanggan'] ?? '') ?>"
+                            required autocomplete="name">
+                    </div>
+
+                    <!-- TTL -->
+                    <div class="form-group">
+                        <label class="form-label" for="ttl">Tempat / Tanggal Lahir <span class="req">*</span></label>
+                        <input type="text" id="ttl" name="ttl"
+                            class="form-input <?= isset($errors['ttl']) ? 'error' : '' ?>"
+                            placeholder="Contoh: Jakarta, 15/08/1990"
+                            value="<?= htmlspecialchars($old['ttl'] ?? '') ?>"
+                            required>
+                    </div>
+
+                    <!-- Nomor KTP -->
+                    <div class="form-group">
+                        <label class="form-label" for="nomor_ktp">Nomor Identitas (KTP 16 Digit) <span class="req">*</span></label>
+                        <input type="text" id="nomor_ktp" name="nomor_ktp"
+                            class="form-input <?= isset($errors['nomor_ktp']) ? 'error' : '' ?>"
+                            placeholder="16 digit angka KTP"
+                            value="<?= htmlspecialchars($old['nomor_ktp'] ?? '') ?>"
+                            maxlength="16" inputmode="numeric" required>
+                        <span id="ktp-count" class="char-count">0/16</span>
+                    </div>
+
+                    <!-- Jenis Kelamin -->
+                    <div class="form-group">
+                        <label class="form-label">Jenis Kelamin (Gender) <span class="req">*</span></label>
+                        <div class="radio-group">
+                            <div class="radio-card">
+                                <input type="radio" id="gender-pria" name="jenis_kelamin" value="PRIA"
+                                    <?= ($old['jenis_kelamin'] ?? 'PRIA') === 'PRIA' ? 'checked' : '' ?> required>
+                                <label class="radio-label-card" for="gender-pria">Pria (Male)</label>
+                            </div>
+                            <div class="radio-card">
+                                <input type="radio" id="gender-wanita" name="jenis_kelamin" value="WANITA"
+                                    <?= ($old['jenis_kelamin'] ?? '') === 'WANITA' ? 'checked' : '' ?>>
+                                <label class="radio-label-card" for="gender-wanita">Wanita (Female)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Telepon Seluler -->
+                    <div class="form-group">
+                        <label class="form-label" for="telp">No. Telepon Seluler / WhatsApp <span class="req">*</span></label>
+                        <input type="tel" id="telp" name="telp"
+                            class="form-input <?= isset($errors['telp']) ? 'error' : '' ?>"
+                            placeholder="08xxxxxxxxxx"
+                            value="<?= htmlspecialchars($old['telp'] ?? '') ?>"
+                            required inputmode="tel">
+                    </div>
+
+                    <!-- Telepon Rumah -->
+                    <div class="form-group">
+                        <label class="form-label" for="telp_rumah">Telepon Rumah (Home Phone) <em style="color:#94a3b8;font-weight:normal;">(opsional)</em></label>
+                        <input type="tel" id="telp_rumah" name="telp_rumah" class="form-input"
+                            placeholder="Contoh: 0217654321"
+                            value="<?= htmlspecialchars($old['telp_rumah'] ?? '') ?>">
+                    </div>
+
+                    <!-- Email -->
+                    <div class="form-group">
+                        <label class="form-label" for="email_pelanggan">Alamat Email Pelanggan <span class="req">*</span></label>
+                        <input type="email" id="email_pelanggan" name="email_pelanggan"
+                            class="form-input <?= isset($errors['email_pelanggan']) ? 'error' : '' ?>"
+                            placeholder="nama@gmail.com (Salinan surat CBN akan dikirim ke sini)"
+                            value="<?= htmlspecialchars($old['email_pelanggan'] ?? '') ?>"
+                            required inputmode="email">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SEKSI 2: ALAMAT PEMASANGAN ================= -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-icon">2</div>
+                    <div>
+                        <div class="section-title">2. ALAMAT PEMASANGAN / INSTALLATION ADDRESS</div>
+                        <div class="section-subtitle">Lokasi instalasi kabel fiber dan perangkat CBN</div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Alamat Lengkap -->
+                    <div class="form-group col-full">
+                        <label class="form-label" for="alamat">Alamat Lengkap Rumah / Gedung <span class="req">*</span></label>
+                        <input type="text" id="alamat" name="alamat"
+                            class="form-input <?= isset($errors['alamat']) ? 'error' : '' ?>"
+                            placeholder="Nama Jalan, Blok, Nomor Rumah, Patokan Lokasi"
+                            value="<?= htmlspecialchars($old['alamat'] ?? '') ?>"
+                            required>
+                    </div>
+
+                    <!-- RT / RW -->
+                    <div class="form-group">
+                        <label class="form-label">RT & RW</label>
+                        <div style="display:flex;gap:10px;">
+                            <input type="text" name="rt" class="form-input" placeholder="RT (005)" style="flex:1;"
+                                value="<?= htmlspecialchars($old['rt'] ?? '') ?>">
+                            <input type="text" name="rw" class="form-input" placeholder="RW (008)" style="flex:1;"
+                                value="<?= htmlspecialchars($old['rw'] ?? '') ?>">
+                        </div>
+                    </div>
+
+                    <!-- Kode Pos -->
+                    <div class="form-group">
+                        <label class="form-label" for="kode_pos">Kode Pos (Zip Code) <span class="req">*</span></label>
+                        <input type="text" id="kode_pos" name="kode_pos"
+                            class="form-input <?= isset($errors['kode_pos']) ? 'error' : '' ?>"
+                            placeholder="Contoh: 10510"
+                            value="<?= htmlspecialchars($old['kode_pos'] ?? '') ?>"
+                            maxlength="6" inputmode="numeric" required>
+                    </div>
+
+                    <!-- Kelurahan & Kecamatan -->
+                    <div class="form-group">
+                        <label class="form-label" for="kelurahan">Kelurahan / Desa</label>
+                        <input type="text" id="kelurahan" name="kelurahan" class="form-input"
+                            placeholder="Nama kelurahan"
+                            value="<?= htmlspecialchars($old['kelurahan'] ?? '') ?>">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="kecamatan">Kecamatan</label>
+                        <input type="text" id="kecamatan" name="kecamatan" class="form-input"
+                            placeholder="Nama kecamatan"
+                            value="<?= htmlspecialchars($old['kecamatan'] ?? '') ?>">
+                    </div>
+
+                    <!-- Status Kepemilikan -->
+                    <div class="form-group">
+                        <label class="form-label">Status Kepemilikan (Ownership Status) <span class="req">*</span></label>
+                        <div class="radio-group">
+                            <div class="radio-card">
+                                <input type="radio" id="own-pemilik" name="status_kepemilikan" value="PEMILIK"
+                                    <?= ($old['status_kepemilikan'] ?? 'PEMILIK') === 'PEMILIK' ? 'checked' : '' ?>>
+                                <label class="radio-label-card" for="own-pemilik">Pemilik (Owner)</label>
+                            </div>
+                            <div class="radio-card">
+                                <input type="radio" id="own-penyewa" name="status_kepemilikan" value="PENYEWA"
+                                    <?= ($old['status_kepemilikan'] ?? '') === 'PENYEWA' ? 'checked' : '' ?>>
+                                <label class="radio-label-card" for="own-penyewa">Penyewa (Renter)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Titik Koordinat GPS -->
+                    <div class="form-group">
+                        <label class="form-label" for="tikor">Titik Koordinat GPS (Opsional)</label>
+                        <div class="input-with-btn">
+                            <input type="text" id="tikor" name="tikor" class="form-input"
+                                placeholder="Klik tombol GPS"
+                                value="<?= htmlspecialchars($old['tikor'] ?? '') ?>">
+                            <button type="button" id="tikor-gps-btn" class="btn-gps">Deteksi GPS</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SEKSI 3: PILIHAN PAKET & ADD-ON ================= -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-icon">3</div>
+                    <div>
+                        <div class="section-title">3. PILIHAN PAKET LAYANAN & ADD-ON CBN</div>
+                        <div class="section-subtitle">Pilih kecepatan internet fiber dan opsi hiburan TV</div>
+                    </div>
+                </div>
+
+                <!-- Paket Cards (Dinamis dari Dashboard Settings) -->
+                <label class="form-label">Pilih Paket Internet Fiber <span class="req">*</span></label>
+                <div class="package-grid">
+                    <?php foreach ($packages as $pkg): 
+                        if (empty($pkg['active'])) continue;
+                        $isSelected = ($selectedService === $pkg['name']);
+                    ?>
+                    <div class="package-card <?= $isSelected ? 'selected' : '' ?>" data-package="<?= htmlspecialchars($pkg['name']) ?>">
+                        <?php if (!empty($pkg['badge'])): ?>
+                            <span class="package-badge" style="background:<?= htmlspecialchars($pkg['badge_color'] ?: '#005696') ?>;"><?= htmlspecialchars($pkg['badge']) ?></span>
+                        <?php endif; ?>
+                        <div class="package-name"><?= htmlspecialchars($pkg['name']) ?></div>
+                        <div class="package-speed"><?= htmlspecialchars($pkg['speed']) ?></div>
+                        <div class="package-price">Rp <?= number_format($pkg['price'], 0, ',', '.') ?> <span class="package-period">/ bln</span></div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="grid-2" style="margin-top:22px;">
+                    <!-- Add-on TV -->
+                    <div class="form-group">
+                        <label class="form-label">Paket Add-On TV & Hiburan</label>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <label class="checkbox-label-card" style="justify-content:flex-start;">
+                                <input type="checkbox" name="addon_tv[]" value="Dens TV+ Apps" class="addon-tv-check">
+                                Dens TV+ Apps (+Rp 30.000/bln)
+                            </label>
+                            <label class="checkbox-label-card" style="justify-content:flex-start;">
+                                <input type="checkbox" name="addon_tv[]" value="Vision - Premium Sports" class="addon-tv-check">
+                                Vision - Premium Sports (+Rp 40.000/bln)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Perangkat Tambahan -->
+                    <div class="form-group">
+                        <label class="form-label">Perangkat Tambahan (Additional Devices)</label>
+                        <div style="display:flex;gap:12px;">
+                            <div style="flex:1;">
+                                <label style="font-size:11.5px;color:#94a3b8;">Wireless Router (Unit)</label>
+                                <input type="number" name="router_qty" class="form-input" value="1" min="1" max="5">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:11.5px;color:#94a3b8;">Smartbox Android TV (+Rp 35rb)</label>
+                                <input type="number" id="smartbox_qty" name="smartbox_qty" class="form-input" value="0" min="0" max="5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aktivasi Username CBN -->
+                    <div class="form-group col-full">
+                        <label class="form-label" for="username_cbn">Pilihan Akun Email CBN (Service Activation)</label>
+                        <div class="input-with-btn">
+                            <input type="text" id="username_cbn" name="username_cbn" class="form-input"
+                                placeholder="nama.pengguna"
+                                value="<?= htmlspecialchars($old['username_cbn'] ?? '') ?>">
+                            <span style="display:flex;align-items:center;padding:0 12px;background:rgba(255,255,255,0.08);border-radius:8px;font-weight:700;color:var(--cbn-cyan);font-size:13px;">
+                                @ cbn.net.id
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rincian Biaya Real-time -->
+                <div class="pricing-summary-card">
+                    <div style="font-size:13.5px;font-weight:700;color:#fff;margin-bottom:8px;border-bottom:1px solid var(--border-color);padding-bottom:6px;">
+                        Estimasi Perincian Biaya / Payment Details
+                    </div>
+                    <div class="pricing-summary-row">
+                        <span>Biaya Pemasangan / Instalasi</span>
+                        <span style="color:#10b981;font-weight:700;">Rp 0 (Promo Gratis)</span>
+                    </div>
+                    <div class="pricing-summary-row">
+                        <span>Biaya Paket Internet Bulanan</span>
+                        <span id="summary-biaya-paket">Rp 299.000</span>
+                    </div>
+                    <div class="pricing-summary-row">
+                        <span>Biaya Layanan Tambahan (Add-On / Device)</span>
+                        <span id="summary-biaya-addon">Rp 0</span>
+                    </div>
+                    <div class="pricing-summary-row">
+                        <span>PPN 11%</span>
+                        <span id="summary-biaya-ppn">Rp 32.890</span>
+                    </div>
+                    <div class="pricing-summary-row total-row">
+                        <span>ESTIMASI TOTAL BULAN PERTAMA</span>
+                        <span id="summary-biaya-total">Rp 331.890</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= SEKSI 4: JADWAL, UPLOAD & TTD ================= -->
+            <div class="form-section">
+                <div class="section-header">
+                    <div class="section-icon">4</div>
+                    <div>
+                        <div class="section-title">4. JADWAL PEMASANGAN & TANDA TANGAN DIGITAL</div>
+                        <div class="section-subtitle">Tentukan waktu instalasi dan bubuhkan tanda tangan pemohon</div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <!-- Jadwal Tanggal -->
+                    <div class="form-group">
+                        <label class="form-label" for="jadwal_tanggal">Rencana Tanggal Pemasangan <span class="req">*</span></label>
+                        <input type="date" id="jadwal_tanggal" name="jadwal_tanggal" class="form-input"
+                            value="<?= htmlspecialchars($old['jadwal_tanggal'] ?? date('Y-m-d', strtotime('+2 days'))) ?>"
+                            required>
+                    </div>
+
+                    <!-- Slot Waktu -->
+                    <div class="form-group">
+                        <label class="form-label" for="jadwal_waktu">Pilihan Slot Waktu Teknisi <span class="req">*</span></label>
+                        <select id="jadwal_waktu" name="jadwal_waktu" class="form-select" required>
+                            <option value="09.00-11.00">09.00 - 11.00 WIB (Pagi)</option>
+                            <option value="11.00-13.00">11.00 - 13.00 WIB (Siang)</option>
+                            <option value="13.00-15.00">13.00 - 15.00 WIB (Siang/Sore)</option>
+                            <option value="15.00-17.00">15.00 - 17.00 WIB (Sore)</option>
+                        </select>
+                    </div>
+
+                    <!-- Catatan Tambahan -->
+                    <div class="form-group col-full">
+                        <label class="form-label" for="catatan">Catatan Lokasi / Permintaan Khusus</label>
+                        <textarea id="catatan" name="catatan" class="form-textarea"
+                            placeholder="Misal: Pagar hitam depan pos satpam, hubungi 30 menit sebelum tiba..."
+                            maxlength="400"><?= htmlspecialchars($old['catatan'] ?? '') ?></textarea>
+                    </div>
+
+                    <!-- Upload Foto KTP -->
+                    <div class="form-group col-full">
+                        <label class="form-label">Upload Foto KTP / Dokumen Identitas <em style="color:#94a3b8;font-weight:normal;">(opsional)</em></label>
+                        <div class="file-drop">
+                            <input type="file" id="sales_order_file" name="sales_order_file" accept=".jpg,.jpeg,.png,.pdf">
+                            <div class="file-drop-icon">[FILE]</div>
+                            <div class="file-drop-text"><strong>Klik untuk pilih foto KTP</strong> atau seret file ke sini</div>
+                            <div class="file-drop-hint">Format: JPG, PNG, PDF &bull; Maks. 8MB</div>
+                        </div>
+                        <div id="file-preview" class="file-preview">
+                            <span id="file-name" class="file-preview-name">foto_ktp.jpg</span>
+                            <button type="button" id="file-remove" class="file-preview-remove">[X]</button>
+                        </div>
+                    </div>
+
+                    <!-- Tanda Tangan Digital Canvas Pad -->
+                    <div class="form-group col-full">
+                        <label class="form-label">Tanda Tangan Digital Pelanggan (Goreskan di dalam kotak)</label>
+                        <div class="signature-box">
+                            <canvas id="signature-canvas"></canvas>
+                            <div id="sign-placeholder" class="signature-placeholder">
+                                <span>Sentuh / gambar tanda tangan di sini</span>
+                            </div>
+                        </div>
+                        <div class="signature-controls">
+                            <span style="font-size:11px;color:#94a3b8;">Tanda tangan akan langsung tertera di Surat Formulir CBN PDF.</span>
+                            <button type="button" id="btn-clear-sign" class="btn-sign-clear">Hapus / Ulangi TTD</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= FOOTER SUBMIT ================= -->
+            <div class="form-footer">
+                <a href="preview_cbn.php" target="_blank" class="btn-preview-live">
+                    Pratinjau Template Surat CBN
+                </a>
+                <button type="submit" id="submit-btn" class="btn-submit">
+                    <span class="spinner"></span>
+                    <span class="btn-text">Kirim Formulir & Buat Dokumen CBN (PDF)</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+</main>
+
+<script src="assets/js/main.js"></script>
+</body>
+</html>

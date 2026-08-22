@@ -1,0 +1,29 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /ALATTEMPUR/FORMGOOGLE/
+
+    # Allow direct access to existing files/dirs
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Admin routes
+    RewriteRule ^admin/?$ public/admin/index.php [L]
+    RewriteRule ^admin/(.*)$ public/admin/$1 [L]
+
+    # Public static assets
+    RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+
+    # Specific PHP endpoints
+    RewriteRule ^submit\.php$ public/submit.php [L]
+    RewriteRule ^preview_cbn\.php$ public/preview_cbn.php [L]
+
+    # /s/KODE_SALES -> public/index.php?sales=KODE_SALES
+    RewriteRule ^s/([a-zA-Z0-9_\-]+)/?$ public/index.php?sales=$1 [QSA,L]
+
+    # /KODE_SALES (e.g. /SEP-001, /SEP-002) -> public/index.php?sales=KODE_SALES
+    RewriteRule ^([a-zA-Z0-9_\-]+)/?$ public/index.php?sales=$1 [QSA,L]
+
+    # Fallback to public/index.php
+    RewriteRule ^$ public/index.php [L]
+</IfModule>

@@ -1,0 +1,95 @@
+{
+    "company_name": "PT. SINERGI EMAS PERDANA",
+    "app_title": "FORMULIR PENDAFTARAN LAYANAN CBN",
+    "app_subtitle": "CBN Service Application Form • Mitra Resmi: PT. Sinergi Emas Perdana",
+    "call_center": "1500 780",
+    "wa_helpdesk": "+6287729154041",
+    "admin_email": "pujapangestu02@gmail.com",
+    "apps_script_url": "https:\/\/script.google.com\/macros\/s\/AKfycbwYoseyog6kineKtkyZ6wu6xXXilNiOhuqwwKcl6va_YImUy2wIYOpZvTjEepy_VATq\/exec",
+    "spreadsheet_id": "1cXeq5CkL4QqhsOnAg7bvV7JQvz5gxXnXE1H1JwF9PmQ",
+    "drive_folder_id": "12q5pLGP9og9rcfVs_CKwKhTxfufvsN1A",
+    "admin_username": "admin",
+    "admin_password": "admin",
+    "packages": [
+        {
+            "id": "f50",
+            "name": "Fiber 50",
+            "speed": "Speed up to 50 Mbps",
+            "price": 299000,
+            "badge": "POPULAR",
+            "badge_color": "#005696",
+            "active": true
+        },
+        {
+            "id": "f100",
+            "name": "Fiber 100",
+            "speed": "Speed up to 100 Mbps",
+            "price": 399000,
+            "badge": "BEST VALUE",
+            "badge_color": "#00a0df",
+            "active": true
+        },
+        {
+            "id": "f200",
+            "name": "Fiber 200",
+            "speed": "Speed up to 200 Mbps",
+            "price": 599000,
+            "badge": "",
+            "badge_color": "",
+            "active": true
+        },
+        {
+            "id": "f250",
+            "name": "Fiber 250",
+            "speed": "Speed up to 250 Mbps",
+            "price": 799000,
+            "badge": "",
+            "badge_color": "",
+            "active": true
+        },
+        {
+            "id": "f1g",
+            "name": "Fiber 1Gbps",
+            "speed": "Speed up to 1.000 Mbps",
+            "price": 1499000,
+            "badge": "ULTRA",
+            "badge_color": "#8b5cf6",
+            "active": true
+        },
+        {
+            "id": "pro100",
+            "name": "Fiber PRO 100",
+            "speed": "Simetris 100 Mbps (1:1)",
+            "price": 699000,
+            "badge": "PRO 1:1",
+            "badge_color": "#0284c7",
+            "active": true
+        },
+        {
+            "id": "pro200",
+            "name": "Fiber PRO 200",
+            "speed": "Simetris 200 Mbps (1:1)",
+            "price": 999000,
+            "badge": "PRO 1:1",
+            "badge_color": "#0284c7",
+            "active": true
+        }
+    ],
+    "addons": {
+        "tv_dens": {
+            "name": "Dens TV+ Apps",
+            "price": 30000,
+            "active": true
+        },
+        "tv_vision": {
+            "name": "Vision - Premium Sports",
+            "price": 40000,
+            "active": true
+        },
+        "device_smartbox": {
+            "name": "Smartbox Android TV",
+            "price": 35000,
+            "active": true
+        }
+    }
+}
