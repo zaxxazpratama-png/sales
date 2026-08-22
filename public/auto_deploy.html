@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Apps Script Auto Deployer</title>
+<style>
+body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+#log { background: #000; color: #0f0; padding: 10px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<h2>🚀 Apps Script Auto Deployer</h2>
+<div id="log">Starting...</div>
+<script>
+const SCRIPT_ID = '1MkIYWQ_0mrKaQSRxh5kcxKBrM6JNbjziKBEsZ7O8t0G3Y4Q8_7Q';
+const log = (msg) => {
+  const d = document.getElementById('log');
+  d.innerHTML += '<br>' + msg;
+  d.scrollTop = d.scrollHeight;
+  console.log(msg);
+};
+
+async function run() {
+  try {
+    // 1. Ambil kode dari server lokal
+    log('📥 Mengambil kode Code.gs terbaru...');
+    const resp = await fetch('/ALATTEMPUR/FORMGOOGLE/public/assets/code_payload.txt');
+    const b64 = await resp.text();
+    const code = atob(b64.trim());
+    log(`✅ Kode diambil: ${code.length} bytes`);
+    log(`   function box(): ${code.includes('function box(') ? 'ADA ✓' : 'TIDAK ADA ✗'}`);
+    
+    // 2. Ambil access token dari Google via endpoint khusus
+    log('🔑 Mengambil Google access token...');
+    
+    // Coba ambil token dari gsi (Google Sign In) yang sudah ada di browser
+    let token = null;
+    
+    // Method A: Coba via fetch ke Google OAuth token endpoint dengan cookie yang ada
+    try {
+      const tokenResp = await fetch('https://accounts.google.com/o/oauth2/token', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'grant_type=urn:ietf:params:oauth:grant-type:device_code'
+      });
+      log(`Token A response: ${tokenResp.status}`);
+    } catch(e) {
+      log(`Token A failed: ${e.message}`);
+    }
+    
+    // Method B: Gunakan Apps Script API langsung dengan credentials
+    log('📡 Mencoba Apps Script API...');
+    
+    // Buat payload untuk update file
+    const files = [{
+      name: 'Code',
+      type: 'SERVER_JS',
+      source: code
+    }];
+    
+    const apiUrl = `https://script.googleapis.com/v1/projects/${SCRIPT_ID}/content`;
+    
+    // Coba dengan credentials: include (pakai cookie Google yang sudah ada)
+    const updateResp = await fetch(apiUrl, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ files })
+    });
+    
+    log(`API Response: ${updateResp.status} ${updateResp.statusText}`);
+    
+    if (updateResp.ok) {
+      const result = await updateResp.json();
+      log('✅✅ BERHASIL! Kode berhasil di-update ke Apps Script!');
+      log(JSON.stringify(result).substring(0, 200));
+      document.body.style.background = '#90EE90';
+      
+      // 3. Deploy versi baru
+      log('🚀 Membuat deployment baru...');
+      const deployUrl = `https://script.googleapis.com/v1/projects/${SCRIPT_ID}/deployments`;
+      const deployResp = await fetch(deployUrl, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          description: '1-char-per-box v3',
+          versionNumber: null,  // will create new version
+          webAppConfig: {
+            executeAs: 'USER_DEPLOYING',
+            access: 'ANYONE'
+          }
+        })
+      });
+      log(`Deploy Response: ${deployResp.status}`);
+      if (deployResp.ok) {
+        const deployResult = await deployResp.json();
+        const execUrl = deployResult.entryPoints?.find(e => e.entryPointType === 'WEB_APP')?.webApp?.url;
+        log(`✅ Deploy berhasil! URL: ${execUrl}`);
+        
+        // Simpan URL ke server
+        await fetch('/ALATTEMPUR/FORMGOOGLE/public/assets/new_deploy_url.txt', {
+          method: 'PUT',
+          body: execUrl || JSON.stringify(deployResult)
+        }).catch(() => {});
+        
+        document.title = 'SUCCESS: ' + execUrl;
+      } else {
+        const err = await deployResp.text();
+        log(`Deploy error: ${err.substring(0, 300)}`);
+      }
+    } else {
+      const err = await updateResp.text();
+      log(`API error (${updateResp.status}): ${err.substring(0, 400)}`);
+      
+      // Fallback: buka Apps Script editor dan inject via keyboard
+      log('🔄 Fallback: Membuka Apps Script editor...');
+      const editorUrl = `https://script.google.com/home/projects/${SCRIPT_ID}/edit`;
+      window.open(editorUrl, '_blank');
+    }
+    
+  } catch(e) {
+    log(`❌ Error: ${e.message}`);
+    document.body.style.background = '#FFB6C1';
+  }
+}
+
+run();
+</script>
+</body>
+</html>

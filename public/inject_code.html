@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Code Injector</title></head>
+<body>
+<h2>Apps Script Code Injector</h2>
+<div id="status">Loading...</div>
+<script>
+(async function() {
+  const status = document.getElementById('status');
+  try {
+    // Ambil kode dari server lokal
+    const resp = await fetch('/ALATTEMPUR/FORMGOOGLE/public/assets/code_payload.txt');
+    const b64code = await resp.text();
+    const code = atob(b64code.trim());
+    status.textContent = 'Code loaded: ' + code.length + ' bytes';
+    
+    // Cari tab Apps Script via CDP dari dalam browser
+    // (tidak bisa langsung, tapi simpan kode ke localStorage untuk diambil)
+    localStorage.setItem('pending_code_gs', code);
+    localStorage.setItem('pending_code_ts', Date.now());
+    status.textContent = 'Code saved to localStorage! Length: ' + code.length;
+    document.body.style.background = '#90EE90';
+    
+    // Juga coba buat BroadcastChannel
+    const bc = new BroadcastChannel('code_inject');
+    bc.postMessage({type: 'CODE_UPDATE', code: code});
+    status.textContent += ' | BroadcastChannel sent!';
+    
+    setTimeout(() => window.close(), 2000);
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    document.body.style.background = '#FFB6C1';
+  }
+})();
+</script>
+</body>
+</html>
