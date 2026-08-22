@@ -383,42 +383,44 @@ function generateCbnDocumentHtml(data) {
 
 
 /**
- * Tambahkan baris data lengkap ke Google Sheets
+ * Tambahkan baris data lengkap ke Google Sheets dengan Auto Styling Profesional
  */
 function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
   const ssId  = sheetId || CONFIG.SPREADSHEET_ID;
   const ss    = SpreadsheetApp.openById(ssId);
   const sheet = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
 
+  const headers = [
+    'Timestamp', 'Sales Code', 'Vendor', 'Nama Pelanggan', 'Nomor KTP',
+    'TTL', 'Jenis Kelamin', 'Telepon Rumah', 'No. WhatsApp / HP', 'Alamat Pemasangan',
+    'RT', 'RW', 'Kode Pos', 'Status Rumah', 'Email Pelanggan',
+    'Paket CBN (Service)', 'Add-On TV', 'Perangkat Tambahan', 'Akun Email CBN',
+    'Jadwal Pasang', 'Waktu Pasang', 'Catatan / Notes', 'Total Biaya',
+    'Link PDF Surat CBN', 'Link Foto KTP'
+  ];
+
   // Inisialisasi Header Kolom CBN jika sheet masih baru/kosong
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      'Timestamp', 'Sales Code', 'Vendor', 'Nama Pelanggan', 'Nomor KTP',
-      'TTL', 'Jenis Kelamin', 'Telepon Rumah', 'Telepon Seluler / WA', 'Alamat Pemasangan',
-      'RT', 'RW', 'Kode Pos', 'Status Kepemilikan', 'Email Pelanggan',
-      'Paket CBN (Service)', 'Add-On TV', 'Perangkat Tambahan', 'Username @cbn.net.id',
-      'Jadwal Pasang', 'Waktu Pasang', 'Catatan / Notes', 'Total Biaya',
-      'Link PDF Surat CBN', 'Link Foto KTP'
-    ]);
-
-    const headerRange = sheet.getRange(1, 1, 1, 25);
-    headerRange.setBackground('#005696');
-    headerRange.setFontColor('#ffffff');
-    headerRange.setFontWeight('bold');
-    sheet.setFrozenRows(1);
+    sheet.appendRow(headers);
+    setupSheetHeaderStyles(sheet);
   }
 
   const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+  
+  // Format Hyperlink yang rapi agar tidak berupa text URL panjang
+  const pdfFormula = pdfUrl ? `=HYPERLINK("${pdfUrl}", "📄 Buka PDF Surat CBN")` : '-';
+  const ktpFormula = ktpUrl ? `=HYPERLINK("${ktpUrl}", "🪪 Lihat Foto KTP")` : '-';
+
   sheet.appendRow([
     now,
     params.sales_code        || 'SEP-001',
     params.vendor            || 'PT. SINERGI EMAS PERDANA',
     params.nama_pelanggan    || '',
-    params.nomor_ktp         || '',
+    "'" + (params.nomor_ktp  || ''),
     params.ttl               || '',
     params.jenis_kelamin     || '',
     params.telp_rumah        || '',
-    params.telp              || '',
+    "'" + (params.telp       || ''),
     params.alamat            || '',
     params.rt                || '',
     params.rw                || '',
@@ -433,14 +435,94 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
     params.jadwal_waktu      || '',
     params.catatan           || '',
     params.biaya_total       || '',
-    pdfUrl                   || '',
-    ktpUrl                   || ''
+    pdfFormula,
+    ktpFormula
   ]);
 
   const lastRow = sheet.getLastRow();
+  const rowRange = sheet.getRange(lastRow, 1, 1, headers.length);
+  
+  // Zebra Striping & Row Styling
+  rowRange.setVerticalAlignment('middle');
+  rowRange.setFontFamily('Arial');
+  rowRange.setFontSize(9.5);
+  rowRange.setBorder(true, true, true, true, true, true, '#dde3ea', SpreadsheetApp.BorderStyle.SOLID);
+  
   if (lastRow % 2 === 0) {
-    sheet.getRange(lastRow, 1, 1, 25).setBackground('#f0f7ff');
+    rowRange.setBackground('#f0f7ff');
+  } else {
+    rowRange.setBackground('#ffffff');
   }
+
+  // Alignment per kolom
+  sheet.getRange(lastRow, 1, 1, 2).setHorizontalAlignment('center'); // Timestamp, Sales Code
+  sheet.getRange(lastRow, 5, 1, 4).setHorizontalAlignment('center'); // KTP, TTL, Gender, Telp Rumah
+  sheet.getRange(lastRow, 9, 1, 1).setHorizontalAlignment('center'); // WA
+  sheet.getRange(lastRow, 11, 1, 4).setHorizontalAlignment('center'); // RT, RW, Pos, Status
+  sheet.getRange(lastRow, 16, 1, 1).setHorizontalAlignment('center'); // Paket
+  sheet.getRange(lastRow, 20, 1, 2).setHorizontalAlignment('center'); // Jadwal, Waktu
+  sheet.getRange(lastRow, 23, 1, 3).setHorizontalAlignment('center'); // Total, PDF, KTP
+}
+
+/**
+ * Styling Header & Pengaturan Lebar Kolom Spreadsheet
+ */
+function setupSheetHeaderStyles(sheet) {
+  const headersCount = 25;
+  const headerRange = sheet.getRange(1, 1, 1, headersCount);
+  
+  headerRange.setBackground('#003366');
+  headerRange.setFontColor('#ffffff');
+  headerRange.setFontWeight('bold');
+  headerRange.setFontFamily('Arial');
+  headerRange.setFontSize(10);
+  headerRange.setHorizontalAlignment('center');
+  headerRange.setVerticalAlignment('middle');
+  headerRange.setWrap(true);
+  sheet.setRowHeight(1, 38);
+  sheet.setFrozenRows(1);
+
+  // Atur lebar kolom yang pas dan nyaman dibaca
+  const colWidths = [
+    140, // Timestamp
+    95,  // Sales Code
+    180, // Vendor
+    180, // Nama Pelanggan
+    150, // Nomor KTP
+    160, // TTL
+    100, // Jenis Kelamin
+    120, // Telp Rumah
+    140, // WhatsApp / HP
+    250, // Alamat Pemasangan
+    55,  // RT
+    55,  // RW
+    80,  // Kode Pos
+    120, // Status Rumah
+    200, // Email Pelanggan
+    130, // Paket CBN
+    140, // Add-On TV
+    150, // Perangkat Tambahan
+    160, // Akun Email CBN
+    110, // Jadwal Pasang
+    110, // Waktu Pasang
+    200, // Catatan
+    120, // Total Biaya
+    160, // Link PDF
+    150  // Link KTP
+  ];
+
+  for (let i = 0; i < colWidths.length; i++) {
+    sheet.setColumnWidth(i + 1, colWidths[i]);
+  }
+}
+
+/**
+ * Fungsi Format Spreadsheet Baru / Reset Desain Tabel Secara Instan
+ */
+function formatCurrentSheet() {
+  const ss    = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
+  setupSheetHeaderStyles(sheet);
 }
 
 
