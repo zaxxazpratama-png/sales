@@ -18,9 +18,12 @@ if ($scriptName !== '/' && $scriptName !== '\\' && strpos($path, $scriptName) ==
 }
 $path = trim($path, '/');
 
-// 0. Static Asset Loader (CSS, JS, Fonts, Images)
-if (preg_match('#^(public/)?assets/(.+)$#', $path, $matches)) {
-    $assetFile = __DIR__ . '/public/assets/' . $matches[2];
+// 0. Static Asset Loader (CSS, JS, Fonts, Images, PDF)
+if (preg_match('#^(public/)?(assets/.+|asli_bg\.jpg|asli_page_1\.png|asli\.pdf)$#', $path, $matches)) {
+    $targetRel = $matches[2];
+    $assetFile = file_exists(__DIR__ . '/public/' . $targetRel) 
+        ? __DIR__ . '/public/' . $targetRel 
+        : __DIR__ . '/' . $targetRel;
     if (file_exists($assetFile)) {
         $ext = strtolower(pathinfo($assetFile, PATHINFO_EXTENSION));
         $mimes = [
@@ -35,6 +38,7 @@ if (preg_match('#^(public/)?assets/(.+)$#', $path, $matches)) {
             'woff'  => 'font/woff',
             'woff2' => 'font/woff2',
             'ttf'   => 'font/ttf',
+            'pdf'   => 'application/pdf',
         ];
         header('Content-Type: ' . ($mimes[$ext] ?? 'application/octet-stream'));
         header('Cache-Control: public, max-age=86400');
