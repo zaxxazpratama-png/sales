@@ -134,7 +134,7 @@ $waHelpdesk = $settings['wa_helpdesk'] ?? '';
     </div>
 
     <?php if (!empty($waHelpdesk)): ?>
-    <a href="https://wa.me/<?= preg_replace('/\D/', '', $waHelpdesk) ?>?text=Halo%20Admin,%20saya%20ingin%20meminta%20link%20pendaftaran%20sales%20CBN" target="_blank" class="btn-wa">
+    <a href="https://wa.me/<?= preg_replace('/\D/', '', $waHelpdesk) ?>?text=Hallo%20min,%20saya%20ingin%20meminta%20link%20pendaftaran%20pengguna%20cbn," target="_blank" class="btn-wa">
         Hubungi Bantuan WhatsApp
     </a>
     <?php endif; ?>

@@ -8,6 +8,8 @@
     "apps_script_url": "https:\/\/script.google.com\/macros\/s\/AKfycbwYoseyog6kineKtkyZ6wu6xXXilNiOhuqwwKcl6va_YImUy2wIYOpZvTjEepy_VATq\/exec",
     "spreadsheet_id": "1cXeq5CkL4QqhsOnAg7bvV7JQvz5gxXnXE1H1JwF9PmQ",
     "drive_folder_id": "12q5pLGP9og9rcfVs_CKwKhTxfufvsN1A",
+    "telegram_bot_token": "8983108876:AAFF5LpamG8EzQI3gXx6ukE_tFOO163QRNc",
+    "telegram_chat_id": "7084271773",
     "admin_username": "admin",
     "admin_password": "admin",
     "packages": [

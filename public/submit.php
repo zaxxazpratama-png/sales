@@ -26,6 +26,7 @@ require_once $autoload;
 use App\Config;
 use App\Validator;
 use App\AppsScriptService;
+use App\TelegramService;
 
 Config::load();
 
@@ -91,9 +92,12 @@ try {
         ];
     }
 
-    // ---- Kirim ke Google Apps Script ----
+    // ---- 1. Kirim ke Google Apps Script (Spreadsheet, Drive PDF, & Email) ----
     $service  = new AppsScriptService();
     $response = $service->send($data, $fileInfo);
+
+    // ---- 2. Kirim Notifikasi Lengkap & Foto KTP ke Telegram Admin/Bot ----
+    TelegramService::sendRegistration($data, $fileInfo);
 
     // ---- Hapus file temp ----
     if ($uploadPath && file_exists($uploadPath)) {
