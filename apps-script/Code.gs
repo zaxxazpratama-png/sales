@@ -131,53 +131,57 @@ function generateCbnDocumentHtml(data) {
 <body>
   <img class='bg-img' src='data:image/jpeg;base64,${bgTemplate}'>
   <div class='layer'>
+    <!-- 0. Sales Code Kanan Atas -->
+    <div class='fld' style='top: 3.2%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;'>${salesCode}</div>
+
     <!-- 1. DATA PELANGGAN -->
-    <div class='fld' style='top: 9.3%; left: 21.5%; font-size: 11pt;'>${nama}</div>
+    <div class='fld' style='top: 10.4%; left: 21.5%; font-size: 11pt;'>${nama}</div>
 
-    ${ttlKota ? `<div class='fld' style='top: 12.0%; left: 21.5%; font-size: 10.5pt;'>${ttlKota}</div>` : ''}
-    ${ttlDay ? `<div class='fld' style='top: 12.0%; left: 58.4%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlDay}</div>` : ''}
-    ${ttlMonth ? `<div class='fld' style='top: 12.0%; left: 63.3%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlMonth}</div>` : ''}
-    ${ttlYear ? `<div class='fld' style='top: 12.0%; left: 69.0%; font-size: 10.5pt; width: 38px; text-align: center;'>${ttlYear}</div>` : ''}
+    ${ttlKota ? `<div class='fld' style='top: 13.0%; left: 21.5%; font-size: 10.5pt;'>${ttlKota}</div>` : ''}
+    ${ttlDay ? `<div class='fld' style='top: 13.0%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlDay}</div>` : ''}
+    ${ttlMonth ? `<div class='fld' style='top: 13.0%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlMonth}</div>` : ''}
+    ${ttlYear ? `<div class='fld' style='top: 13.0%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;'>${ttlYear}</div>` : ''}
 
-    <div class='fld' style='top: 14.6%; left: 21.5%; font-size: 11pt; letter-spacing: 2.2px;'>${ktp}</div>
+    <div class='fld' style='top: 15.6%; left: 21.6%; font-size: 11pt; letter-spacing: 2.2px;'>${ktp}</div>
 
-    ${isPria ? `<div class='fld' style='top: 14.7%; left: 75.3%; font-size: 11pt;'>&#10006;</div>` : ''}
-    ${isWanita ? `<div class='fld' style='top: 14.7%; left: 84.4%; font-size: 11pt;'>&#10006;</div>` : ''}
+    ${isPria ? `<div class='fld' style='top: 15.6%; left: 75.8%; font-size: 11pt;'>&#10006;</div>` : ''}
+    ${isWanita ? `<div class='fld' style='top: 15.6%; left: 84.8%; font-size: 11pt;'>&#10006;</div>` : ''}
 
-    <div class='fld' style='top: 17.2%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;'>${telpSelular}</div>
-    <div class='fld' style='top: 19.1%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;'>${telpRumah || telpSelular}</div>
+    <div class='fld' style='top: 18.0%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;'>${telpSelular}</div>
+    <div class='fld' style='top: 19.8%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;'>${telpRumah || telpSelular}</div>
 
     <!-- 2. ALAMAT PEMASANGAN -->
-    <div class='fld' style='top: 24.9%; left: 21.8%; font-size: 10.5pt;'>${alamat1}</div>
-    ${alamat2 ? `<div class='fld' style='top: 26.8%; left: 21.8%; font-size: 10.5pt;'>${alamat2}</div>` : ''}
+    <div class='fld' style='top: 25.8%; left: 21.8%; font-size: 10.5pt;'>${alamat1}</div>
+    ${alamat2 ? `<div class='fld' style='top: 27.6%; left: 21.8%; font-size: 10.5pt;'>${alamat2}</div>` : ''}
 
-    ${isPemilik ? `<div class='fld' style='top: 31.9%; left: 21.6%; font-size: 12pt;'>&#10004;</div>` : ''}
-    ${isPenyewa ? `<div class='fld' style='top: 31.9%; left: 34.8%; font-size: 12pt;'>&#10004;</div>` : ''}
+    ${isPemilik ? `<div class='fld' style='top: 32.7%; left: 21.6%; font-size: 12pt;'>&#10004;</div>` : ''}
+    ${isPenyewa ? `<div class='fld' style='top: 32.7%; left: 35.2%; font-size: 12pt;'>&#10004;</div>` : ''}
 
-    <div class='fld' style='top: 33.9%; left: 21.8%; font-size: 11pt;'>${email}</div>
+    <div class='fld' style='top: 34.6%; left: 21.8%; font-size: 11pt;'>${email}</div>
 
     <!-- 3. PILIHAN PAKET & ADD-ON -->
-    <div class='fld' style='top: 41.7%; left: 2.9%; font-size: 12pt;'>&#10004;</div>
-    <div class='fld' style='top: 41.7%; left: 11.4%; font-size: 11pt;'>${service} ....................................................</div>
+    <div class='fld' style='top: 42.4%; left: 3.0%; font-size: 12pt;'>&#10004;</div>
+    <div class='fld' style='top: 42.4%; left: 11.8%; font-size: 11pt;'>${service} ....................................................</div>
 
-    ${addonTv ? `<div class='fld' style='top: 48.4%; left: 74.4%; font-size: 8.5pt;'>&#10004; ${addonTv}</div>` : ''}
+    ${addonTv ? `<div class='fld' style='top: 49.3%; left: 74.4%; font-size: 8.5pt;'>&#10004; ${addonTv}</div>` : ''}
 
     <!-- RINCIAN BIAYA -->
-    <div class='fld' style='top: 59.3%; left: 69.5%; font-size: 11pt;'>${biayaPaket}</div>
-    <div class='fld' style='top: 60.9%; left: 69.5%; font-size: 11pt;'>${biayaPasang}</div>
-    <div class='fld' style='top: 68.8%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
+    <div class='fld' style='top: 60.1%; left: 69.5%; font-size: 11pt;'>${biayaPaket}</div>
+    <div class='fld' style='top: 61.6%; left: 69.5%; font-size: 11pt;'>${biayaPasang}</div>
+    <div class='fld' style='top: 67.5%; left: 69.5%; font-size: 11pt;'>${biayaPpn || 'Rp 32.890'}</div>
+    <div class='fld' style='top: 69.4%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
 
     <!-- 4. USERNAME & NOTES -->
-    <div class='fld' style='top: 84.1%; left: 2.8%; font-size: 11pt;'>${usernameCbn}</div>
-    <div class='fld' style='top: 88.8%; left: 53.0%; font-size: 9.5pt;'>${catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
+    <div class='fld' style='top: 84.8%; left: 2.8%; font-size: 11pt;'>${usernameCbn}</div>
+    <div class='fld' style='top: 89.2%; left: 53.0%; font-size: 9.5pt;'>${catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
 
     <!-- 5. TANGGAL & TANDA TANGAN -->
-    <div class='fld' style='top: 92.8%; left: 10.5%; font-size: 10pt;'>${tglTtd}</div>
+    <div class='fld' style='top: 93.3%; left: 10.5%; font-size: 10pt;'>${tglTtd}</div>
 
     ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:90.5%;left:5%;max-height:40px;max-width:140px;z-index:3;'>` : ''}
 
-    <div class='fld' style='top: 94.6%; left: 42.0%; font-size: 10.5pt;'>${salesName}</div>
-    <div class='fld' style='top: 94.6%; left: 77.5%; font-size: 10.5pt;'>${salesCode} - PT. SEP</div>
+    <div class='fld' style='top: 95.0%; left: 42.0%; font-size: 10.5pt;'>${salesName}</div>
+    <div class='fld' style='top: 95.0%; left: 77.5%; font-size: 10.5pt;'>${salesCode} - PT. SEP</div>
   </div>
 </body>
 </html>`;
