@@ -180,21 +180,13 @@ function renderPdfBoxes(text, count) {
 
 
 /**
- * Helper untuk mencetak huruf/angka tepat 1-per-1 di tengah kotak karakter asli.pdf
+ * Helper teks tebal di posisi tertentu (persentase dari tinggi/lebar halaman)
  */
-function renderGridBoxes(text, startX, startY, stepX, fontSize) {
-  if (!text) return '';
-  const str = text.toString().toUpperCase();
-  let html = '';
-  const sX = stepX || 2.483;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-    if (ch === ' ') continue;
-    const x = (startX + (i * sX) + (sX * 0.15)).toFixed(3);
-    const y = startY.toFixed(2);
-    html += `<div class='fld' style='top: ${y}%; left: ${x}%; font-size: ${fontSize || '10pt'}; font-weight: bold;'>${ch}</div>\n`;
-  }
-  return html;
+function fld(text, top, left, fs, extra) {
+  if (!text && text !== 0) return '';
+  fs = fs || '11.5pt';
+  extra = extra || '';
+  return `<div class='fld' style='top:${top}%;left:${left}%;font-size:${fs};${extra}'>${text}</div>`;
 }
 
 /**
@@ -292,16 +284,14 @@ function generateCbnDocumentHtml(data) {
   }
   .bg-img {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 210mm;
     height: 297mm;
     z-index: 1;
   }
   .layer {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 0; left: 0;
     width: 210mm;
     height: 297mm;
     z-index: 2;
@@ -312,72 +302,84 @@ function generateCbnDocumentHtml(data) {
     color: #000;
     font-family: Arial, Helvetica, sans-serif;
     white-space: nowrap;
-    line-height: 1;
+    line-height: 1.1;
+    letter-spacing: 0.3px;
   }
 </style>
 </head>
 <body>
   ${bgTemplate ? `<img class='bg-img' src='data:image/jpeg;base64,${bgTemplate}'>` : `<img class='bg-img' src='https://sales-sales.up.railway.app/assets/img/asli_bg.jpg'>`}
   <div class='layer'>
-    <!-- 0. Sales Code Kanan Atas (6 Kotak) -->
-    ${renderGridBoxes(salesCode, 84.8, 3.5, 2.15, '10pt')}
 
-    <!-- 1. DATA PELANGGAN (Kotak Grid Presisi) -->
-    <!-- Nama (29 Kotak) -->
-    ${renderGridBoxes(nama, 21.15, 11.4, 2.483, '10pt')}
+    <!-- 0. SALES CODE kanan atas -->
+    ${fld(salesCode, 3.4, 74.2, '10pt', 'letter-spacing:1.5px;')}
 
-    <!-- Tempat Lahir (15 Kotak) -->
-    ${renderGridBoxes(ttlKota, 21.15, 14.0, 2.483, '10pt')}
+    <!-- 1. DATA PELANGGAN -->
+    <!-- Nama Pelanggan -->
+    ${fld(nama, 11.3, 21.2, '12.5pt')}
 
-    <!-- Tanggal Lahir (2 Kotak DD, 2 Kotak MM, 4 Kotak YYYY) -->
-    ${renderGridBoxes(ttlDay, 59.0, 14.0, 2.483, '10pt')}
-    ${renderGridBoxes(ttlMonth, 64.0, 14.0, 2.483, '10pt')}
-    ${renderGridBoxes(ttlYear, 69.8, 14.0, 2.483, '10pt')}
+    <!-- Tempat / Tanggal Lahir -->
+    ${fld(ttlKota, 13.85, 21.2, '12pt')}
+    ${fld(ttlDay,   13.85, 59.0, '12pt')}
+    ${fld(ttlMonth, 13.85, 64.1, '12pt')}
+    ${fld(ttlYear,  13.85, 69.4, '12pt')}
 
-    <!-- KTP (16 Kotak) -->
-    ${renderGridBoxes(ktp, 21.15, 16.6, 2.483, '10.5pt')}
+    <!-- Nomor Identitas / KTP -->
+    ${fld(ktp, 16.5, 21.2, '12pt', 'letter-spacing:1.8px;')}
 
     <!-- Jenis Kelamin -->
-    ${isPria ? `<div class='fld' style='top: 16.5%; left: 75.4%; font-size: 11pt;'>&#10006;</div>` : ''}
-    ${isWanita ? `<div class='fld' style='top: 16.5%; left: 84.5%; font-size: 11pt;'>&#10006;</div>` : ''}
+    ${isPria   ? fld('X', 16.45, 75.4, '13pt') : ''}
+    ${isWanita ? fld('X', 16.45, 84.5, '13pt') : ''}
 
-    <!-- Telepon Selular (Kotak HP) -->
-    ${renderGridBoxes(telpSelular, 68.8, 19.2, 2.483, '10pt')}
+    <!-- Telepon Rumah -->
+    ${telpRumah ? fld(telpRumah, 19.05, 21.2, '12pt', 'letter-spacing:0.8px;') : ''}
 
-    <!-- 2. ALAMAT PEMASANGAN (29 Kotak per baris) -->
-    ${renderGridBoxes(alamat1, 21.15, 27.0, 2.483, '10pt')}
-    ${alamat2 ? renderGridBoxes(alamat2, 21.15, 29.0, 2.483, '10pt') : ''}
+    <!-- Telepon Selular -->
+    ${fld(telpSelular, 19.05, 68.8, '12pt', 'letter-spacing:0.8px;')}
+
+    <!-- Telepon Selular row 2 (repeat) -->
+    ${fld(telpSelular, 20.65, 68.8, '12pt', 'letter-spacing:0.8px;')}
+
+    <!-- 2. ALAMAT PEMASANGAN -->
+    ${fld(alamat1, 26.9, 21.5, '12pt')}
+    ${alamat2 ? fld(alamat2, 28.8, 21.5, '12pt') : ''}
 
     <!-- Status Kepemilikan -->
-    ${isPemilik ? `<div class='fld' style='top: 33.3%; left: 21.2%; font-size: 12pt;'>&#10004;</div>` : ''}
-    ${isPenyewa ? `<div class='fld' style='top: 33.3%; left: 34.8%; font-size: 12pt;'>&#10004;</div>` : ''}
+    ${isPemilik ? fld('\u2714', 33.2, 21.2, '14pt') : ''}
+    ${isPenyewa ? fld('\u2714', 33.2, 34.8, '14pt') : ''}
 
-    <!-- Email (29 Kotak) -->
-    ${renderGridBoxes(email, 21.15, 35.4, 2.483, '9.5pt')}
+    <!-- Alamat Email -->
+    ${fld(email.toLowerCase(), 35.3, 21.5, '12pt')}
 
-    <!-- 3. PILIHAN PAKET & ADD-ON -->
-    <div class='fld' style='top: 42.4%; left: 2.9%; font-size: 12pt;'>&#10004;</div>
-    <div class='fld' style='top: 42.4%; left: 11.4%; font-size: 11pt;'>${service} ....................................................</div>
+    <!-- 3. PILIHAN PAKET LAYANAN -->
+    ${fld('\u2714', 42.3, 2.9, '14pt')}
+    ${fld(service, 42.3, 11.4, '12pt')}
 
-    ${addonTv ? `<div class='fld' style='top: 49.4%; left: 74.4%; font-size: 8.5pt;'>&#10004; ${addonTv}</div>` : ''}
+    <!-- Add-On TV -->
+    ${addonTv ? fld('\u2714 ' + addonTv, 49.3, 74.4, '9pt') : ''}
 
     <!-- RINCIAN BIAYA -->
-    <div class='fld' style='top: 60.1%; left: 69.5%; font-size: 11pt;'>${biayaPaket}</div>
-    <div class='fld' style='top: 61.6%; left: 69.5%; font-size: 11pt;'>${biayaPasang}</div>
-    <div class='fld' style='top: 67.6%; left: 69.5%; font-size: 11pt;'>${data.biaya_ppn || 'Rp 32.890'}</div>
-    <div class='fld' style='top: 69.5%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
+    ${fld(biayaPaket, 60.05, 69.5, '11pt')}
+    ${fld(biayaPasang, 61.6, 69.5, '11pt')}
+    ${fld(data.biaya_ppn || 'Rp19.140', 67.5, 69.5, '11pt')}
+    ${fld(totalBiaya, 69.4, 69.5, '13pt')}
 
-    <!-- 4. USERNAME & NOTES -->
-    ${renderGridBoxes(usernameCbn, 2.8, 84.6, 2.483, '10pt')}
-    <div class='fld' style='top: 88.9%; left: 53.0%; font-size: 9.5pt;'>${data.catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
+    <!-- 4. AKTIVASI LAYANAN - USERNAME -->
+    ${fld(usernameCbn.toLowerCase(), 84.55, 2.8, '12pt')}
+
+    <!-- NOTES -->
+    ${fld(data.catatan || 'REGULAR PROMO CBN - PT. SEP', 88.85, 51.5, '9.5pt')}
 
     <!-- 5. TANGGAL & TANDA TANGAN -->
-    <div class='fld' style='top: 93.0%; left: 10.5%; font-size: 10pt;'>${tglTtd}</div>
+    ${fld(tglTtd, 92.9, 9.5, '10.5pt')}
 
-    ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:90.5%;left:5%;max-height:40px;max-width:140px;z-index:3;'>` : ''}
+    ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:89.5%;left:4%;max-height:45px;max-width:150px;z-index:3;'>` : ''}
 
-    <div class='fld' style='top: 95.0%; left: 42.0%; font-size: 10.5pt;'>${salesName}</div>
-    <div class='fld' style='top: 95.0%; left: 77.5%; font-size: 10.5pt;'>${salesCode} - PT. SEP</div>
+    <!-- Nama Sales -->
+    ${fld(salesName, 94.9, 38.5, '10.5pt')}
+
+    <!-- Sales Code SPV -->
+    ${fld(salesCode + '-' + salesName.split(' ')[0], 94.9, 74.0, '10.5pt')}
   </div>
 </body>
 </html>`;
