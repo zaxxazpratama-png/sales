@@ -396,19 +396,133 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================================
-    // 6. FORM SUBMISSION HANDLER
+    // 6. CLIENT-SIDE VALIDATION & FORM SUBMISSION HANDLER
     // ========================================================
     const form = document.getElementById('cbn-form');
     const submitBtn = document.getElementById('submit-btn');
 
     if (form && submitBtn) {
+        // Hilangkan error merah secara dinamis saat user mengetik
+        form.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('input', () => {
+                input.classList.remove('error', 'is-invalid');
+                const errLabel = input.parentElement.querySelector('.field-error-msg');
+                if (errLabel) errLabel.style.display = 'none';
+            });
+        });
+
         form.addEventListener('submit', (e) => {
-            // Update signature base64 data if drawn
+            // Update data tanda tangan jika ada
             if (canvas && hasDrawn) {
                 signatureInput.value = canvas.toDataURL('image/png');
             }
 
-            // Show loading state
+            // Bersihkan error lama
+            document.querySelectorAll('.client-err').forEach(el => el.remove());
+            document.querySelectorAll('.is-invalid, .error').forEach(el => el.classList.remove('is-invalid', 'error'));
+
+            const clientErrors = [];
+            let firstInvalidEl = null;
+
+            const addError = (element, message, container = null) => {
+                if (!element) return;
+                element.classList.add('error', 'is-invalid');
+                const targetBox = container || element.parentElement;
+                
+                const errDiv = document.createElement('div');
+                errDiv.className = 'field-error-msg client-err';
+                errDiv.style.cssText = 'color:#f87171;font-size:12px;font-weight:700;margin-top:5px;display:flex;align-items:center;gap:4px;';
+                errDiv.innerHTML = `⚠️ ${message}`;
+                targetBox.appendChild(errDiv);
+
+                clientErrors.push(message);
+                if (!firstInvalidEl) {
+                    firstInvalidEl = element;
+                }
+            };
+
+            // 1. Nama Pelanggan
+            const namaEl = document.getElementById('nama_pelanggan');
+            if (!namaEl || !namaEl.value.trim()) {
+                addError(namaEl, 'Nama Lengkap Pelanggan belum diisi');
+            }
+
+            // 2. Tempat / Tanggal Lahir
+            const ttlEl = document.getElementById('ttl');
+            if (!ttlEl || !ttlEl.value.trim()) {
+                addError(ttlEl, 'Tempat & Tanggal Lahir belum diisi (Contoh: Medan, 15/08/1995)');
+            }
+
+            // 3. Nomor KTP (16 Digit)
+            const ktpEl = document.getElementById('nomor_ktp');
+            const cleanKtp = ktpEl ? ktpEl.value.replace(/\D/g, '') : '';
+            if (!ktpEl || !cleanKtp) {
+                addError(ktpEl, 'Nomor KTP belum diisi');
+            } else if (cleanKtp.length !== 16) {
+                addError(ktpEl, `Nomor KTP harus 16 digit angka (saat ini: ${cleanKtp.length} digit)`);
+            }
+
+            // 4. Nomor Telepon / WA
+            const telpEl = document.getElementById('telp');
+            const cleanTelp = telpEl ? telpEl.value.replace(/[^\d+]/g, '') : '';
+            if (!telpEl || !cleanTelp) {
+                addError(telpEl, 'Nomor Telepon Seluler / WhatsApp belum diisi');
+            } else if (cleanTelp.length < 9) {
+                addError(telpEl, 'Nomor Telepon terlalu pendek (minimal 10 digit)');
+            }
+
+            // 5. Email Pelanggan
+            const emailEl = document.getElementById('email_pelanggan');
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailEl || !emailEl.value.trim()) {
+                addError(emailEl, 'Alamat Email Pelanggan belum diisi');
+            } else if (!emailRegex.test(emailEl.value.trim())) {
+                addError(emailEl, 'Format email tidak valid (Contoh: nama@gmail.com)');
+            }
+
+            // 6. Alamat Pemasangan
+            const alamatEl = document.getElementById('alamat');
+            if (!alamatEl || !alamatEl.value.trim()) {
+                addError(alamatEl, 'Alamat Lengkap Rumah / Gedung belum diisi');
+            }
+
+            // 7. Kode Pos
+            const kodePosEl = document.getElementById('kode_pos');
+            if (!kodePosEl || !kodePosEl.value.trim()) {
+                addError(kodePosEl, 'Kode Pos belum diisi');
+            }
+
+            // 8. Tanda Tangan Digital
+            const signBox = document.querySelector('.signature-box');
+            if (!signatureInput || !signatureInput.value || !hasDrawn) {
+                if (signBox) {
+                    signBox.classList.add('error');
+                    const errDiv = document.createElement('div');
+                    errDiv.className = 'field-error-msg client-err';
+                    errDiv.style.cssText = 'color:#f87171;font-size:12px;font-weight:700;margin-top:5px;';
+                    errDiv.innerHTML = '⚠️ Tanda Tangan Digital Pelanggan wajib digoreskan pada kotak di atas';
+                    signBox.parentElement.appendChild(errDiv);
+                    if (!firstInvalidEl) firstInvalidEl = signBox;
+                    clientErrors.push('Tanda Tangan Digital Pelanggan belum digoreskan');
+                }
+            }
+
+            // JIKA ADA FIELD YANG BELUM DIISI -> GAGALKAN SUBMIT & ARAHKAN KE FIELD TERSEBUT
+            if (clientErrors.length > 0) {
+                e.preventDefault();
+                submitBtn.classList.remove('loading');
+                submitBtn.disabled = false;
+
+                if (firstInvalidEl) {
+                    firstInvalidEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (typeof firstInvalidEl.focus === 'function') {
+                        firstInvalidEl.focus();
+                    }
+                }
+                return false;
+            }
+
+            // Jika valid -> tampilkan animasi loading submit
             submitBtn.classList.add('loading');
             submitBtn.disabled = true;
         });

@@ -133,10 +133,7 @@ try {
     $logMsg = "[" . date('Y-m-d H:i:s') . "] " . $e->getMessage() . "\n";
     file_put_contents($logDir . 'error.log', $logMsg, FILE_APPEND);
 
-    $debugMode = Config::get('app_debug', false);
-    $errMsg    = $debugMode
-        ? 'Error: ' . $e->getMessage()
-        : 'Terjadi kendala saat mengirimkan pendaftaran. Silakan periksa kembali data Anda atau hubungi kami.';
+    $errMsg = 'Gagal memproses pendaftaran ke Google Apps Script: ' . $e->getMessage() . '. Silakan periksa kembali konfigurasi atau coba beberapa saat lagi.';
 
     $_SESSION['errors']['general'] = $errMsg;
     $_SESSION['old'] = $_POST;

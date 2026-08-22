@@ -151,15 +151,17 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
     <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
-    <div class="alert alert-error" role="alert">
-        <span class="alert-icon">[!]</span>
-        <div>
-            <strong>Mohon lengkapi dan perbaiki data berikut:</strong>
-            <ul style="margin-top:4px;padding-left:18px;">
-                <?php foreach ($errors as $msg): ?>
-                    <li><?= htmlspecialchars(is_array($msg) ? implode(', ', $msg) : $msg) ?></li>
-                <?php endforeach; ?>
-            </ul>
+    <div class="alert alert-error" role="alert" style="border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+            <span style="font-size:22px;line-height:1;">⚠️</span>
+            <div style="flex:1;">
+                <strong style="font-size:14px;color:#fca5a5;display:block;margin-bottom:6px;">Mohon lengkapi dan perbaiki data formulir berikut:</strong>
+                <ul style="margin:0;padding-left:20px;color:#fecaca;font-size:13px;line-height:1.7;">
+                    <?php foreach ($errors as $fieldKey => $msg): ?>
+                        <li><strong><?= htmlspecialchars(is_array($msg) ? implode(', ', $msg) : $msg) ?></strong></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
         </div>
     </div>
     <?php endif; ?>
@@ -235,6 +237,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             placeholder="Sesuai KTP"
                             value="<?= htmlspecialchars($old['nama_pelanggan'] ?? '') ?>"
                             required autocomplete="name">
+                        <?php if (!empty($errors['nama_pelanggan'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['nama_pelanggan']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- TTL -->
@@ -245,6 +250,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             placeholder="Contoh: Jakarta, 15/08/1990"
                             value="<?= htmlspecialchars($old['ttl'] ?? '') ?>"
                             required>
+                        <?php if (!empty($errors['ttl'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['ttl']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Nomor KTP -->
@@ -256,6 +264,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             value="<?= htmlspecialchars($old['nomor_ktp'] ?? '') ?>"
                             maxlength="16" inputmode="numeric" required>
                         <span id="ktp-count" class="char-count">0/16</span>
+                        <?php if (!empty($errors['nomor_ktp'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['nomor_ktp']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Jenis Kelamin -->
@@ -273,6 +284,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                                 <label class="radio-label-card" for="gender-wanita">Wanita (Female)</label>
                             </div>
                         </div>
+                        <?php if (!empty($errors['jenis_kelamin'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['jenis_kelamin']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Telepon Seluler -->
@@ -283,6 +297,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             placeholder="08xxxxxxxxxx"
                             value="<?= htmlspecialchars($old['telp'] ?? '') ?>"
                             required inputmode="tel">
+                        <?php if (!empty($errors['telp'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['telp']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Telepon Rumah -->
@@ -301,6 +318,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             placeholder="nama@gmail.com (Salinan surat CBN akan dikirim ke sini)"
                             value="<?= htmlspecialchars($old['email_pelanggan'] ?? '') ?>"
                             required inputmode="email">
+                        <?php if (!empty($errors['email_pelanggan'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['email_pelanggan']) ?></div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -324,6 +344,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             placeholder="Nama Jalan, Blok, Nomor Rumah, Patokan Lokasi"
                             value="<?= htmlspecialchars($old['alamat'] ?? '') ?>"
                             required>
+                        <?php if (!empty($errors['alamat'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['alamat']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- RT / RW -->
@@ -345,6 +368,9 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             placeholder="Contoh: 10510"
                             value="<?= htmlspecialchars($old['kode_pos'] ?? '') ?>"
                             maxlength="6" inputmode="numeric" required>
+                        <?php if (!empty($errors['kode_pos'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['kode_pos']) ?></div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Kelurahan & Kecamatan -->
@@ -556,15 +582,18 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
 
                     <!-- Tanda Tangan Digital Canvas Pad -->
                     <div class="form-group col-full">
-                        <label class="form-label">Tanda Tangan Digital Pelanggan (Goreskan di dalam kotak)</label>
-                        <div class="signature-box">
+                        <label class="form-label">Tanda Tangan Digital Pelanggan (Goreskan di dalam kotak) <span class="req">*</span></label>
+                        <div class="signature-box <?= isset($errors['signature_data']) ? 'error' : '' ?>">
                             <canvas id="signature-canvas"></canvas>
                             <div id="sign-placeholder" class="signature-placeholder">
                                 <span>Sentuh / gambar tanda tangan di sini</span>
                             </div>
                         </div>
+                        <?php if (!empty($errors['signature_data'])): ?>
+                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['signature_data']) ?></div>
+                        <?php endif; ?>
                         <div class="signature-controls">
-                            <span style="font-size:11px;color:#94a3b8;">Tanda tangan akan langsung tertera di Surat Formulir CBN PDF.</span>
+                            <span style="font-size:11px;color:#94a3b8;">Tanda tangan wajib diisi dan akan langsung dicetak pada Surat Formulir CBN PDF.</span>
                             <button type="button" id="btn-clear-sign" class="btn-sign-clear">Hapus / Ulangi TTD</button>
                         </div>
                     </div>
