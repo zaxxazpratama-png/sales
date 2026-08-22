@@ -241,16 +241,22 @@ function generateCbnDocumentHtml(data) {
     }
   }
 
-  // Ambil Template Gambar Resmi Asli CBN dari Server Railway
+  // Ambil Template Gambar Resmi Asli CBN dari Server Railway / Drive Cache
   let bgTemplate = '';
-  try {
-    const bgUrl = 'https://sales-sales.up.railway.app/asli_bg.jpg';
-    const bgResponse = UrlFetchApp.fetch(bgUrl, { muteHttpExceptions: true });
-    if (bgResponse.getResponseCode() === 200) {
-      bgTemplate = Utilities.base64Encode(bgResponse.getBlob().getBytes());
+  const urls = [
+    'https://sales-sales.up.railway.app/asli_bg.jpg',
+    'https://sales-sales.up.railway.app/assets/img/asli_bg.jpg'
+  ];
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const resp = UrlFetchApp.fetch(urls[i], { muteHttpExceptions: true });
+      if (resp.getResponseCode() === 200) {
+        bgTemplate = Utilities.base64Encode(resp.getBlob().getBytes());
+        break;
+      }
+    } catch (e) {
+      Logger.log('Fetch error: ' + e.message);
     }
-  } catch (e) {
-    Logger.log('Gagal fetch background template: ' + e.message);
   }
 
   return `<!DOCTYPE html>
@@ -301,51 +307,51 @@ function generateCbnDocumentHtml(data) {
   ${bgTemplate ? `<img class='bg-img' src='data:image/jpeg;base64,${bgTemplate}'>` : `<img class='bg-img' src='https://sales-sales.up.railway.app/asli_bg.jpg'>`}
   <div class='layer'>
     <!-- 0. Sales Code Kanan Atas -->
-    <div class='fld' style='top: 3.2%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;'>${salesCode}</div>
+    <div class='fld' style='top: 3.4%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;'>${salesCode}</div>
 
     <!-- 1. DATA PELANGGAN -->
-    <div class='fld' style='top: 10.4%; left: 21.5%; font-size: 11pt;'>${nama}</div>
+    <div class='fld' style='top: 11.3%; left: 21.2%; font-size: 11pt;'>${nama}</div>
 
-    ${ttlKota ? `<div class='fld' style='top: 13.0%; left: 21.5%; font-size: 10.5pt;'>${ttlKota}</div>` : ''}
-    ${ttlDay ? `<div class='fld' style='top: 13.0%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlDay}</div>` : ''}
-    ${ttlMonth ? `<div class='fld' style='top: 13.0%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlMonth}</div>` : ''}
-    ${ttlYear ? `<div class='fld' style='top: 13.0%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;'>${ttlYear}</div>` : ''}
+    ${ttlKota ? `<div class='fld' style='top: 13.9%; left: 21.2%; font-size: 10.5pt;'>${ttlKota}</div>` : ''}
+    ${ttlDay ? `<div class='fld' style='top: 13.9%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlDay}</div>` : ''}
+    ${ttlMonth ? `<div class='fld' style='top: 13.9%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlMonth}</div>` : ''}
+    ${ttlYear ? `<div class='fld' style='top: 13.9%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;'>${ttlYear}</div>` : ''}
 
-    <div class='fld' style='top: 15.6%; left: 21.6%; font-size: 11pt; letter-spacing: 2.2px;'>${ktp}</div>
+    <div class='fld' style='top: 16.5%; left: 21.2%; font-size: 11pt;'>${ktp}</div>
 
-    ${isPria ? `<div class='fld' style='top: 15.6%; left: 75.8%; font-size: 11pt;'>&#10006;</div>` : ''}
-    ${isWanita ? `<div class='fld' style='top: 15.6%; left: 84.8%; font-size: 11pt;'>&#10006;</div>` : ''}
+    ${isPria ? `<div class='fld' style='top: 16.5%; left: 75.4%; font-size: 11pt;'>&#10006;</div>` : ''}
+    ${isWanita ? `<div class='fld' style='top: 16.5%; left: 84.5%; font-size: 11pt;'>&#10006;</div>` : ''}
 
-    <div class='fld' style='top: 18.0%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;'>${telpSelular}</div>
-    <div class='fld' style='top: 19.8%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;'>${telpRumah || telpSelular}</div>
+    <div class='fld' style='top: 19.1%; left: 68.8%; font-size: 11pt;'>${telpSelular}</div>
+    <div class='fld' style='top: 20.7%; left: 68.8%; font-size: 11pt;'>${telpRumah || telpSelular}</div>
 
     <!-- 2. ALAMAT PEMASANGAN -->
-    <div class='fld' style='top: 25.8%; left: 21.8%; font-size: 10.5pt;'>${alamat1}</div>
-    ${alamat2 ? `<div class='fld' style='top: 27.6%; left: 21.8%; font-size: 10.5pt;'>${alamat2}</div>` : ''}
+    <div class='fld' style='top: 26.9%; left: 21.5%; font-size: 10.5pt;'>${alamat1}</div>
+    ${alamat2 ? `<div class='fld' style='top: 28.9%; left: 21.5%; font-size: 10.5pt;'>${alamat2}</div>` : ''}
 
-    ${isPemilik ? `<div class='fld' style='top: 32.7%; left: 21.6%; font-size: 12pt;'>&#10004;</div>` : ''}
-    ${isPenyewa ? `<div class='fld' style='top: 32.7%; left: 35.2%; font-size: 12pt;'>&#10004;</div>` : ''}
+    ${isPemilik ? `<div class='fld' style='top: 33.3%; left: 21.2%; font-size: 12pt;'>&#10004;</div>` : ''}
+    ${isPenyewa ? `<div class='fld' style='top: 33.3%; left: 34.8%; font-size: 12pt;'>&#10004;</div>` : ''}
 
-    <div class='fld' style='top: 34.6%; left: 21.8%; font-size: 11pt;'>${email}</div>
+    <div class='fld' style='top: 35.3%; left: 21.5%; font-size: 11pt;'>${email}</div>
 
     <!-- 3. PILIHAN PAKET & ADD-ON -->
-    <div class='fld' style='top: 42.4%; left: 3.0%; font-size: 12pt;'>&#10004;</div>
-    <div class='fld' style='top: 42.4%; left: 11.8%; font-size: 11pt;'>${service} ....................................................</div>
+    <div class='fld' style='top: 42.4%; left: 2.9%; font-size: 12pt;'>&#10004;</div>
+    <div class='fld' style='top: 42.4%; left: 11.4%; font-size: 11pt;'>${service} ....................................................</div>
 
-    ${addonTv ? `<div class='fld' style='top: 49.3%; left: 74.4%; font-size: 8.5pt;'>&#10004; ${addonTv}</div>` : ''}
+    ${addonTv ? `<div class='fld' style='top: 49.4%; left: 74.4%; font-size: 8.5pt;'>&#10004; ${addonTv}</div>` : ''}
 
     <!-- RINCIAN BIAYA -->
     <div class='fld' style='top: 60.1%; left: 69.5%; font-size: 11pt;'>${biayaPaket}</div>
     <div class='fld' style='top: 61.6%; left: 69.5%; font-size: 11pt;'>${biayaPasang}</div>
-    <div class='fld' style='top: 67.5%; left: 69.5%; font-size: 11pt;'>${data.biaya_ppn || 'Rp 32.890'}</div>
-    <div class='fld' style='top: 69.4%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
+    <div class='fld' style='top: 67.6%; left: 69.5%; font-size: 11pt;'>${data.biaya_ppn || 'Rp 32.890'}</div>
+    <div class='fld' style='top: 69.5%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
 
     <!-- 4. USERNAME & NOTES -->
-    <div class='fld' style='top: 84.8%; left: 2.8%; font-size: 11pt;'>${usernameCbn}</div>
-    <div class='fld' style='top: 89.2%; left: 53.0%; font-size: 9.5pt;'>${catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
+    <div class='fld' style='top: 84.5%; left: 2.8%; font-size: 11pt;'>${usernameCbn}</div>
+    <div class='fld' style='top: 88.9%; left: 53.0%; font-size: 9.5pt;'>${catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
 
     <!-- 5. TANGGAL & TANDA TANGAN -->
-    <div class='fld' style='top: 93.3%; left: 10.5%; font-size: 10pt;'>${tglTtd}</div>
+    <div class='fld' style='top: 93.0%; left: 10.5%; font-size: 10pt;'>${tglTtd}</div>
 
     ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:90.5%;left:5%;max-height:40px;max-width:140px;z-index:3;'>` : ''}
 

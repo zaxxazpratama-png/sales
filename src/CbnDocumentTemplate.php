@@ -219,95 +219,95 @@ class CbnDocumentTemplate
   <div class="cbn-data-layer">
     
     <!-- 0. Sales Code Kanan Atas -->
-    <div class="cbn-fld" style="top: 3.2%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;">
+    <div class="cbn-fld" style="top: 3.4%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;">
       <?= htmlspecialchars($salesCode) ?>
     </div>
 
     <!-- 1. DATA PELANGGAN -->
     <!-- Nama Pelanggan -->
-    <div class="cbn-fld" style="top: 10.4%; left: 21.5%; font-size: 11pt;">
+    <div class="cbn-fld" style="top: 11.3%; left: 21.2%; font-size: 11pt;">
       <?= htmlspecialchars($nama) ?>
     </div>
 
     <!-- Tempat / Tanggal Lahir -->
     <?php if (!empty($ttlKota)): ?>
-      <div class="cbn-fld" style="top: 13.0%; left: 21.5%; font-size: 10.5pt;">
+      <div class="cbn-fld" style="top: 13.9%; left: 21.2%; font-size: 10.5pt;">
         <?= htmlspecialchars($ttlKota) ?>
       </div>
     <?php endif; ?>
     <?php if (!empty($ttlDay)): ?>
-      <div class="cbn-fld" style="top: 13.0%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;">
+      <div class="cbn-fld" style="top: 13.9%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;">
         <?= htmlspecialchars($ttlDay) ?>
       </div>
     <?php endif; ?>
     <?php if (!empty($ttlMonth)): ?>
-      <div class="cbn-fld" style="top: 13.0%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;">
+      <div class="cbn-fld" style="top: 13.9%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;">
         <?= htmlspecialchars($ttlMonth) ?>
       </div>
     <?php endif; ?>
     <?php if (!empty($ttlYear)): ?>
-      <div class="cbn-fld" style="top: 13.0%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;">
+      <div class="cbn-fld" style="top: 13.9%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;">
         <?= htmlspecialchars($ttlYear) ?>
       </div>
     <?php endif; ?>
 
     <!-- Nomor KTP (16 Digit) -->
-    <div class="cbn-fld" style="top: 15.6%; left: 21.6%; font-size: 11pt; letter-spacing: 2.2px;">
+    <div class="cbn-fld" style="top: 16.5%; left: 21.2%; font-size: 11pt;">
       <?= htmlspecialchars($ktp) ?>
     </div>
 
     <!-- Jenis Kelamin -->
     <?php if ($isPria): ?>
-      <div class="cbn-fld" style="top: 15.6%; left: 75.8%; font-size: 11pt;">&#10006;</div>
+      <div class="cbn-fld" style="top: 16.5%; left: 75.4%; font-size: 11pt;">&#10006;</div>
     <?php elseif ($isWanita): ?>
-      <div class="cbn-fld" style="top: 15.6%; left: 84.8%; font-size: 11pt;">&#10006;</div>
+      <div class="cbn-fld" style="top: 16.5%; left: 84.5%; font-size: 11pt;">&#10006;</div>
     <?php endif; ?>
 
     <!-- Telepon Selular / WhatsApp -->
-    <div class="cbn-fld" style="top: 18.0%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;">
+    <div class="cbn-fld" style="top: 19.1%; left: 68.8%; font-size: 11pt;">
       <?= htmlspecialchars($telpSelular) ?>
     </div>
     <?php if (!empty($telpRumah) && $telpRumah !== $telpSelular): ?>
-      <div class="cbn-fld" style="top: 19.8%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;">
+      <div class="cbn-fld" style="top: 20.7%; left: 68.8%; font-size: 11pt;">
         <?= htmlspecialchars($telpRumah) ?>
       </div>
     <?php else: ?>
-      <div class="cbn-fld" style="top: 19.8%; left: 69.0%; font-size: 11pt; letter-spacing: 0.8px;">
+      <div class="cbn-fld" style="top: 20.7%; left: 68.8%; font-size: 11pt;">
         <?= htmlspecialchars($telpSelular) ?>
       </div>
     <?php endif; ?>
 
     <!-- 2. ALAMAT PEMASANGAN -->
-    <div class="cbn-fld" style="top: 25.8%; left: 21.8%; font-size: 10.5pt;">
+    <div class="cbn-fld" style="top: 26.9%; left: 21.5%; font-size: 10.5pt;">
       <?= htmlspecialchars($alamat1) ?>
     </div>
     <?php if (!empty($alamat2)): ?>
-      <div class="cbn-fld" style="top: 27.6%; left: 21.8%; font-size: 10.5pt;">
+      <div class="cbn-fld" style="top: 28.9%; left: 21.5%; font-size: 10.5pt;">
         <?= htmlspecialchars($alamat2) ?>
       </div>
     <?php endif; ?>
 
     <!-- Status Kepemilikan -->
     <?php if ($isPemilik): ?>
-      <div class="cbn-fld" style="top: 32.7%; left: 21.6%; font-size: 12pt;">&#10004;</div>
+      <div class="cbn-fld" style="top: 33.3%; left: 21.2%; font-size: 12pt;">&#10004;</div>
     <?php elseif ($isPenyewa): ?>
-      <div class="cbn-fld" style="top: 32.7%; left: 35.2%; font-size: 12pt;">&#10004;</div>
+      <div class="cbn-fld" style="top: 33.3%; left: 34.8%; font-size: 12pt;">&#10004;</div>
     <?php endif; ?>
 
     <!-- Alamat Email -->
-    <div class="cbn-fld" style="top: 34.6%; left: 21.8%; font-size: 11pt;">
+    <div class="cbn-fld" style="top: 35.3%; left: 21.5%; font-size: 11pt;">
       <?= htmlspecialchars($email) ?>
     </div>
 
     <!-- 3. PILIHAN PAKET LAYANAN & ADDON -->
-    <div class="cbn-fld" style="top: 42.4%; left: 3.0%; font-size: 12pt;">&#10004;</div>
-    <div class="cbn-fld" style="top: 42.4%; left: 11.8%; font-size: 11pt;">
+    <div class="cbn-fld" style="top: 42.4%; left: 2.9%; font-size: 12pt;">&#10004;</div>
+    <div class="cbn-fld" style="top: 42.4%; left: 11.4%; font-size: 11pt;">
       <?= htmlspecialchars($service) ?> ....................................................
     </div>
 
     <!-- Add-On TV & Devices -->
     <?php if (!empty($addonTvText)): ?>
-      <div class="cbn-fld" style="top: 49.3%; left: 74.4%; font-size: 8.5pt;">
+      <div class="cbn-fld" style="top: 49.4%; left: 74.4%; font-size: 8.5pt;">
         &#10004; <?= htmlspecialchars($addonTvText) ?>
       </div>
     <?php endif; ?>
@@ -319,22 +319,22 @@ class CbnDocumentTemplate
     <div class="cbn-fld" style="top: 61.6%; left: 69.5%; font-size: 11pt;">
       <?= htmlspecialchars($biayaPasang) ?>
     </div>
-    <div class="cbn-fld" style="top: 69.4%; left: 69.5%; font-size: 13pt;">
+    <div class="cbn-fld" style="top: 69.5%; left: 69.5%; font-size: 13pt;">
       <?= htmlspecialchars($biayaTotal) ?>
     </div>
 
     <!-- 4. AKTIVASI LAYANAN (USERNAME) -->
-    <div class="cbn-fld" style="top: 84.8%; left: 2.8%; font-size: 11pt;">
+    <div class="cbn-fld" style="top: 84.5%; left: 2.8%; font-size: 11pt;">
       <?= htmlspecialchars($usernameCbn) ?>
     </div>
 
     <!-- 5. JADWAL & NOTES -->
-    <div class="cbn-fld" style="top: 89.2%; left: 53.0%; font-size: 9.5pt;">
+    <div class="cbn-fld" style="top: 88.9%; left: 53.0%; font-size: 9.5pt;">
       <?= htmlspecialchars(!empty($catatan) ? $catatan : 'REGULAR PROMO CBN - PT. SEP') ?>
     </div>
 
     <!-- Tanggal Surat -->
-    <div class="cbn-fld" style="top: 93.3%; left: 10.5%; font-size: 10pt;">
+    <div class="cbn-fld" style="top: 93.0%; left: 10.5%; font-size: 10pt;">
       <?= htmlspecialchars($tglTtd) ?>
     </div>
 
