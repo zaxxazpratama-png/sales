@@ -216,101 +216,125 @@ class CbnDocumentTemplate
   <?php endif; ?>
 
   <?php
-    // Helper: render teks tebal di posisi % halaman
-    $f = function($text, $top, $left, $fs = '12pt', $extra = '') {
+    /**
+     * $box() - 1 karakter per 1 kotak, terpusat di tengah, font bold
+     * $startX = left edge kotak pertama (%)
+     * $startY = top (%)
+     * $stepX  = lebar 1 kotak (%), default 2.483
+     * $fs     = font-size CSS
+     * $max    = jumlah kotak maksimum field
+     */
+    $box = function($text, $startX, $startY, $stepX = 2.483, $fs = '10pt', $max = 50) {
         if (empty($text) && $text !== '0') return '';
-        return "<div class=\"cbn-fld\" style=\"top:{$top}%;left:{$left}%;font-size:{$fs};{$extra}\">" 
-               . htmlspecialchars((string)$text) 
-               . "</div>\n";
+        $str = strtoupper(trim((string)$text));
+        $html = '';
+        $col = 0;
+        for ($i = 0; $i < strlen($str) && $col < $max; $i++) {
+            $ch = $str[$i];
+            if ($ch === ' ') { $col++; continue; } // spasi: kosongi kotak, tetap hitung
+            $bLeft = number_format($startX + $col * $stepX, 3, '.', '');
+            $bW    = number_format($stepX, 3, '.', '');
+            $bTop  = number_format($startY, 2, '.', '');
+            $html .= "<div class=\"cbn-fld\" style=\"top:{$bTop}%;left:{$bLeft}%;width:{$bW}%;font-size:{$fs};text-align:center;\">"
+                   . htmlspecialchars($ch) . "</div>\n";
+            $col++;
+        }
+        return $html;
+    };
+
+    // $f() - render teks biasa (tidak per-kotak)
+    $f = function($text, $top, $left, $fs = '11pt', $extra = '') {
+        if (empty($text) && $text !== '0') return '';
+        return "<div class=\"cbn-fld\" style=\"top:{$top}%;left:{$left}%;font-size:{$fs};{$extra}\">"
+               . htmlspecialchars((string)$text) . "</div>\n";
     };
   ?>
 
-  <!-- DATA LAYER DENGAN PENEMPATAN PRESISI (IDENTIK CONTOH KANTOR) -->
+  <!-- DATA LAYER DENGAN PENEMPATAN PRESISI (1 HURUF = 1 KOTAK) -->
   <div class="cbn-data-layer">
-    
-    <!-- 0. Sales Code kanan atas -->
-    <?= $f(preg_replace('/[^A-Z0-9\-]/', '', strtoupper($salesCode)), 3.4, 74.2, '10pt', 'letter-spacing:1.5px;') ?>
 
-    <!-- 1. DATA PELANGGAN -->
-    <!-- Nama Pelanggan -->
-    <?= $f($nama, 11.3, 21.2, '12.5pt') ?>
+    <!-- 0. SALES CODE kanan atas (6 kotak, step=2.15%) -->
+    <?= $box(preg_replace('/[^A-Z0-9]/', '', strtoupper($salesCode)), 74.0, 3.3, 2.15, '9pt', 6) ?>
 
-    <!-- Tempat / Tanggal Lahir -->
-    <?= $f($ttlKota, 13.85, 21.2, '12pt') ?>
-    <?= $f($ttlDay,   13.85, 59.0, '12pt') ?>
-    <?= $f($ttlMonth, 13.85, 64.1, '12pt') ?>
-    <?= $f($ttlYear,  13.85, 69.4, '12pt') ?>
+    <!-- 1. NAMA PELANGGAN (29 kotak) -->
+    <?= $box($nama, 21.15, 11.25, 2.483, '10pt', 29) ?>
 
-    <!-- Nomor KTP -->
-    <?= $f(preg_replace('/[^0-9]/', '', $ktp), 16.5, 21.2, '12pt', 'letter-spacing:1.8px;') ?>
+    <!-- TEMPAT LAHIR (15 kotak) -->
+    <?= $box($ttlKota, 21.15, 13.8, 2.483, '10pt', 15) ?>
 
-    <!-- Jenis Kelamin -->
+    <!-- TANGGAL LAHIR: DD | MM | YYYY -->
+    <?= $box($ttlDay,   59.0,  13.8, 2.483, '10pt', 2) ?>
+    <?= $box($ttlMonth, 64.45, 13.8, 2.483, '10pt', 2) ?>
+    <?= $box($ttlYear,  69.9,  13.8, 2.483, '10pt', 4) ?>
+
+    <!-- NOMOR IDENTITAS KTP (16 kotak) -->
+    <?= $box(preg_replace('/[^0-9]/', '', $ktp), 21.15, 16.45, 2.483, '10pt', 16) ?>
+
+    <!-- JENIS KELAMIN -->
     <?php if ($isPria): ?>
-      <div class="cbn-fld" style="top:16.45%;left:75.4%;font-size:13pt;font-weight:bold;">X</div>
+      <div class="cbn-fld" style="top:16.35%;left:75.6%;width:2.483%;font-size:12pt;text-align:center;">X</div>
     <?php elseif ($isWanita): ?>
-      <div class="cbn-fld" style="top:16.45%;left:84.5%;font-size:13pt;font-weight:bold;">X</div>
+      <div class="cbn-fld" style="top:16.35%;left:84.4%;width:2.483%;font-size:12pt;text-align:center;">X</div>
     <?php endif; ?>
 
-    <!-- Telepon Rumah -->
+    <!-- TELEPON RUMAH -->
     <?php if (!empty($telpRumah) && $telpRumah !== $telpSelular): ?>
-      <?= $f(preg_replace('/[^0-9]/', '', $telpRumah), 19.05, 21.2, '12pt', 'letter-spacing:0.8px;') ?>
+      <?= $box(preg_replace('/[^0-9]/', '', $telpRumah), 21.15, 18.95, 2.483, '10pt', 12) ?>
     <?php endif; ?>
 
-    <!-- Telepon Selular (baris 1 & 2) -->
-    <?= $f(preg_replace('/[^0-9]/', '', $telpSelular), 19.05, 68.8, '12pt', 'letter-spacing:0.8px;') ?>
-    <?= $f(preg_replace('/[^0-9]/', '', $telpSelular), 20.65, 68.8, '12pt', 'letter-spacing:0.8px;') ?>
+    <!-- TELEPON SELULAR / WA (2 baris sama) -->
+    <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 68.8, 18.95, 2.483, '10pt', 12) ?>
+    <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 68.8, 20.5,  2.483, '10pt', 12) ?>
 
-    <!-- 2. ALAMAT PEMASANGAN -->
-    <?= $f($alamat1, 26.9, 21.5, '12pt') ?>
+    <!-- 2. ALAMAT PEMASANGAN (29 kotak × 2 baris) -->
+    <?= $box($alamat1, 21.15, 26.8, 2.483, '9.5pt', 29) ?>
     <?php if (!empty($alamat2)): ?>
-      <?= $f($alamat2, 28.8, 21.5, '12pt') ?>
+      <?= $box($alamat2, 21.15, 28.7, 2.483, '9.5pt', 29) ?>
     <?php endif; ?>
 
-    <!-- Status Kepemilikan -->
+    <!-- STATUS KEPEMILIKAN -->
     <?php if ($isPemilik): ?>
-      <div class="cbn-fld" style="top:33.2%;left:21.2%;font-size:14pt;font-weight:bold;">&#10004;</div>
+      <div class="cbn-fld" style="top:33.15%;left:21.2%;font-size:13pt;font-weight:bold;">&#10004;</div>
     <?php elseif ($isPenyewa): ?>
-      <div class="cbn-fld" style="top:33.2%;left:34.8%;font-size:14pt;font-weight:bold;">&#10004;</div>
+      <div class="cbn-fld" style="top:33.15%;left:34.8%;font-size:13pt;font-weight:bold;">&#10004;</div>
     <?php endif; ?>
 
-    <!-- Alamat Email -->
-    <?= $f(strtolower($email), 35.3, 21.5, '12pt') ?>
+    <!-- ALAMAT EMAIL (29 kotak) -->
+    <?= $box(strtolower($email), 21.15, 35.2, 2.483, '9pt', 29) ?>
 
     <!-- 3. PILIHAN PAKET LAYANAN -->
-    <div class="cbn-fld" style="top:42.3%;left:2.9%;font-size:14pt;font-weight:bold;">&#10004;</div>
-    <?= $f($service, 42.3, 11.4, '12pt') ?>
+    <div class="cbn-fld" style="top:42.25%;left:2.9%;font-size:13pt;font-weight:bold;">&#10004;</div>
+    <?= $f($service, 42.25, 11.4, '11.5pt') ?>
 
-    <!-- Add-On TV -->
+    <!-- ADD-ON TV -->
     <?php if (!empty($addonTvText)): ?>
-      <div class="cbn-fld" style="top:49.3%;left:74.4%;font-size:9pt;font-weight:bold;">
+      <div class="cbn-fld" style="top:49.25%;left:74.4%;font-size:9pt;font-weight:bold;">
         &#10004; <?= htmlspecialchars($addonTvText) ?>
       </div>
     <?php endif; ?>
 
-    <!-- Perincian Biaya -->
-    <?= $f($biayaPaket,  60.05, 69.5, '11pt') ?>
-    <?= $f($biayaPasang, 61.6,  69.5, '11pt') ?>
-    <?= $f($biayaTotal,  69.4,  69.5, '13pt') ?>
+    <!-- RINCIAN BIAYA -->
+    <?= $f($biayaPaket,  60.0, 69.5, '11pt') ?>
+    <?= $f($biayaPasang, 61.5, 69.5, '11pt') ?>
+    <?= $f($biayaTotal,  69.3, 69.5, '13pt') ?>
 
-    <!-- 4. AKTIVASI LAYANAN (USERNAME) -->
-    <?= $f(strtolower($usernameCbn), 84.55, 2.8, '12pt') ?>
+    <!-- 4. USERNAME (11 kotak) -->
+    <?= $box(strtolower($usernameCbn), 2.8, 84.5, 2.483, '10pt', 11) ?>
 
-    <!-- 5. JADWAL & NOTES -->
-    <?= $f(!empty($catatan) ? $catatan : 'REGULAR PROMO CBN - PT. SEP', 88.85, 51.5, '9.5pt') ?>
+    <!-- 5. NOTES -->
+    <?= $f(!empty($catatan) ? $catatan : 'REGULAR PROMO CBN - PT. SEP', 88.8, 51.5, '9.5pt') ?>
 
-    <!-- Tanggal Surat -->
-    <?= $f($tglTtd, 92.9, 9.5, '10.5pt') ?>
+    <!-- TANGGAL SURAT -->
+    <?= $f($tglTtd, 92.85, 9.5, '10.5pt') ?>
 
-    <!-- Tanda Tangan Pelanggan -->
+    <!-- TANDA TANGAN PELANGGAN -->
     <?php if (!empty($signatureImg)): ?>
       <img src="<?= $signatureImg ?>" style="position:absolute;top:89.5%;left:4%;max-height:45px;max-width:150px;z-index:3;" alt="TTD">
     <?php endif; ?>
 
-    <!-- Nama Sales -->
-    <?= $f($salesName, 94.9, 38.5, '10.5pt') ?>
-
-    <!-- Sales Code SPV -->
-    <?= $f($salesCode . '-' . explode(' ', $salesName)[0], 94.9, 74.0, '10.5pt') ?>
+    <!-- NAMA SALES & SALES CODE -->
+    <?= $f($salesName, 94.85, 38.5, '10.5pt') ?>
+    <?= $f($salesCode . '-' . explode(' ', $salesName)[0], 94.85, 74.0, '10.5pt') ?>
 
   </div>
 </div>
