@@ -115,9 +115,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $settings['spreadsheet_id']  = trim($_POST['spreadsheet_id'] ?? ($settings['spreadsheet_id'] ?? ''));
             $settings['drive_folder_id'] = trim($_POST['drive_folder_id'] ?? ($settings['drive_folder_id'] ?? ''));
             
-            $settings['telegram_bot_token'] = trim($_POST['telegram_bot_token'] ?? ($settings['telegram_bot_token'] ?? '8983108876:AAFF5LpamG8EzQI3gXx6ukE_tFOO163QRNc'));
-            $settings['telegram_chat_id']   = trim($_POST['telegram_chat_id'] ?? ($settings['telegram_chat_id'] ?? '7084271773'));
-            
             if (!empty($_POST['admin_username'])) {
                 $settings['admin_username'] = trim($_POST['admin_username']);
             }
@@ -135,26 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 file_put_contents($envPath, $envContent);
             }
 
-            $msgSuccess = "Pengaturan Google, Telegram & Profil Admin berhasil disimpan!";
-        } catch (\Exception $e) {
-            $msgError = $e->getMessage();
-        }
-    }
-
-    // 5. TEST KIRIM TELEGRAM
-    elseif ($action === 'test_telegram') {
-        try {
-            $token  = trim($_POST['telegram_bot_token'] ?? '');
-            $chatId = trim($_POST['telegram_chat_id'] ?? '');
-            if (empty($token) || empty($chatId)) {
-                throw new \Exception("Token Bot dan Chat ID Telegram wajib diisi!");
-            }
-            $testMsg = "🔔 <b>UJI COBA BOT TELEGRAM CBN BERHASIL!</b>\n\nSistem Formulir Pendaftaran Layanan CBN - PT. Sinergi Emas Perdana telah terhubung sempurna dengan akun Telegram Anda.\n\n⏱️ <i>Waktu: " . date('d/m/Y H:i:s') . " WIB</i>";
-            if (\App\TelegramService::sendMessage($token, $chatId, $testMsg)) {
-                $msgSuccess = "Pesan notifikasi uji coba berhasil dikirim ke akun Telegram Anda (Chat ID: {$chatId})!";
-            } else {
-                throw new \Exception("Gagal mengirim ke Telegram. Pastikan Anda sudah membuka bot dan mengklik tombol START.");
-            }
+            $msgSuccess = "Pengaturan Google & Profil Admin berhasil disimpan!";
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
