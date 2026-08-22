@@ -529,6 +529,188 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* ================= MOBILE RESPONSIVE ================= */
+        @media (max-width: 768px) {
+            body { padding: 0; }
+            .container { padding: 12px; max-width: 100%; box-sizing: border-box; }
+            
+            /* Topbar */
+            .topbar {
+                padding: 12px 16px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .brand-area { width: 100%; }
+            .cbn-logo { font-size: 24px; }
+            .topbar-title { font-size: 13px; }
+            .topbar-sub { font-size: 10.5px; }
+            .topbar-right {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+            }
+            .btn-view-form {
+                flex: 1;
+                font-size: 11.5px;
+                padding: 8px 10px;
+                text-align: center;
+                justify-content: center;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .btn-logout {
+                font-size: 11.5px;
+                padding: 8px 14px;
+                flex-shrink: 0;
+            }
+
+            /* Stats */
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                margin-bottom: 16px;
+            }
+            .stats-grid .stat-card:last-child {
+                grid-column: span 2;
+            }
+            .stat-card {
+                padding: 12px 14px;
+            }
+            .stat-val {
+                font-size: 22px;
+            }
+            .stat-lbl {
+                font-size: 10.5px;
+            }
+            .stat-icon-wrap {
+                width: 36px;
+                height: 36px;
+                font-size: 14px;
+            }
+
+            /* Tabs Nav */
+            .tabs-nav {
+                display: flex;
+                gap: 6px;
+                margin-bottom: 16px;
+                padding-bottom: 8px;
+                overflow-x: auto;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+            }
+            .tabs-nav::-webkit-scrollbar { height: 3px; }
+            .tabs-nav::-webkit-scrollbar-thumb { background: rgba(0, 160, 223, 0.4); border-radius: 4px; }
+            .tab-btn {
+                padding: 8px 14px;
+                font-size: 12px;
+                flex-shrink: 0;
+                border-radius: 8px;
+            }
+
+            /* Cards & Panels */
+            .panel-card {
+                padding: 16px 14px;
+                border-radius: 12px;
+                margin-bottom: 16px;
+                box-sizing: border-box;
+                width: 100%;
+                overflow: hidden;
+            }
+            .panel-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+                margin-bottom: 14px;
+                padding-bottom: 10px;
+            }
+            .panel-title {
+                font-size: 15px;
+            }
+            .panel-desc {
+                font-size: 11.5px;
+            }
+
+            /* Form Grids */
+            .form-grid-2, .form-grid-3 {
+                grid-template-columns: 1fr !important;
+                gap: 10px !important;
+            }
+            .form-group {
+                margin-bottom: 10px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .form-control {
+                font-size: 13px;
+                padding: 9px 12px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .btn-primary {
+                width: 100%;
+                text-align: center;
+                justify-content: center;
+                padding: 11px 16px;
+                font-size: 13px;
+            }
+
+            /* Table Responsive */
+            .table-responsive {
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                border-radius: 8px;
+                border: 1px solid var(--border);
+            }
+            .admin-table {
+                min-width: 580px;
+            }
+            .admin-table th, .admin-table td {
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+
+            /* Integration Box */
+            .integration-box {
+                padding: 12px 14px;
+                font-size: 12px;
+            }
+
+            /* Modal */
+            .modal {
+                padding: 12px;
+            }
+            .modal-content {
+                padding: 18px 14px;
+                width: 100%;
+                max-width: 100%;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats-grid .stat-card:last-child {
+                grid-column: span 1;
+            }
+            .topbar-right {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .btn-view-form, .btn-logout {
+                width: 100%;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>

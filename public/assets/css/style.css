@@ -721,12 +721,160 @@ body::after {
     to { transform: rotate(360deg); }
 }
 
-/* Responsive */
+/* ================= MOBILE RESPONSIVE ================= */
 @media (max-width: 768px) {
-    .header-inner { flex-direction: column; align-items: flex-start; gap: 10px; }
-    .header-right { width: 100%; justify-content: space-between; }
-    .grid-2, .grid-3 { grid-template-columns: 1fr; }
-    .form-section { padding: 20px 18px; }
-    .form-footer { flex-direction: column; width: 100%; }
-    .btn-submit, .btn-preview-live { width: 100%; justify-content: center; }
+    body { padding: 0; }
+    
+    /* Header */
+    .site-header { padding: 12px 0; }
+    .header-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 0 14px;
+    }
+    .logo-wrap { gap: 10px; }
+    .cbn-brand-logo { font-size: 26px; }
+    .header-title h1 { font-size: 14px; }
+    .header-title p { font-size: 11px; }
+    .header-right {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-preview-live {
+        padding: 8px 12px;
+        font-size: 11.5px;
+    }
+    .badge-callcenter {
+        font-size: 10px;
+        padding: 4px 10px;
+    }
+
+    /* Main Container */
+    .main-wrapper {
+        padding: 12px 10px 60px;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .form-card {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* Progress Step Bar */
+    .progress-bar-container {
+        padding: 12px 14px;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        justify-content: flex-start;
+        gap: 10px;
+        scrollbar-width: none;
+    }
+    .progress-bar-container::-webkit-scrollbar { display: none; }
+    .progress-step {
+        flex-shrink: 0;
+        gap: 6px;
+    }
+    .progress-dot {
+        width: 26px;
+        height: 26px;
+        font-size: 11px;
+    }
+    .progress-label {
+        font-size: 11px;
+    }
+    .progress-line {
+        min-width: 16px;
+        flex-shrink: 0;
+    }
+
+    /* Grids & Forms */
+    .grid-2, .grid-3, .grid-4 {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+    .form-section {
+        padding: 16px 14px;
+    }
+    .section-title {
+        font-size: 14px;
+    }
+    .section-desc {
+        font-size: 11px;
+        margin-bottom: 14px;
+    }
+    .form-group {
+        margin-bottom: 12px;
+    }
+    .form-label {
+        font-size: 11.5px;
+    }
+    .form-input, .form-select, .form-textarea {
+        font-size: 13px;
+        padding: 9px 12px;
+    }
+
+    /* Package & Addons */
+    .package-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+    }
+    .package-card {
+        padding: 14px;
+    }
+    .package-speed {
+        font-size: 16px;
+    }
+    .radio-group {
+        flex-direction: column;
+        gap: 8px;
+    }
+    .radio-card {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    /* Signature */
+    .signature-box {
+        height: 160px;
+        touch-action: none;
+    }
+    .signature-box canvas {
+        width: 100% !important;
+        height: 100% !important;
+        touch-action: none;
+    }
+    .signature-controls {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    /* Footer Submit */
+    .form-footer {
+        padding: 16px 14px;
+        flex-direction: column-reverse;
+        gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .btn-submit, .btn-preview-live {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 18px;
+        font-size: 13.5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .cbn-brand-logo { font-size: 22px; }
+    .header-title h1 { font-size: 12.5px; }
+    .header-title p { font-size: 10px; }
+    .main-wrapper { padding: 10px 8px 50px; }
+    .form-section { padding: 14px 12px; }
+    .btn-submit { font-size: 12.5px; padding: 11px 14px; }
 }

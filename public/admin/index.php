@@ -164,6 +164,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transition: color 0.2s;
         }
         .btn-back-form:hover { color: #00a0df; }
+
+        @media (max-width: 480px) {
+            body { padding: 14px; }
+            .login-card { padding: 26px 18px; border-radius: 12px; }
+            .brand-logo { font-size: 28px; }
+            .brand-header h1 { font-size: 15px; }
+            .brand-header p { font-size: 11px; }
+            .btn-login { padding: 11px; font-size: 13.5px; }
+        }
     </style>
 </head>
 <body>
