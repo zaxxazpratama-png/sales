@@ -21,3 +21,5 @@ Thumbs.db
 *.log
 
 .vercel
+/node_modules/
+asli_page_*.png

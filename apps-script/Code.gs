@@ -180,11 +180,12 @@ function renderPdfBoxes(text, count) {
 
 
 /**
- * Generator HTML Formulir Pendaftaran Layanan CBN (PDF Ready)
+ * Generator HTML Formulir Pendaftaran Layanan CBN (100% Identik dengan asli.pdf)
  */
 function generateCbnDocumentHtml(data) {
   const nama        = (data.nama_pelanggan || '').toUpperCase();
   const salesCode   = (data.sales_code || 'SEP-001').toUpperCase();
+  const salesName   = (data.sales_name || 'PUJA PANGESTU').toUpperCase();
   const ttl         = (data.ttl || '').toUpperCase();
   const ktp         = data.nomor_ktp || '';
   const gender      = (data.jenis_kelamin || 'PRIA').toUpperCase();
@@ -209,6 +210,8 @@ function generateCbnDocumentHtml(data) {
   const waktuPasang = data.jadwal_waktu || '09.00-11.00';
   const catatan     = data.catatan || '';
   const totalBiaya  = data.biaya_total || 'Rp 331.890';
+  const biayaPasang = data.biaya_pasang || 'Rp 0 (Promo Gratis Pasang)';
+  const biayaPaket  = data.biaya_paket || 'Rp 299.000';
   const tglTtd      = data.so_date || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
   const signatureImg= data.signature_data || '';
 
@@ -217,18 +220,45 @@ function generateCbnDocumentHtml(data) {
   const isPemilik = (kepemilikan === 'PEMILIK' || kepemilikan === 'OWNER');
   const isPenyewa = (kepemilikan === 'PENYEWA' || kepemilikan === 'RENTER');
 
-  const isF50     = (service === 'Fiber 50');
-  const isF100    = (service === 'Fiber 100');
-  const isF200    = (service === 'Fiber 200');
-  const isF250    = (service === 'Fiber 250');
-  const isF1G     = (service === 'Fiber 1Gbps');
-  const isPro100  = (service === 'Fiber PRO 100');
-  const isPro200  = (service === 'Fiber PRO 200');
+  const isFiberSafe = (service.indexOf('Safe') !== -1);
+  const isFiberPro  = (service.indexOf('Pro') !== -1);
+  const isFiberStd  = (!isFiberSafe && !isFiberPro);
 
   const hasDensTv = addonTv.indexOf('Dens') !== -1;
   const hasVision = addonTv.indexOf('Vision') !== -1;
   const hasRouter = addonDevice.indexOf('Router') !== -1 || routerQty !== '0';
   const hasSmartbox = addonDevice.indexOf('Smartbox') !== -1 || smartboxQty !== '0';
+
+  // Pisahkan TTL
+  let ttlKota = '', ttlDay = '', ttlMonth = '', ttlYear = '';
+  if (ttl) {
+    const ttlParts = ttl.split(',');
+    ttlKota = (ttlParts[0] || '').trim();
+    if (ttlParts[1]) {
+      const dParts = ttlParts[1].trim().split(/[\/\-\s]+/);
+      if (dParts.length >= 3) {
+        ttlDay = ('0' + dParts[0]).slice(-2);
+        ttlMonth = ('0' + dParts[1]).slice(-2);
+        ttlYear = dParts[2];
+      }
+    }
+  }
+
+  // Pisahkan Alamat
+  const alamatRow1 = alamat.substring(0, 30);
+  const alamatRow2 = alamat.substring(30, 60);
+  const alamatRow3 = alamat.substring(60, 73);
+
+  // Jadwal
+  let jadwalDay = '', jadwalMonth = '', jadwalYear = '';
+  if (tglPasang) {
+    const jParts = tglPasang.trim().split(/[\/\-\s]+/);
+    if (jParts.length >= 3) {
+      jadwalDay = ('0' + jParts[0]).slice(-2);
+      jadwalMonth = ('0' + jParts[1]).slice(-2);
+      jadwalYear = jParts[2];
+    }
+  }
 
   return `
 <!DOCTYPE html>
@@ -237,143 +267,212 @@ function generateCbnDocumentHtml(data) {
 <meta charset="UTF-8">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #111; background: #fff; line-height: 1.2; padding: 8mm 10mm; }
-  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #005696; padding-bottom: 5px; margin-bottom: 5px; }
-  .logo { font-size: 24pt; font-weight: 900; color: #005696; font-family: 'Arial Black', sans-serif; }
-  .logo span { color: #00a0df; }
-  .sec-bar { background: #005696; color: #fff; font-weight: bold; font-size: 8pt; padding: 3px 6px; margin: 5px 0 3px; text-transform: uppercase; }
-  .row { display: flex; margin-bottom: 2px; align-items: center; }
-  .lbl { width: 140px; font-size: 7.5pt; font-weight: bold; color: #222; flex-shrink: 0; }
-  .lbl small { display: block; font-size: 6pt; font-weight: normal; font-style: italic; color: #555; }
-  .val { flex: 1; display: flex; align-items: center; }
-  .sq { width: 11px; height: 11px; border: 1.5px solid #222; display: inline-block; text-align: center; line-height: 9px; font-size: 8pt; font-weight: bold; margin-right: 3px; }
-  .chk { display: inline-flex; align-items: center; margin-right: 12px; font-size: 7.5pt; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
-  .card { border: 1px solid #ccc; padding: 4px 6px; font-size: 7.5pt; }
-  .card h4 { font-size: 7.5pt; font-weight: bold; color: #005696; border-bottom: 1px dotted #ccc; padding-bottom: 2px; margin-bottom: 3px; }
-  .sign-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 6px; text-align: center; }
-  .sign-box { border: 1px solid #aaa; height: 65px; position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 2px; }
-  .sign-img { max-height: 40px; max-width: 120px; margin: 0 auto; position: absolute; top: 2px; left: 0; right: 0; }
-  .sign-title { font-size: 6.5pt; font-weight: bold; border-top: 1px solid #333; padding-top: 2px; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 7.2pt; color: #111; background: #fff; line-height: 1.15; padding: 6mm 8mm; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+  .brand { font-size: 24pt; font-weight: 900; color: #005696; font-family: 'Arial Black', sans-serif; line-height: 1; }
+  .brand span { color: #00a0df; }
+  .title-h1 { font-size: 9.5pt; color: #0066a1; font-weight: 800; text-transform: uppercase; margin-top: 3px; }
+  .title-sub { font-size: 7.5pt; font-style: italic; color: #0066a1; }
+  .bar { background: #0066a1; color: #fff; font-weight: 800; font-size: 7.5pt; padding: 2px 6px; margin: 3px 0 2px; text-transform: uppercase; }
+  .row { display: flex; margin-bottom: 1.5px; align-items: center; }
+  .lbl { width: 135px; font-size: 6.8pt; font-weight: 800; color: #111; flex-shrink: 0; }
+  .lbl small { display: block; font-size: 5.5pt; font-weight: normal; font-style: italic; color: #555; }
+  .fld { flex: 1; display: flex; align-items: center; }
+  .sq { width: 10px; height: 10px; border: 1.2px solid #222; display: inline-block; text-align: center; line-height: 8px; font-size: 7pt; font-weight: bold; margin-right: 3px; }
+  .chk { display: inline-flex; align-items: center; margin-right: 10px; font-size: 6.8pt; }
+  .cols { display: grid; grid-template-columns: 49.5% 49.5%; gap: 1%; margin-top: 2px; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 6.5pt; margin-top: 2px; }
+  .tbl td { border: 1px solid #888; padding: 1.5px 4px; }
+  .disc { font-size: 5.2pt; color: #444; line-height: 1.15; margin: 1.5px 0; font-style: italic; }
+  .signs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 5px; text-align: center; }
+  .sig-col { position: relative; padding-top: 26px; }
+  .sig-img { max-height: 30px; max-width: 100px; position: absolute; top: 0; left: 0; right: 0; margin: auto; }
+  .sig-line { border-top: 1px solid #333; padding-top: 1.5px; font-size: 6.5pt; font-weight: 700; color: #222; }
+  .sig-sub { font-size: 5.5pt; font-style: italic; color: #555; }
 </style>
 </head>
 <body>
 
+  <!-- HEADER -->
   <div class="head">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div class="logo">cbn<span>.</span></div>
-      <div>
-        <h1 style="font-size:10pt;color:#005696;font-weight:bold;margin:0;">FORMULIR PENDAFTARAN LAYANAN CBN</h1>
-        <p style="font-size:7.5pt;font-style:italic;color:#444;margin:0;">CBN service application form</p>
-      </div>
+    <div>
+      <div class="brand"><span>&bull;</span>CBN</div>
+      <div class="title-h1">FORMULIR PENDAFTARAN LAYANAN CBN</div>
+      <div class="title-sub">CBN service application form</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-size:7.5pt;font-weight:bold;margin-bottom:2px;">Sales code: ${renderPdfBoxes(salesCode, 8)}</div>
-      <div style="font-size:7pt;color:#555;">@www.cbn.id &bull; Call Center: 1500 780</div>
+      <div style="font-size:7.2pt;font-weight:bold;margin-bottom:3px;">
+        Sales code: ${renderPdfBoxes(salesCode, 8)}
+      </div>
+      <div style="font-size:6.5pt;color:#333;">
+        <span>🌐 www.cbn.id &bull; di_CBN &bull; </span>
+        <span style="background:#e30613;color:#fff;padding:1px 6px;border-radius:8px;font-weight:bold;">1500 780</span>
+      </div>
     </div>
   </div>
 
-  <div class="sec-bar">DATA PELANGGAN / CUSTOMER DATA</div>
-  <div class="row"><div class="lbl">NAMA PELANGGAN<small>Full Name</small></div><div class="val">${renderPdfBoxes(nama, 28)}</div></div>
+  <!-- 1. DATA PELANGGAN -->
+  <div class="bar">DATA PELANGGAN / CUSTOMER DATA</div>
   <div class="row">
-    <div class="lbl">TEMPAT/TGL LAHIR<small>Place/Date of birth</small></div>
-    <div class="val" style="gap:10px;">
-      ${renderPdfBoxes(ttl, 16)}
-      <span class="chk"><span class="sq">${isPria ? 'V' : ''}</span> Pria</span>
-      <span class="chk"><span class="sq">${isWanita ? 'V' : ''}</span> Wanita</span>
+    <div class="lbl">NAMA PELANGGAN<small>Full Name</small></div>
+    <div class="fld">${renderPdfBoxes(nama, 28)}</div>
+  </div>
+  <div class="row">
+    <div class="lbl">TEMPAT/TANGGAL LAHIR<small>Place/Date of birth</small></div>
+    <div class="fld" style="gap:3px;">
+      ${renderPdfBoxes(ttlKota, 14)}
+      <span style="font-size:5.8pt;font-style:italic;color:#444;">dd/mm/yyyy</span>
+      ${renderPdfBoxes(ttlDay, 2)} / ${renderPdfBoxes(ttlMonth, 2)} / ${renderPdfBoxes(ttlYear, 4)}
     </div>
   </div>
-  <div class="row"><div class="lbl">NOMOR IDENTITAS<small>No. KTP 16 Digit</small></div><div class="val">${renderPdfBoxes(ktp, 20)}</div></div>
   <div class="row">
-    <div class="lbl">TELEPON<small>Rumah / Selular</small></div>
-    <div class="val" style="gap:12px;">
-      <span>Rumah: ${renderPdfBoxes(telpRumah, 10)}</span>
-      <span>Selular: ${renderPdfBoxes(telpSelular, 13)}</span>
+    <div class="lbl">NOMOR IDENTITAS<small>ID Card No.</small></div>
+    <div class="fld" style="justify-content:space-between;">
+      ${renderPdfBoxes(ktp, 16)}
+      <div style="display:flex;align-items:center;">
+        <span style="font-size:6.5pt;font-weight:bold;margin-right:4px;">JENIS KELAMIN</span>
+        <div class="chk"><span class="sq">${isPria ? '&#10003;' : ''}</span> Pria</div>
+        <div class="chk"><span class="sq">${isWanita ? '&#10003;' : ''}</span> Wanita</div>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="lbl">TELEPON RUMAH<small>Home Phone</small></div>
+    <div class="fld" style="justify-content:space-between;">
+      ${renderPdfBoxes(telpRumah, 10)}
+      <div style="display:flex;align-items:center;">
+        <span style="font-size:6.5pt;font-weight:bold;margin-right:4px;">TELEPON SELULAR</span>
+        ${renderPdfBoxes(telpSelular, 13)}
+      </div>
+    </div>
+  </div>
+  <div class="disc">
+    Data yang tercantum harus sesuai dengan identitas pelanggan yang berlaku. Semua pelanggan baru CBN diwajibkan untuk menyertakan kopi identitas yang berlaku.
+  </div>
+
+  <!-- 2. ALAMAT PEMASANGAN -->
+  <div class="bar">ALAMAT PEMASANGAN / INSTALLATION ADDRESS</div>
+  <div class="row"><div class="lbl">ALAMAT PEMASANGAN<small>Installation Address</small></div><div class="fld">${renderPdfBoxes(alamatRow1, 30)}</div></div>
+  <div class="row"><div class="lbl"></div><div class="fld">${renderPdfBoxes(alamatRow2, 30)}</div></div>
+  <div class="row">
+    <div class="lbl"></div>
+    <div class="fld" style="gap:3px;">
+      ${renderPdfBoxes(alamatRow3, 13)}
+      <span style="font-size:6.2pt;font-weight:bold;">RT</span> ${renderPdfBoxes(rt, 2)}
+      <span style="font-size:6.2pt;font-weight:bold;">RW</span> ${renderPdfBoxes(rw, 2)}
+      <span style="font-size:6.2pt;font-weight:bold;margin-left:2px;">KODE POS</span> ${renderPdfBoxes(kodePos, 5)}
+    </div>
+  </div>
+  <div class="row">
+    <div class="lbl">STATUS KEPEMILIKAN<small>Ownership Status</small></div>
+    <div class="fld">
+      <div class="chk"><span class="sq">${isPemilik ? '&#10003;' : ''}</span> Pemilik - Owner</div>
+      <div class="chk"><span class="sq">${isPenyewa ? '&#10003;' : ''}</span> Penyewa - Renter</div>
+    </div>
+  </div>
+  <div class="row"><div class="lbl">ALAMAT EMAIL<small>Email Address</small></div><div class="fld">${renderPdfBoxes(email, 30)}</div></div>
+  <div class="disc">
+    Alamat pemasangan di atas akan berlaku sebagai alamat penagihan biaya berlangganan Anda. Tagihan dikirimkan via e-billing ke alamat email tercantum.
+  </div>
+
+  <!-- 3. MIDDLE TWO COLUMNS -->
+  <div class="cols">
+    <div>
+      <div class="bar">PILIHAN PAKET LAYANAN / SERVICE OPTIONS</div>
+      <div style="padding:1px 0;">
+        <div class="chk"><span class="sq">${isFiberStd ? '&#10003;' : ''}</span> CBN Fiber <strong>${service}</strong></div><br>
+        <div class="chk"><span class="sq">${isFiberSafe ? '&#10003;' : ''}</span> CBN Fiber Safe (Free Cyber Insurance)</div><br>
+        <div class="chk"><span class="sq">${isFiberPro ? '&#10003;' : ''}</span> CBN Fiber Pro</div>
+      </div>
+      <div class="disc">Minimal kontrak berlangganan 12 bulan. Termasuk paket Dens.TV.</div>
+
+      <div class="bar" style="margin-top:3px;">PEMBAYARAN VIA KARTU KREDIT / CC METHOD</div>
+      <div style="font-size:6pt;line-height:1.2;">
+        Nama pada kartu : ................................................................<br>
+        Nomor kartu : ................................................................<br>
+        Masa berlaku : ................................ (MM/YYYY)<br>
+        Bank : ................................. (Visa/Mastercard/BCA/JCB)
+      </div>
+    </div>
+
+    <div>
+      <div class="bar">PILIHAN LAYANAN TAMBAHAN / ADD-ON</div>
+      <div style="font-size:6.2pt;">
+        <strong>PERANGKAT TAMBAHAN:</strong><br>
+        <div class="chk"><span class="sq">${hasRouter ? '&#10003;' : ''}</span> Wireless Router [ ${hasRouter ? routerQty : '0'} Unit ]</div>
+        <div class="chk"><span class="sq">${hasSmartbox ? '&#10003;' : ''}</span> Smartbox [ ${hasSmartbox ? smartboxQty : '0'} Unit ]</div><br>
+        <strong style="display:inline-block;margin-top:2px;">ADD-ON TV:</strong><br>
+        <div class="chk"><span class="sq">${hasDensTv ? '&#10003;' : ''}</span> Dens.TV+ Apps</div>
+        <div class="chk"><span class="sq">${hasVision ? '&#10003;' : ''}</span> Vision+ Premium</div>
+      </div>
+
+      <div class="bar" style="margin-top:3px;">PERINCIAN BIAYA / PAYMENT DETAILS</div>
+      <table class="tbl">
+        <tr><td>Biaya Pasang</td><td style="text-align:right;">${biayaPasang}</td></tr>
+        <tr><td>Biaya Paket</td><td style="text-align:right;">${biayaPaket}</td></tr>
+        <tr><td>PPN 11%</td><td style="text-align:right;">Termasuk</td></tr>
+        <tr style="font-weight:bold;background:#f0f4f8;"><td>TOTAL</td><td style="text-align:right;color:#005696;">${totalBiaya}</td></tr>
+      </table>
     </div>
   </div>
 
-  <div class="sec-bar">ALAMAT PEMASANGAN / INSTALLATION ADDRESS</div>
-  <div class="row"><div class="lbl">ALAMAT PEMASANGAN<small>Installation Address</small></div><div class="val">${renderPdfBoxes(alamat, 28)}</div></div>
-  <div class="row">
-    <div class="lbl">RT/RW & KODE POS</div>
-    <div class="val" style="gap:6px;">
-      <span>RT ${renderPdfBoxes(rt, 3)}</span>
-      <span>RW ${renderPdfBoxes(rw, 3)}</span>
-      <span>KODE POS ${renderPdfBoxes(kodePos, 5)}</span>
-    </div>
-  </div>
-  <div class="row">
-    <div class="lbl">STATUS KEPEMILIKAN</div>
-    <div class="val">
-      <span class="chk"><span class="sq">${isPemilik ? 'V' : ''}</span> Pemilik - Owner</span>
-      <span class="chk"><span class="sq">${isPenyewa ? 'V' : ''}</span> Penyewa - Renter</span>
-    </div>
-  </div>
-  <div class="row"><div class="lbl">ALAMAT EMAIL</div><div class="val">${renderPdfBoxes(email, 28)}</div></div>
-
-  <div class="grid2">
-    <div class="card">
-      <h4>PILIHAN PAKET LAYANAN CBN</h4>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;">
-        <div>
-          <strong>FIBER</strong><br>
-          <span class="chk"><span class="sq">${isF50 ? 'V' : ''}</span> Fiber 50</span><br>
-          <span class="chk"><span class="sq">${isF100 ? 'V' : ''}</span> Fiber 100</span><br>
-          <span class="chk"><span class="sq">${isF200 ? 'V' : ''}</span> Fiber 200</span><br>
-          <span class="chk"><span class="sq">${isF250 ? 'V' : ''}</span> Fiber 250</span><br>
-          <span class="chk"><span class="sq">${isF1G ? 'V' : ''}</span> Fiber 1Gbps</span>
+  <!-- 4. LOWER TWO COLUMNS -->
+  <div class="cols" style="margin-top:3px;">
+    <div>
+      <div class="bar">AKTIVASI LAYANAN / SERVICE ACTIVATION</div>
+      <div class="row" style="margin:2px 0;">
+        <div class="lbl" style="width:65px;">USERNAME</div>
+        <div class="fld">
+          ${renderPdfBoxes(usernameCbn, 14)} <strong style="font-size:6.5pt;margin-left:2px;">@ cbn.net.id</strong>
         </div>
-        <div>
-          <strong>FIBER PRO</strong><br>
-          <span class="chk"><span class="sq">${isPro100 ? 'V' : ''}</span> Fiber PRO 100</span><br>
-          <span class="chk"><span class="sq">${isPro200 ? 'V' : ''}</span> Fiber PRO 200</span>
+      </div>
+      <div style="border:1px solid #999;padding:2px 3px;font-size:5pt;color:#333;line-height:1.1;">
+        <strong>Syarat dan ketentuan:</strong> Saya dengan ini menyatakan bahwa semua keterangan yang diisi adalah benar, serta menerima dan bersedia untuk terikat pada seluruh ketentuan berlangganan CBN di www.cbn.id/terms-of-service.html.
+      </div>
+    </div>
+
+    <div>
+      <div class="bar">JADWAL PEMASANGAN / INSTALLATION SCHEDULE</div>
+      <div style="font-size:6.2pt;">
+        <div><strong>Tanggal:</strong> ${renderPdfBoxes(jadwalDay, 2)} / ${renderPdfBoxes(jadwalMonth, 2)} / ${renderPdfBoxes(jadwalYear, 4)}</div>
+        <div style="margin-top:2px;">
+          <strong>Waktu:</strong>
+          <div class="chk"><span class="sq">${waktuPasang === '09.00-11.00' ? '&#10003;' : ''}</span> 09.00-11.00</div>
+          <div class="chk"><span class="sq">${waktuPasang === '11.00-13.00' ? '&#10003;' : ''}</span> 11.00-13.00</div>
+          <div class="chk"><span class="sq">${waktuPasang === '13.00-15.00' ? '&#10003;' : ''}</span> 13.00-15.00</div>
         </div>
-      </div>
-    </div>
-    <div class="card">
-      <h4>LAYANAN TAMBAHAN & PERANGKAT</h4>
-      <div style="margin-bottom:3px;">
-        <span class="chk"><span class="sq">${hasRouter ? 'V' : ''}</span> Wireless Router (${routerQty} Unit)</span><br>
-        <span class="chk"><span class="sq">${hasSmartbox ? 'V' : ''}</span> Smartbox (${smartboxQty} Unit)</span>
-      </div>
-      <div>
-        <strong>ADD-ON TV:</strong><br>
-        <span class="chk"><span class="sq">${hasDensTv ? 'V' : ''}</span> Dens TV+</span>
-        <span class="chk"><span class="sq">${hasVision ? 'V' : ''}</span> Vision Sports</span>
+        <div style="margin-top:2px;font-size:5.5pt;"><strong>Notes:</strong> ${catatan || '-'}</div>
       </div>
     </div>
   </div>
 
-  <div class="grid2">
-    <div class="card">
-      <h4>AKTIVASI & PEMBAYARAN</h4>
-      <p style="margin:2px 0;">Username: <strong>${usernameCbn}@cbn.net.id</strong></p>
-      <p style="margin:2px 0;">Total Biaya: <strong>${totalBiaya}</strong></p>
+  <!-- 5. SIGNATURES & FOOTER -->
+  <div style="font-size:6.5pt;font-weight:bold;margin-top:4px;">Tanggal : ${tglTtd}</div>
+  <div class="signs">
+    <div class="sig-col">
+      ${signatureImg ? `<img class="sig-img" src="${signatureImg}" alt="TTD">` : ''}
+      <div class="sig-line">Tanda tangan pelanggan</div>
+      <div class="sig-sub">customer signature</div>
     </div>
-    <div class="card">
-      <h4>JADWAL PEMASANGAN</h4>
-      <p style="margin:2px 0;">Tanggal: <strong>${tglPasang}</strong></p>
-      <p style="margin:2px 0;">Waktu: <strong>${waktuPasang} WIB</strong></p>
-      ${catatan ? '<p style="margin:2px 0;font-size:6.5pt;color:#666;">Catatan: ' + catatan + '</p>' : ''}
+    <div class="sig-col">
+      <div style="position:absolute;top:2px;left:0;right:0;font-size:6.5pt;font-weight:bold;color:#005696;">
+        ${salesCode} - ${salesName}
+      </div>
+      <div class="sig-line">Tanda tangan sales</div>
+      <div class="sig-sub">sales signature</div>
     </div>
-  </div>
-
-  <div class="sign-row">
-    <div class="sign-box">
-      ${signatureImg ? '<img class="sign-img" src="' + signatureImg + '" alt="TTD">' : ''}
-      <div class="sign-title">Tanda tangan pelanggan<br><span style="font-weight:normal;font-size:5.5pt;">Tanggal: ${tglTtd}</span></div>
-    </div>
-    <div class="sign-box">
-      <div class="sign-title">Tanda tangan sales<br><span style="font-weight:normal;font-size:5.5pt;">Sales: ${salesCode}</span></div>
-    </div>
-    <div class="sign-box">
-      <div class="sign-title">Tanda tangan SPV<br><span style="font-weight:normal;font-size:5.5pt;">PT. SEP</span></div>
+    <div class="sig-col">
+      <div style="position:absolute;top:2px;left:0;right:0;font-size:6.5pt;font-weight:bold;color:#005696;">
+        PT. SINERGI EMAS PERDANA
+      </div>
+      <div class="sig-line">Tanda tangan sales SPV</div>
+      <div class="sig-sub">sales SPV signature</div>
     </div>
   </div>
 
-  <div style="display:flex;justify-content:space-between;font-size:6pt;color:#888;margin-top:4px;border-top:1px solid #ddd;padding-top:2px;">
-    <span>Dokumen Resmi Pendaftaran Layanan CBN</span>
-    <span>CA-JKT-REL-FRM-00002023-1.0</span>
+  <div style="display:flex;justify-content:space-between;font-size:5.5pt;color:#666;margin-top:3px;border-top:1px solid #ddd;padding-top:2px;">
+    <span>Dokumen Resmi Pendaftaran Layanan CBN &bull; PT. Sinergi Emas Perdana</span>
+    <span>F /CA-COMM/CBD-BDSA/IX/2025/</span>
   </div>
 
 </body>
