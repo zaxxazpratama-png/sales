@@ -28,3 +28,7 @@ asli_bg.jpg
 test_preview.html
 update_codegs.py
 output_cbn_test.*
+assemble_*.py
+test_end_to_end.py
+drive_cbn_*.pdf
+drive_cbn_*.png
