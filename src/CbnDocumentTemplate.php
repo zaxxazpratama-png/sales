@@ -215,46 +215,48 @@ class CbnDocumentTemplate
     <img class="cbn-template-bg" src="<?= $baseUrl ?>/asli_page_1.png" alt="Template Asli CBN">
   <?php endif; ?>
 
+  <?php
+    $renderGrid = function($text, $startX, $startY, $stepX = 2.483, $fontSize = '10pt') {
+        if (empty($text)) return '';
+        $str = strtoupper(trim((string)$text));
+        $html = '';
+        for ($i = 0; $i < strlen($str); $i++) {
+            $ch = $str[$i];
+            if ($ch === ' ') continue;
+            $x = number_format($startX + ($i * $stepX) + ($stepX * 0.15), 3, '.', '');
+            $y = number_format($startY, 2, '.', '');
+            $html .= "<div class=\"cbn-fld\" style=\"top: {$y}%; left: {$x}%; font-size: {$fontSize};\">" . htmlspecialchars($ch) . "</div>\n";
+        }
+        return $html;
+    };
+  ?>
+
   <!-- DATA LAYER DENGAN PENEMPATAN PRESISI (100% IDENTIK DENGAN CONTOH KANTOR) -->
   <div class="cbn-data-layer">
     
-    <!-- 0. Sales Code Kanan Atas -->
-    <div class="cbn-fld" style="top: 3.4%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;">
-      <?= htmlspecialchars($salesCode) ?>
-    </div>
+    <!-- 0. Sales Code Kanan Atas (6 Kotak) -->
+    <?= $renderGrid(preg_replace('/[^A-Z0-9]/', '', $salesCode), 84.8, 3.5, 2.15, '10pt') ?>
 
-    <!-- 1. DATA PELANGGAN -->
-    <!-- Nama Pelanggan -->
-    <div class="cbn-fld" style="top: 11.3%; left: 21.2%; font-size: 11pt;">
-      <?= htmlspecialchars($nama) ?>
-    </div>
+    <!-- 1. DATA PELANGGAN (Kotak Grid Presisi) -->
+    <!-- Nama Pelanggan (29 Kotak) -->
+    <?= $renderGrid($nama, 21.15, 11.4, 2.483, '10pt') ?>
 
-    <!-- Tempat / Tanggal Lahir -->
+    <!-- Tempat Lahir (15 Kotak) -->
     <?php if (!empty($ttlKota)): ?>
-      <div class="cbn-fld" style="top: 13.9%; left: 21.2%; font-size: 10.5pt;">
-        <?= htmlspecialchars($ttlKota) ?>
-      </div>
+      <?= $renderGrid($ttlKota, 21.15, 14.0, 2.483, '10pt') ?>
     <?php endif; ?>
     <?php if (!empty($ttlDay)): ?>
-      <div class="cbn-fld" style="top: 13.9%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;">
-        <?= htmlspecialchars($ttlDay) ?>
-      </div>
+      <?= $renderGrid($ttlDay, 59.0, 14.0, 2.483, '10pt') ?>
     <?php endif; ?>
     <?php if (!empty($ttlMonth)): ?>
-      <div class="cbn-fld" style="top: 13.9%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;">
-        <?= htmlspecialchars($ttlMonth) ?>
-      </div>
+      <?= $renderGrid($ttlMonth, 64.0, 14.0, 2.483, '10pt') ?>
     <?php endif; ?>
     <?php if (!empty($ttlYear)): ?>
-      <div class="cbn-fld" style="top: 13.9%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;">
-        <?= htmlspecialchars($ttlYear) ?>
-      </div>
+      <?= $renderGrid($ttlYear, 69.8, 14.0, 2.483, '10pt') ?>
     <?php endif; ?>
 
-    <!-- Nomor KTP (16 Digit) -->
-    <div class="cbn-fld" style="top: 16.5%; left: 21.2%; font-size: 11pt;">
-      <?= htmlspecialchars($ktp) ?>
-    </div>
+    <!-- Nomor KTP (16 Kotak) -->
+    <?= $renderGrid(preg_replace('/[^0-9]/', '', $ktp), 21.15, 16.6, 2.483, '10.5pt') ?>
 
     <!-- Jenis Kelamin -->
     <?php if ($isPria): ?>
@@ -263,28 +265,13 @@ class CbnDocumentTemplate
       <div class="cbn-fld" style="top: 16.5%; left: 84.5%; font-size: 11pt;">&#10006;</div>
     <?php endif; ?>
 
-    <!-- Telepon Selular / WhatsApp -->
-    <div class="cbn-fld" style="top: 19.1%; left: 68.8%; font-size: 11pt;">
-      <?= htmlspecialchars($telpSelular) ?>
-    </div>
-    <?php if (!empty($telpRumah) && $telpRumah !== $telpSelular): ?>
-      <div class="cbn-fld" style="top: 20.7%; left: 68.8%; font-size: 11pt;">
-        <?= htmlspecialchars($telpRumah) ?>
-      </div>
-    <?php else: ?>
-      <div class="cbn-fld" style="top: 20.7%; left: 68.8%; font-size: 11pt;">
-        <?= htmlspecialchars($telpSelular) ?>
-      </div>
-    <?php endif; ?>
+    <!-- Telepon Selular / WhatsApp (Kotak HP) -->
+    <?= $renderGrid(preg_replace('/[^0-9]/', '', $telpSelular), 68.8, 19.2, 2.483, '10pt') ?>
 
-    <!-- 2. ALAMAT PEMASANGAN -->
-    <div class="cbn-fld" style="top: 26.9%; left: 21.5%; font-size: 10.5pt;">
-      <?= htmlspecialchars($alamat1) ?>
-    </div>
+    <!-- 2. ALAMAT PEMASANGAN (29 Kotak per baris) -->
+    <?= $renderGrid($alamat1, 21.15, 27.0, 2.483, '10pt') ?>
     <?php if (!empty($alamat2)): ?>
-      <div class="cbn-fld" style="top: 28.9%; left: 21.5%; font-size: 10.5pt;">
-        <?= htmlspecialchars($alamat2) ?>
-      </div>
+      <?= $renderGrid($alamat2, 21.15, 29.0, 2.483, '10pt') ?>
     <?php endif; ?>
 
     <!-- Status Kepemilikan -->
@@ -294,10 +281,8 @@ class CbnDocumentTemplate
       <div class="cbn-fld" style="top: 33.3%; left: 34.8%; font-size: 12pt;">&#10004;</div>
     <?php endif; ?>
 
-    <!-- Alamat Email -->
-    <div class="cbn-fld" style="top: 35.3%; left: 21.5%; font-size: 11pt;">
-      <?= htmlspecialchars($email) ?>
-    </div>
+    <!-- Alamat Email (29 Kotak) -->
+    <?= $renderGrid($email, 21.15, 35.4, 2.483, '9.5pt') ?>
 
     <!-- 3. PILIHAN PAKET LAYANAN & ADDON -->
     <div class="cbn-fld" style="top: 42.4%; left: 2.9%; font-size: 12pt;">&#10004;</div>
@@ -323,10 +308,8 @@ class CbnDocumentTemplate
       <?= htmlspecialchars($biayaTotal) ?>
     </div>
 
-    <!-- 4. AKTIVASI LAYANAN (USERNAME) -->
-    <div class="cbn-fld" style="top: 84.5%; left: 2.8%; font-size: 11pt;">
-      <?= htmlspecialchars($usernameCbn) ?>
-    </div>
+    <!-- 4. AKTIVASI LAYANAN (USERNAME - 11 Kotak) -->
+    <?= $renderGrid($usernameCbn, 2.8, 84.6, 2.483, '10pt') ?>
 
     <!-- 5. JADWAL & NOTES -->
     <div class="cbn-fld" style="top: 88.9%; left: 53.0%; font-size: 9.5pt;">

@@ -180,31 +180,44 @@ function renderPdfBoxes(text, count) {
 
 
 /**
+ * Helper untuk mencetak huruf/angka tepat 1-per-1 di tengah kotak karakter asli.pdf
+ */
+function renderGridBoxes(text, startX, startY, stepX, fontSize) {
+  if (!text) return '';
+  const str = text.toString().toUpperCase();
+  let html = '';
+  const sX = stepX || 2.483;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === ' ') continue;
+    const x = (startX + (i * sX) + (sX * 0.15)).toFixed(3);
+    const y = startY.toFixed(2);
+    html += `<div class='fld' style='top: ${y}%; left: ${x}%; font-size: ${fontSize || '10pt'}; font-weight: bold;'>${ch}</div>\n`;
+  }
+  return html;
+}
+
+/**
  * Generator HTML Formulir Pendaftaran Layanan CBN (100% Identik dengan asli.pdf & contoh.jpeg)
  */
 function generateCbnDocumentHtml(data) {
   const nama        = (data.nama_pelanggan || '').toUpperCase().trim();
-  const salesCode   = (data.sales_code || 'SEP-001').toUpperCase().trim();
+  const salesCode   = (data.sales_code || 'SEP001').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const salesName   = (data.sales_name || 'PUJA PANGESTU').toUpperCase().trim();
   const ttl         = (data.ttl || '').toUpperCase().trim();
-  const ktp         = (data.nomor_ktp || '').trim();
+  const ktp         = (data.nomor_ktp || '').replace(/[^0-9]/g, '');
   const gender      = (data.jenis_kelamin || 'PRIA').toUpperCase().trim();
-  const telpRumah   = (data.telp_rumah || '').trim();
-  const telpSelular = (data.telp || '').trim();
+  const telpSelular = (data.telp || '').replace(/[^0-9]/g, '');
+  const telpRumah   = (data.telp_rumah || '').replace(/[^0-9]/g, '');
   
   const alamat      = (data.alamat || '').toUpperCase().trim();
-  const rt          = (data.rt || '').trim();
-  const rw          = (data.rw || '').trim();
-  const kodePos     = (data.kode_pos || '').trim();
   const kepemilikan = (data.status_kepemilikan || 'PEMILIK').toUpperCase().trim();
-  const email       = (data.email_pelanggan || '').toLowerCase().trim();
+  const email       = (data.email_pelanggan || '').toUpperCase().trim();
   
   const service     = (data.service || 'Fiber 50').trim();
   const addonTv     = data.addon_tv || '';
-  const usernameCbn = (data.username_cbn || (nama.split(' ')[0] || 'user')).toLowerCase().trim();
+  const usernameCbn = (data.username_cbn || (nama.split(' ')[0] || 'user')).toUpperCase().trim();
   
-  const tglPasang   = data.jadwal_tanggal || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
-  const catatan     = (data.catatan || '').trim();
   const totalBiaya  = data.biaya_total || 'Rp 331.890';
   const biayaPasang = data.biaya_pasang || 'Rp 0';
   const biayaPaket  = data.biaya_paket || 'Rp 299.000';
@@ -231,10 +244,10 @@ function generateCbnDocumentHtml(data) {
     }
   }
 
-  // Pisahkan Alamat
+  // Pisahkan Alamat jadi 2 baris (maks 29 karakter per baris kotak)
   let alamat1 = alamat, alamat2 = '';
-  if (alamat.length > 38) {
-    const pos = alamat.substring(0, 38).lastIndexOf(' ');
+  if (alamat.length > 29) {
+    const pos = alamat.substring(0, 29).lastIndexOf(' ');
     if (pos !== -1) {
       alamat1 = alamat.substring(0, pos);
       alamat2 = alamat.substring(pos).trim();
@@ -244,8 +257,8 @@ function generateCbnDocumentHtml(data) {
   // Ambil Template Gambar Resmi Asli CBN dari Server Railway / Drive Cache
   let bgTemplate = '';
   const urls = [
-    'https://sales-sales.up.railway.app/asli_bg.jpg',
-    'https://sales-sales.up.railway.app/assets/img/asli_bg.jpg'
+    'https://sales-sales.up.railway.app/assets/img/asli_bg.jpg',
+    'https://sales-sales.up.railway.app/asli_bg.jpg'
   ];
   for (let i = 0; i < urls.length; i++) {
     try {
@@ -304,35 +317,43 @@ function generateCbnDocumentHtml(data) {
 </style>
 </head>
 <body>
-  ${bgTemplate ? `<img class='bg-img' src='data:image/jpeg;base64,${bgTemplate}'>` : `<img class='bg-img' src='https://sales-sales.up.railway.app/asli_bg.jpg'>`}
+  ${bgTemplate ? `<img class='bg-img' src='data:image/jpeg;base64,${bgTemplate}'>` : `<img class='bg-img' src='https://sales-sales.up.railway.app/assets/img/asli_bg.jpg'>`}
   <div class='layer'>
-    <!-- 0. Sales Code Kanan Atas -->
-    <div class='fld' style='top: 3.4%; left: 84.8%; font-size: 11pt; letter-spacing: 2px;'>${salesCode}</div>
+    <!-- 0. Sales Code Kanan Atas (6 Kotak) -->
+    ${renderGridBoxes(salesCode, 84.8, 3.5, 2.15, '10pt')}
 
-    <!-- 1. DATA PELANGGAN -->
-    <div class='fld' style='top: 11.3%; left: 21.2%; font-size: 11pt;'>${nama}</div>
+    <!-- 1. DATA PELANGGAN (Kotak Grid Presisi) -->
+    <!-- Nama (29 Kotak) -->
+    ${renderGridBoxes(nama, 21.15, 11.4, 2.483, '10pt')}
 
-    ${ttlKota ? `<div class='fld' style='top: 13.9%; left: 21.2%; font-size: 10.5pt;'>${ttlKota}</div>` : ''}
-    ${ttlDay ? `<div class='fld' style='top: 13.9%; left: 59.2%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlDay}</div>` : ''}
-    ${ttlMonth ? `<div class='fld' style='top: 13.9%; left: 64.0%; font-size: 10.5pt; width: 18px; text-align: center;'>${ttlMonth}</div>` : ''}
-    ${ttlYear ? `<div class='fld' style='top: 13.9%; left: 69.8%; font-size: 10.5pt; width: 38px; text-align: center;'>${ttlYear}</div>` : ''}
+    <!-- Tempat Lahir (15 Kotak) -->
+    ${renderGridBoxes(ttlKota, 21.15, 14.0, 2.483, '10pt')}
 
-    <div class='fld' style='top: 16.5%; left: 21.2%; font-size: 11pt;'>${ktp}</div>
+    <!-- Tanggal Lahir (2 Kotak DD, 2 Kotak MM, 4 Kotak YYYY) -->
+    ${renderGridBoxes(ttlDay, 59.0, 14.0, 2.483, '10pt')}
+    ${renderGridBoxes(ttlMonth, 64.0, 14.0, 2.483, '10pt')}
+    ${renderGridBoxes(ttlYear, 69.8, 14.0, 2.483, '10pt')}
 
+    <!-- KTP (16 Kotak) -->
+    ${renderGridBoxes(ktp, 21.15, 16.6, 2.483, '10.5pt')}
+
+    <!-- Jenis Kelamin -->
     ${isPria ? `<div class='fld' style='top: 16.5%; left: 75.4%; font-size: 11pt;'>&#10006;</div>` : ''}
     ${isWanita ? `<div class='fld' style='top: 16.5%; left: 84.5%; font-size: 11pt;'>&#10006;</div>` : ''}
 
-    <div class='fld' style='top: 19.1%; left: 68.8%; font-size: 11pt;'>${telpSelular}</div>
-    <div class='fld' style='top: 20.7%; left: 68.8%; font-size: 11pt;'>${telpRumah || telpSelular}</div>
+    <!-- Telepon Selular (Kotak HP) -->
+    ${renderGridBoxes(telpSelular, 68.8, 19.2, 2.483, '10pt')}
 
-    <!-- 2. ALAMAT PEMASANGAN -->
-    <div class='fld' style='top: 26.9%; left: 21.5%; font-size: 10.5pt;'>${alamat1}</div>
-    ${alamat2 ? `<div class='fld' style='top: 28.9%; left: 21.5%; font-size: 10.5pt;'>${alamat2}</div>` : ''}
+    <!-- 2. ALAMAT PEMASANGAN (29 Kotak per baris) -->
+    ${renderGridBoxes(alamat1, 21.15, 27.0, 2.483, '10pt')}
+    ${alamat2 ? renderGridBoxes(alamat2, 21.15, 29.0, 2.483, '10pt') : ''}
 
+    <!-- Status Kepemilikan -->
     ${isPemilik ? `<div class='fld' style='top: 33.3%; left: 21.2%; font-size: 12pt;'>&#10004;</div>` : ''}
     ${isPenyewa ? `<div class='fld' style='top: 33.3%; left: 34.8%; font-size: 12pt;'>&#10004;</div>` : ''}
 
-    <div class='fld' style='top: 35.3%; left: 21.5%; font-size: 11pt;'>${email}</div>
+    <!-- Email (29 Kotak) -->
+    ${renderGridBoxes(email, 21.15, 35.4, 2.483, '9.5pt')}
 
     <!-- 3. PILIHAN PAKET & ADD-ON -->
     <div class='fld' style='top: 42.4%; left: 2.9%; font-size: 12pt;'>&#10004;</div>
@@ -347,8 +368,8 @@ function generateCbnDocumentHtml(data) {
     <div class='fld' style='top: 69.5%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
 
     <!-- 4. USERNAME & NOTES -->
-    <div class='fld' style='top: 84.5%; left: 2.8%; font-size: 11pt;'>${usernameCbn}</div>
-    <div class='fld' style='top: 88.9%; left: 53.0%; font-size: 9.5pt;'>${catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
+    ${renderGridBoxes(usernameCbn, 2.8, 84.6, 2.483, '10pt')}
+    <div class='fld' style='top: 88.9%; left: 53.0%; font-size: 9.5pt;'>${data.catatan || 'REGULAR PROMO CBN - PT. SEP'}</div>
 
     <!-- 5. TANGGAL & TANDA TANGAN -->
     <div class='fld' style='top: 93.0%; left: 10.5%; font-size: 10pt;'>${tglTtd}</div>
