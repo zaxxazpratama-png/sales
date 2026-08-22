@@ -23,3 +23,7 @@ Thumbs.db
 .vercel
 /node_modules/
 asli_page_*.png
+asli_template_hd.png
+asli_bg.jpg
+test_preview.html
+update_codegs.py
