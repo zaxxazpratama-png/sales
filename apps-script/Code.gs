@@ -21,6 +21,165 @@ const CONFIG = {
 
 
 /**
+ * Handler untuk HTTP POST dari Form Web PHP
+ */
+function doPost(e) {
+  try {
+    let params = {};
+
+    // Parse JSON body atau Form parameters
+    if (e.postData && e.postData.contents) {
+      try {
+        params = JSON.parse(e.postData.contents);
+      } catch (jsonErr) {
+        params = e.parameter || {};
+      }
+    } else if (e.parameter) {
+      params = e.parameter;
+    }
+
+    // Ambil konfigurasi dinamis yang dikirim dari Dashboard Admin
+    const targetFolderId = params.drive_folder_id || CONFIG.DRIVE_FOLDER_ID;
+    const targetSheetId  = params.spreadsheet_id  || CONFIG.SPREADSHEET_ID;
+    const targetEmail    = params.notif_email     || CONFIG.NOTIF_EMAIL;
+
+    let ktpDriveUrl = '';
+    let pdfDriveUrl = '';
+    let pdfBlob     = null;
+
+    // ---- 1. Simpan Foto KTP ke Google Drive (jika ada) ----
+    if (params.file_data && params.file_name) {
+      try {
+        ktpDriveUrl = saveBase64ToDrive(
+          params.file_data,
+          params.file_name,
+          params.file_mime || 'image/jpeg',
+          targetFolderId
+        );
+      } catch (eKtp) {
+        logError('KTP Drive Error: ' + eKtp.toString(), targetSheetId);
+      }
+    }
+
+    // ---- 2. Generate PDF Surat Formulir CBN Resmi ----
+    try {
+      const cbnHtmlContent = generateCbnDocumentHtml(params);
+      const cleanName = (params.nama_pelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const pdfFileName = 'Formulir_CBN_' + cleanName + '_' + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmm') + '.pdf';
+      
+      const htmlOutput = HtmlService.createHtmlOutput(cbnHtmlContent);
+      pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
+
+      let folder;
+      try {
+        folder = DriveApp.getFolderById(targetFolderId);
+      } catch (fErr) {
+        folder = DriveApp.getRootFolder();
+      }
+
+      const pdfFile = folder.createFile(pdfBlob);
+      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      pdfDriveUrl = pdfFile.getUrl();
+    } catch (driveErr) {
+      logError('PDF Drive Error: ' + driveErr.toString(), targetSheetId);
+    }
+
+    // ---- 3. Simpan Baris Data ke Google Sheets ----
+    try {
+      appendToSheet(params, pdfDriveUrl, ktpDriveUrl, targetSheetId);
+    } catch (sheetErr) {
+      logError('Sheet Error: ' + sheetErr.toString(), targetSheetId);
+    }
+
+    // ---- 4. Kirim Email Notifikasi ke Master / Admin (+ Attachment PDF Surat CBN) ----
+    try {
+      sendAdminEmail(params, pdfDriveUrl, ktpDriveUrl, pdfBlob, targetEmail);
+    } catch (mailErr) {
+      logError('Mail Admin Error: ' + mailErr.toString(), targetSheetId);
+    }
+
+    // ---- 5. Kirim Email "Terima Kasih Atas Pendaftaran Anda" ke Email Pelanggan (+ Attachment PDF Surat CBN) ----
+    if (params.email_pelanggan && params.email_pelanggan.indexOf('@') !== -1) {
+      try {
+        sendCustomerEmail(params, pdfDriveUrl, pdfBlob);
+      } catch (custMailErr) {
+        logError('Mail Customer Error: ' + custMailErr.toString(), targetSheetId);
+      }
+    }
+
+    // ---- 6. Response Sukses ke PHP Form ----
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status:  'success',
+        message: 'Data dan Surat Formulir CBN berhasil disimpan',
+        pdf_url: pdfDriveUrl,
+        drive:   pdfDriveUrl,
+        ktp_url: ktpDriveUrl
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    logError('General Error: ' + err.toString());
+
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status:  'error',
+        message: err.toString()
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+
+/**
+ * GET handler untuk cek status endpoint
+ */
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status:  'ok',
+      message: 'CBN Google Apps Script Web App Aktif & Siap Menerima Data Formulir!',
+      time:    new Date().toISOString()
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+/**
+ * Simpan file base64 ke Google Drive
+ */
+function saveBase64ToDrive(base64Data, fileName, mimeType, folderId) {
+  let folder;
+  try {
+    folder = DriveApp.getFolderById(folderId || CONFIG.DRIVE_FOLDER_ID);
+  } catch (e) {
+    folder = DriveApp.getRootFolder();
+  }
+  const decoded = Utilities.base64Decode(base64Data);
+  const blob    = Utilities.newBlob(decoded, mimeType, fileName);
+  const file    = folder.createFile(blob);
+
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+
+/**
+ * Helper render char boxes untuk template PDF
+ */
+function renderPdfBoxes(text, count) {
+  text = (text || '').toUpperCase();
+  let html = '<div style="display:inline-flex;gap:1px;">';
+  for (let i = 0; i < count; i++) {
+    const ch = i < text.length ? text[i] : '&nbsp;';
+    html += '<div style="width:13px;height:15px;border:1px solid #777;text-align:center;font-size:8pt;font-weight:bold;line-height:14px;background:#fff;">' + ch + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+
+/**
  * Generator HTML Formulir Pendaftaran Layanan CBN (100% Identik dengan asli.pdf & contoh.jpeg)
  */
 function generateCbnDocumentHtml(data) {
@@ -168,7 +327,7 @@ function generateCbnDocumentHtml(data) {
     <!-- RINCIAN BIAYA -->
     <div class='fld' style='top: 60.1%; left: 69.5%; font-size: 11pt;'>${biayaPaket}</div>
     <div class='fld' style='top: 61.6%; left: 69.5%; font-size: 11pt;'>${biayaPasang}</div>
-    <div class='fld' style='top: 67.5%; left: 69.5%; font-size: 11pt;'>${biayaPpn || 'Rp 32.890'}</div>
+    <div class='fld' style='top: 67.5%; left: 69.5%; font-size: 11pt;'>${data.biaya_ppn || 'Rp 32.890'}</div>
     <div class='fld' style='top: 69.4%; left: 69.5%; font-size: 13pt;'>${totalBiaya}</div>
 
     <!-- 4. USERNAME & NOTES -->
@@ -189,9 +348,7 @@ function generateCbnDocumentHtml(data) {
 
 
 /**
- * Tambahkan baris data lengkap ke Google Sheets dengan Auto Styling Profesional
- */
-function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
+ * function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
   const ssId  = sheetId || CONFIG.SPREADSHEET_ID;
   const ss    = SpreadsheetApp.openById(ssId);
   const sheet = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
