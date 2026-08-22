@@ -792,7 +792,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
     <!-- TABS NAV -->
     <div class="tabs-nav">
         <button type="button" class="tab-btn active" onclick="switchTab('sales-tab')">Manajemen Tim Sales & Shortlink</button>
-        <button type="button" class="tab-btn" onclick="switchTab('google-tab')">Integrasi Google & Telegram</button>
+        <button type="button" class="tab-btn" onclick="switchTab('google-tab')">Integrasi Google & Apps Script</button>
         <button type="button" class="tab-btn" onclick="switchTab('packages-tab')">Pengaturan Paket & Form</button>
         <button type="button" class="tab-btn" onclick="switchTab('settings-tab')">Profil Perusahaan & Admin</button>
     </div>
@@ -926,34 +926,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     </div>
                 </div>
 
-                <!-- INTEGRASI TELEGRAM -->
-                <div style="border-top:1px solid var(--border);margin-top:24px;padding-top:20px;">
-                    <div style="font-size:15px;font-weight:800;color:#38bdf8;margin-bottom:6px;">🤖 Integrasi Bot Telegram (Notifikasi Instan)</div>
-                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Setiap ada pendaftaran baru, sistem akan otomatis mengirimkan rincian data pelanggan dan foto KTP ke bot Telegram Anda.</div>
-                    
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label>Token Bot Telegram (TELEGRAM_BOT_TOKEN)</label>
-                            <input type="text" name="telegram_bot_token" class="form-control" 
-                                value="<?= htmlspecialchars($settings['telegram_bot_token'] ?? '8983108876:AAFF5LpamG8EzQI3gXx6ukE_tFOO163QRNc') ?>" 
-                                placeholder="8983108876:AAFF5LpamG8EzQI3gXx6ukE_tFOO163QRNc" style="font-family:'JetBrains Mono',monospace;font-size:12px;">
-                        </div>
-
-                        <div class="form-group">
-                            <label>ID User / Chat ID Telegram (TELEGRAM_CHAT_ID)</label>
-                            <input type="text" name="telegram_chat_id" class="form-control" 
-                                value="<?= htmlspecialchars($settings['telegram_chat_id'] ?? '7084271773') ?>" 
-                                placeholder="7084271773" style="font-family:'JetBrains Mono',monospace;font-size:12px;">
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-                    <button type="submit" class="btn-primary">Simpan Pengaturan Google & Telegram</button>
-                    <button type="submit" name="action" value="test_telegram" class="btn-action" style="padding:10px 18px;font-size:13px;font-weight:700;color:#67e8f9;border-color:rgba(0,160,223,0.4);background:rgba(0,160,223,0.15);">
-                        🔔 Test Kirim Pesan Telegram
-                    </button>
-                </div>
+                <button type="submit" class="btn-primary" style="margin-top:12px;">Simpan Pengaturan Google & Sistem</button>
             </form>
 
             <!-- KOTAK COPY SOURCE CODE CODE.GS -->

