@@ -7,7 +7,9 @@ require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use App\SettingsManager;
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Jika sudah login, langsung ke dashboard
 if (!empty($_SESSION['admin_logged_in'])) {

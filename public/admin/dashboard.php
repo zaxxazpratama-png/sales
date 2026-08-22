@@ -10,18 +10,21 @@ use App\Config;
 use App\SalesManager;
 use App\SettingsManager;
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Cek autentikasi login
 if (empty($_SESSION['admin_logged_in'])) {
-    header('Location: index.php');
+    header('Location: admin');
     exit;
 }
 
 // Handle Logout
 if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: index.php');
+    $_SESSION['admin_logged_in'] = false;
+    unset($_SESSION['admin_logged_in'], $_SESSION['admin_user']);
+    header('Location: admin');
     exit;
 }
 

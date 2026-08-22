@@ -1,7 +1,7 @@
 <?php
 /**
  * FORMGOOGLE - Root Router
- * Memproses direct access, ngrok, dan clean URL path /KODE_SALES
+ * Memproses direct access, railway, ngrok, clean URL path /KODE_SALES, dan rute Admin Dashboard
  */
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -11,15 +11,19 @@ if (session_status() === PHP_SESSION_NONE) {
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $path = parse_url($requestUri, PHP_URL_PATH);
 
-// Bersihkan base folder path: /ALATTEMPUR/FORMGOOGLE/ atau path hosting/ngrok
+// Bersihkan base folder path: /ALATTEMPUR/FORMGOOGLE/ atau path hosting/ngrok/railway
 $scriptName = dirname($_SERVER['SCRIPT_NAME']);
 if ($scriptName !== '/' && $scriptName !== '\\' && strpos($path, $scriptName) === 0) {
     $path = substr($path, strlen($scriptName));
 }
 $path = trim($path, '/');
 
-// 1. Jika rute admin
-if ($path === 'admin' || strpos($path, 'admin/') === 0) {
+// 1. Jika rute admin atau dashboard
+if ($path === 'admin' || strpos($path, 'admin/') === 0 || $path === 'dashboard.php' || $path === 'dashboard') {
+    if ($path === 'dashboard.php' || $path === 'dashboard' || $path === 'admin/dashboard.php' || $path === 'admin/dashboard') {
+        require __DIR__ . '/public/admin/dashboard.php';
+        exit;
+    }
     require __DIR__ . '/public/admin/index.php';
     exit;
 }
