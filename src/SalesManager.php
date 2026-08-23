@@ -76,6 +76,7 @@ class SalesManager
             'no_wa'      => trim($data['no_wa'] ?? ''),
             'email'      => trim($data['email'] ?? ''),
             'tl_code'    => trim($data['tl_code'] ?? 'TL-01'),
+            'ttd_path'   => trim($data['ttd_path'] ?? ''),
             'status'     => ($data['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active',
             'created_at' => date('Y-m-d H:i:s'),
         ];
@@ -106,6 +107,7 @@ class SalesManager
                 $item['no_wa']      = trim($data['no_wa'] ?? $item['no_wa']);
                 $item['email']      = trim($data['email'] ?? $item['email']);
                 $item['tl_code']    = trim($data['tl_code'] ?? $item['tl_code']);
+                $item['ttd_path']   = trim($data['ttd_path'] ?? ($item['ttd_path'] ?? ''));
                 $item['status']     = ($data['status'] ?? $item['status']) === 'inactive' ? 'inactive' : 'active';
                 $found = true;
                 break;

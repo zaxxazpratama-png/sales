@@ -14,9 +14,15 @@ if (file_exists($autoload)) {
 
 use App\CbnDocumentTemplate;
 use App\SettingsManager;
+use App\SalesManager;
 
 // Ambil data dasar
 $data = $_SESSION['cbn_last_submission'] ?? [];
+
+// Parameter Sales
+$requestedSalesCode = $_GET['sales_code'] ?? ($_GET['sales'] ?? ($_SESSION['sales_code'] ?? 'SEP-001'));
+$salesData = SalesManager::findByCode($requestedSalesCode);
+$currentSalesName = $salesData['nama_sales'] ?? 'FIRMAN';
 
 // Jika ada parameter pkg_id atau service dari dashboard admin
 $requestedPkgId = $_GET['pkg_id'] ?? null;
@@ -58,15 +64,17 @@ if ($targetPkg) {
     $cbnLinesFormatted = array_map(fn($l) => str_replace('{BULAN}', $currentMonth . ' ' . $currentYear, $l), $cbnLines);
 
     $data = array_merge([
-        'sales_code'        => $_SESSION['sales_code'] ?? 'SEP-001',
-        'sales_name'        => $_SESSION['sales_name'] ?? 'PUJA PANGESTU',
+        'sales_code'        => $requestedSalesCode,
+        'sales_name'        => $currentSalesName,
         'nama_pelanggan'    => 'CONTOH PELANGGAN CBN',
         'ttl'               => 'MEDAN, 15/08/1995',
         'nomor_ktp'         => '1271184887725666',
         'jenis_kelamin'     => 'PRIA',
         'telp_rumah'        => '0217654321',
         'telp'              => '081265753141',
-        'alamat'            => 'JL. KL. YOS SUDARSO NO. 88 MEDAN',
+        'alamat'            => 'JL. KL. YOS SUDARSO NO. 88',
+        'kelurahan'         => 'KOTA MEDAN',
+        'kecamatan'         => 'MEDAN BARAT',
         'rt'                => '005',
         'rw'                => '012',
         'kode_pos'          => '20158',
@@ -103,8 +111,8 @@ if ($targetPkg) {
     $cbnLinesFormatted = array_map(fn($l) => str_replace('{BULAN}', $currentMonth . ' ' . $currentYear, $l), $cbnLines);
 
     $data = [
-        'sales_code'        => 'SEP-001',
-        'sales_name'        => 'PUJA PANGESTU',
+        'sales_code'        => $requestedSalesCode,
+        'sales_name'        => $currentSalesName,
         'nama_pelanggan'    => 'PRAMUDYA ADI KUSUMA',
         'ttl'               => 'JAKARTA, 15/08/1990',
         'nomor_ktp'         => '3171021508900001',
@@ -112,6 +120,8 @@ if ($targetPkg) {
         'telp_rumah'        => '0217654321',
         'telp'              => '081234567890',
         'alamat'            => 'JL. CEMPAKA PUTIH TENGAH NO. 45',
+        'kelurahan'         => 'CEMPAKA PUTIH TIMUR',
+        'kecamatan'         => 'CEMPAKA PUTIH',
         'rt'                => '005',
         'rw'                => '008',
         'kode_pos'          => '10510',

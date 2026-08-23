@@ -78,12 +78,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tlCode    = trim($_POST['tl_code'] ?? 'TL-01');
             $status    = $_POST['status'] ?? 'active';
 
+            $existingSales = SalesManager::findById($id);
+            $ttdPath = $existingSales['ttd_path'] ?? '';
+
+            if (!empty($_FILES['ttd_sales']['name']) && $_FILES['ttd_sales']['error'] === UPLOAD_ERR_OK) {
+                $fileName = 'ttd_sales_' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $salesCode)) . '.png';
+                $target = dirname(__DIR__) . '/assets/img/' . $fileName;
+                \App\ImageHelper::makeTransparentSignature($_FILES['ttd_sales']['tmp_name'], $target);
+                $ttdPath = 'assets/img/' . $fileName;
+            }
+
             SalesManager::update($id, [
                 'sales_code' => $salesCode,
                 'nama_sales' => $namaSales,
                 'no_wa'      => $noWa,
                 'email'      => $email,
                 'tl_code'    => $tlCode,
+                'ttd_path'   => $ttdPath,
                 'status'     => $status
             ]);
 
@@ -111,26 +122,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $settings['call_center']     = trim($_POST['call_center'] ?? $settings['call_center']);
             $settings['wa_helpdesk']     = trim($_POST['wa_helpdesk'] ?? $settings['wa_helpdesk']);
             $settings['admin_email']     = trim($_POST['admin_email'] ?? $settings['admin_email']);
-            $settings['apps_script_url'] = trim($_POST['apps_script_url'] ?? ($settings['apps_script_url'] ?? ''));
-            $settings['spreadsheet_id']  = trim($_POST['spreadsheet_id'] ?? ($settings['spreadsheet_id'] ?? ''));
-            $settings['drive_folder_id'] = trim($_POST['drive_folder_id'] ?? ($settings['drive_folder_id'] ?? ''));
             
-            if (!empty($_POST['admin_username'])) {
-                $settings['admin_username'] = trim($_POST['admin_username']);
-            }
-            if (!empty($_POST['admin_password'])) {
-                $settings['admin_password'] = trim($_POST['admin_password']);
+            if (!empty($_FILES['ttd_spv']['name']) && $_FILES['ttd_spv']['error'] === UPLOAD_ERR_OK) {
+                $target = dirname(__DIR__) . '/assets/img/ttd_spv_master.png';
+                \App\ImageHelper::makeTransparentSignature($_FILES['ttd_spv']['tmp_name'], $target);
+                $settings['ttd_spv_path'] = 'assets/img/ttd_spv_master.png';
             }
 
             SettingsManager::update($settings);
-
-            // Update file .env secara otomatis agar selalu sinkron
-            $envPath = dirname(__DIR__, 2) . '/.env';
-            if (file_exists($envPath)) {
-                $envContent = file_get_contents($envPath);
-                $envContent = preg_replace('/APPS_SCRIPT_URL=.*/', 'APPS_SCRIPT_URL=' . $settings['apps_script_url'], $envContent);
-                file_put_contents($envPath, $envContent);
-            }
 
             $msgSuccess = "Pengaturan Google & Profil Admin berhasil disimpan!";
         } catch (\Exception $e) {
@@ -1398,7 +1397,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                 </div>
             </div>
 
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="update_general_settings">
 
                 <div class="form-grid-2">
@@ -1423,7 +1422,26 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     </div>
                 </div>
 
-                <button type="submit" class="btn-primary" style="margin-top:12px;">Simpan Pengaturan Profil</button>
+                <div class="form-group" style="margin-top:16px;background:rgba(0,160,223,0.06);border:1px solid rgba(0,160,223,0.25);border-radius:10px;padding:16px;">
+                    <label style="font-size:13.5px;font-weight:700;color:#67e8f9;display:flex;align-items:center;gap:6px;">
+                        ✍️ Tanda Tangan SPV Master (Disetujui Oleh)
+                    </label>
+                    <div style="font-size:12px;color:var(--text-muted);margin:4px 0 10px;line-height:1.5;">
+                        Upload foto atau scan tanda tangan SPV (JPG atau PNG). Background kertas putih akan otomatis di-convert menjadi transparan murni untuk dicetak pada kolom <strong>Disetujui Oleh (SPV)</strong> di Formulir CBN.
+                    </div>
+                    <input type="file" name="ttd_spv" class="form-control" accept="image/*">
+                    <?php if (!empty($settings['ttd_spv_path'])): ?>
+                    <div style="margin-top:12px;display:flex;align-items:center;gap:14px;background:rgba(0,0,0,0.3);padding:12px 16px;border-radius:8px;border:1px solid var(--border);">
+                        <img src="../<?= htmlspecialchars($settings['ttd_spv_path']) ?>?v=<?= time() ?>" style="max-height:60px;max-width:160px;background:#fff;padding:6px;border-radius:6px;" alt="TTD SPV">
+                        <div>
+                            <div style="font-size:12.5px;font-weight:700;color:#6ee7b7;">✓ Tanda Tangan SPV Aktif</div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">File: <?= htmlspecialchars($settings['ttd_spv_path']) ?></div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <button type="submit" class="btn-primary" style="margin-top:14px;">Simpan Pengaturan Profil & TTD SPV</button>
             </form>
         </div>
     </div>
@@ -1477,7 +1495,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             <div class="modal-title">Edit Data Sales</div>
             <button type="button" class="modal-close" onclick="closeModal('modal-edit-sales')">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="action" value="edit_sales">
             <input type="hidden" id="edit-id" name="sales_id">
 
@@ -1504,6 +1522,15 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             <div class="form-group">
                 <label>Team Leader</label>
                 <input type="text" id="edit-tl" name="tl_code" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label>Tanda Tangan Sales (PNG/JPG)</label>
+                <input type="file" name="ttd_sales" class="form-control" accept="image/*">
+                <div id="edit-ttd-preview" style="margin-top:8px;display:none;">
+                    <img id="img-ttd-sales" src="" style="max-height:50px;border:1px solid var(--border);border-radius:4px;padding:4px;background:white;">
+                    <div style="font-size:10px;color:var(--text-muted);">Tanda tangan saat ini</div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -1563,6 +1590,15 @@ function openEditModal(sales) {
     document.getElementById('edit-email').value = sales.email || '';
     document.getElementById('edit-tl').value = sales.tl_code || 'TL-01';
     document.getElementById('edit-status').value = sales.status || 'active';
+    
+    const ttdPreview = document.getElementById('edit-ttd-preview');
+    if (sales.ttd_path) {
+        document.getElementById('img-ttd-sales').src = '../' + sales.ttd_path;
+        ttdPreview.style.display = 'block';
+    } else {
+        ttdPreview.style.display = 'none';
+    }
+    
     document.getElementById('modal-edit-sales').classList.add('active');
 }
 

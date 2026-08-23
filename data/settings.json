@@ -5,11 +5,12 @@
     "call_center": "1500 780",
     "wa_helpdesk": "+6287729154041",
     "admin_email": "pujapangestu02@gmail.com",
-    "apps_script_url": "https:\/\/script.google.com\/macros\/s\/AKfycbyRzHjjTXYSg6ILlivvlkcqN3Z9dTl80D7Mjql2ILoppo1ysqk8wLupg5l6SQi9vTNe\/exec",
+    "apps_script_url": "https:\/\/script.google.com\/macros\/s\/AKfycbxQQ-DETxG_owpc2FReDNC1bUOEW7rNBGME2lzsrPcXjpD1vu3gYkGZfbFHt7nd1KvZ\/exec",
     "spreadsheet_id": "1cXeq5CkL4QqhsOnAg7bvV7JQvz5gxXnXE1H1JwF9PmQ",
     "drive_folder_id": "12q5pLGP9og9rcfVs_CKwKhTxfufvsN1A",
     "admin_username": "admin",
     "admin_password": "admin",
+    "ttd_spv_path": "assets\/img\/ttd_spv_master.png",
     "packages": [
         {
             "id": "cbn_p1_20",
@@ -61,7 +62,7 @@
             "biaya_tambahan": 5000,
             "badge": "ULTRA",
             "badge_color": "#8b5cf6",
-            "active": false,
+            "active": true,
             "cbn_package": []
         },
         {

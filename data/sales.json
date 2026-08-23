@@ -2,12 +2,13 @@
     {
         "id": "1",
         "sales_code": "SEP-001",
-        "nama_sales": "Puja Pangestu",
+        "nama_sales": "FIRMAN",
         "no_wa": "081265753141",
         "email": "puja.pangestu@gmail.com",
         "tl_code": "TL-MEDAN-01",
         "status": "active",
-        "created_at": "2026-08-20 10:00:00"
+        "created_at": "2026-08-20 10:00:00",
+        "ttd_path": "assets/img/ttd_sales_master.png"
     },
     {
         "id": "2",
@@ -17,7 +18,8 @@
         "email": "budi.santoso@gmail.com",
         "tl_code": "TL-MEDAN-01",
         "status": "active",
-        "created_at": "2026-08-20 10:30:00"
+        "created_at": "2026-08-20 10:30:00",
+        "ttd_path": "assets/img/ttd_sales_sep_002.png"
     },
     {
         "id": "3",
@@ -27,7 +29,8 @@
         "email": "dimas.pratama@gmail.com",
         "tl_code": "TL-MEDAN-01",
         "status": "active",
-        "created_at": "2026-08-20 11:00:00"
+        "created_at": "2026-08-20 11:00:00",
+        "ttd_path": "assets/img/ttd_sales_sep_003.png"
     },
     {
         "id": "4",

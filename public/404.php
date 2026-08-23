@@ -2,8 +2,12 @@
 /**
  * 404 Not Found - Akses Tanpa Link Sales Resmi
  */
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+use App\SettingsManager;
+
 http_response_code(404);
-$settings = \App\SettingsManager::get();
+$settings = SettingsManager::get();
 $callCenter = $settings['call_center'] ?? '1500 780';
 $companyName = $settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA';
 $waHelpdesk = $settings['wa_helpdesk'] ?? '';

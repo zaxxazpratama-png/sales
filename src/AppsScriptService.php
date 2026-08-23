@@ -70,6 +70,23 @@ class AppsScriptService
             'signature_data'    => $data['signature_data']    ?? '',
         ];
 
+        // Attach Base64 SPV Signature & Sales Signature
+        $spvFile = dirname(__DIR__) . '/public/assets/img/ttd_spv_master.png';
+        if (file_exists($spvFile)) {
+            $payload['ttd_spv_base64'] = 'data:image/png;base64,' . base64_encode(file_get_contents($spvFile));
+        }
+
+        $salesCode = $data['sales_code'] ?? 'SEP-001';
+        $salesData = SalesManager::findByCode($salesCode);
+        $payload['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
+        $salesTtdPath = !empty($salesData['ttd_path']) ? dirname(__DIR__) . '/public/' . $salesData['ttd_path'] : '';
+        if (empty($salesTtdPath) || !file_exists($salesTtdPath)) {
+            $salesTtdPath = dirname(__DIR__) . '/public/assets/img/ttd_sales_master.png';
+        }
+        if (file_exists($salesTtdPath)) {
+            $payload['ttd_sales_base64'] = 'data:image/png;base64,' . base64_encode(file_get_contents($salesTtdPath));
+        }
+
         // Encode file KTP sebagai base64 jika ada
         if (!empty($fileInfo['tmp_path']) && file_exists($fileInfo['tmp_path'])) {
             $payload['file_data'] = base64_encode(file_get_contents($fileInfo['tmp_path']));

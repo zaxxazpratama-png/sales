@@ -51,6 +51,9 @@ if (!$valid) {
 }
 
 $data = $validator->getData();
+$salesCode = $data['sales_code'] ?? ($salesCode ?? 'SEP-001');
+$salesData = \App\SalesManager::findByCode($salesCode);
+$data['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
 
 // Simpan data terakhir di session untuk preview/download PDF
 $_SESSION['cbn_last_submission'] = $data;
@@ -107,11 +110,22 @@ try {
     // ---- Regenerate CSRF ----
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
-    // ---- Pesan Sukses Bersih untuk User / Pelanggan ----
+    // ---- Pesan Sukses & Data Tiket Pendaftaran ----
+    $cleanSalesCode = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $data['sales_code'] ?? 'SEP001'));
+    $ticketNumber = 'CBN-' . $cleanSalesCode . '-' . date('ymd') . '-' . rand(1000, 9999);
+
     $_SESSION['success'] = [
-        'nama'  => $data['nama_pelanggan'],
-        'email' => $data['email_pelanggan'],
-        'paket' => $data['service'],
+        'ticket_no'  => $ticketNumber,
+        'nama'       => $data['nama_pelanggan'],
+        'email'      => $data['email_pelanggan'],
+        'telp'       => $data['telp'] ?? '',
+        'alamat'     => $data['alamat'] . (!empty($data['kelurahan']) ? ', Kel. ' . $data['kelurahan'] : '') . (!empty($data['kecamatan']) ? ', Kec. ' . $data['kecamatan'] : ''),
+        'paket'      => $data['service'],
+        'jadwal'     => ($data['jadwal_tanggal'] ?? '') . (!empty($data['jadwal_waktu']) ? ' (' . $data['jadwal_waktu'] . ')' : ''),
+        'total'      => $data['biaya_total'] ?? 'Rp 193.140',
+        'sales_name' => $data['sales_name'] ?? ($salesData['nama_sales'] ?? 'FIRMAN'),
+        'sales_code' => $data['sales_code'] ?? $salesCode,
+        'timestamp'  => date('d/m/Y H:i:s'),
     ];
 
     $redirectTarget = !empty($data['sales_code']) ? $data['sales_code'] : $salesCode;

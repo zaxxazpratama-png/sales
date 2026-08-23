@@ -117,21 +117,66 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
     <?php endif; ?>
 
     <!-- Alert Notifikasi Sukses / Error -->
+    <!-- Alert & Kartu Tiket Pendaftaran Sukses -->
     <?php if ($success): ?>
-    <div class="alert alert-success" role="alert" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); padding: 18px 22px; border-radius: 12px; display: flex; gap: 14px; align-items: flex-start; margin-bottom: 24px;">
-        <div style="background: #10b981; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; flex-shrink: 0;">V</div>
-        <div>
-            <strong style="font-size: 15px; color: #fff; display: block; margin-bottom: 4px;">Pendaftaran Berhasil Dikirim!</strong>
-            <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.6; margin: 0;">
-                Terima kasih <strong><?= htmlspecialchars(is_array($success) ? ($success['nama'] ?? 'Pelanggan') : $success) ?></strong>, data pendaftaran Anda telah berhasil kami terima. 
-                Salinan resmi formulir pendaftaran berformat PDF telah dikirimkan ke email Anda 
-                <?php if (is_array($success) && !empty($success['email'])): ?>
-                    (<strong><?= htmlspecialchars($success['email']) ?></strong>).
-                <?php else: ?>
-                    .
-                <?php endif; ?>
-                Tim teknisi kami akan segera menghubungi Anda untuk konfirmasi jadwal pemasangan.
-            </p>
+    <div class="ticket-card" style="background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95)); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 28px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #10b981, #3b82f6);"></div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 20px; margin-bottom: 22px;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                    <span style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        ✓ PENDAFTARAN BERHASIL
+                    </span>
+                    <span style="color: #64748b; font-size: 12px;"><?= htmlspecialchars(is_array($success) ? ($success['timestamp'] ?? date('d/m/Y H:i')) : date('d/m/Y H:i')) ?></span>
+                </div>
+                <h2 style="font-size: 22px; color: #fff; margin: 0; font-weight: 700;">
+                    Tiket Pendaftaran Layanan CBN
+                </h2>
+                <div style="font-family: monospace; font-size: 14px; color: #38bdf8; margin-top: 4px; font-weight: bold;">
+                    NO. TIKET: <?= htmlspecialchars(is_array($success) ? ($success['ticket_no'] ?? '#CBN-ORDER') : '#CBN-ORDER') ?>
+                </div>
+            </div>
+            <div>
+                <a href="preview_cbn.php" target="_blank" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                    📄 Lihat Salinan PDF Formulir CBN
+                </a>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 22px; font-size: 13px;">
+            <div style="background: rgba(255,255,255,0.03); padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Nama Pelanggan</div>
+                <div style="color: #fff; font-weight: 600; font-size: 14px;"><?= htmlspecialchars(is_array($success) ? ($success['nama'] ?? '-') : $success) ?></div>
+                <div style="color: #cbd5e1; font-size: 12px; margin-top: 2px;"><?= htmlspecialchars(is_array($success) ? ($success['email'] ?? '') : '') ?></div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Paket Terpilih & Biaya</div>
+                <div style="color: #38bdf8; font-weight: 700; font-size: 14px;"><?= htmlspecialchars(is_array($success) ? ($success['paket'] ?? 'CBN Fiber') : 'CBN Fiber') ?></div>
+                <div style="color: #10b981; font-weight: 700; font-size: 12px; margin-top: 2px;"><?= htmlspecialchars(is_array($success) ? ($success['total'] ?? '-') : '-') ?> /bulan</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Jadwal Pemasangan</div>
+                <div style="color: #fff; font-weight: 600; font-size: 13.5px;"><?= htmlspecialchars(is_array($success) ? ($success['jadwal'] ?? 'Sesuai Antrean') : 'Sesuai Antrean') ?></div>
+                <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">Slot Teknisi Terjadwal</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); grid-column: 1 / -1;">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Alamat Pemasangan Lengkap</div>
+                <div style="color: #fff; font-weight: 600; font-size: 13.5px;"><?= htmlspecialchars(is_array($success) ? ($success['alamat'] ?? '-') : '-') ?></div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Sales Consultant</div>
+                <div style="color: #fff; font-weight: 600; font-size: 13.5px;"><?= htmlspecialchars(is_array($success) ? ($success['sales_name'] ?? $salesName) : $salesName) ?> (<?= htmlspecialchars($salesCode) ?>)</div>
+                <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">PT. Sinergi Emas Perdana</div>
+            </div>
+        </div>
+
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 12px 16px; border-radius: 6px; color: #cbd5e1; font-size: 12.5px; line-height: 1.6;">
+            💡 <strong>Informasi Selanjutnya:</strong> Salinan resmi Formulir Pendaftaran PDF telah berhasil dikirimkan ke email Anda dan tercatat di sistem CBN. Tim teknisi akan menghubungi nomor telepon Anda sebelum kedatangan untuk konfirmasi kesiapan lokasi.
         </div>
     </div>
     <?php endif; ?>
@@ -475,7 +520,7 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                         <div style="display:flex;gap:12px;">
                             <div style="flex:1;">
                                 <label style="font-size:11.5px;color:#94a3b8;">Wireless Router (Unit)</label>
-                                <input type="number" name="router_qty" class="form-input" value="1" min="1" max="5">
+                                <input type="number" name="router_qty" class="form-input" value="0" min="0" max="5">
                             </div>
                             <div style="flex:1;">
                                 <label style="font-size:11.5px;color:#94a3b8;">Smartbox Android TV (+Rp 35rb)</label>
