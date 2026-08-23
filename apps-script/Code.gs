@@ -195,31 +195,23 @@ function generateCbnDocumentHtml(data) {
   const kelurahan   = (data.kelurahan || '').toUpperCase().trim().replace(/^(KELURAHAN|KEL\.?)\s*/i, '');
   const kecamatan   = (data.kecamatan || '').toUpperCase().trim().replace(/^(KECAMATAN|KEC\.?)\s*/i, '');
   
-  let alamat1 = alamat;
-  if (alamat1.length > 29) {
-    const pos = alamat1.substring(0, 29).lastIndexOf(' ');
-    if (pos !== -1) {
-      alamat1 = alamat1.substring(0, pos);
-    } else {
-      alamat1 = alamat1.substring(0, 29);
-    }
-  }
+  const fullAddrParts = [];
+  if (alamat) fullAddrParts.push(alamat);
+  if (kelurahan) fullAddrParts.push("KEL. " + kelurahan);
+  if (kecamatan) fullAddrParts.push("KEC. " + kecamatan);
+  const combinedAddr = fullAddrParts.join(', ');
 
-  let alamat2 = '';
-  if (kelurahan && kecamatan) {
-    alamat2 = "KEL. " + kelurahan + ", KEC. " + kecamatan;
-    if (alamat2.length > 29) {
-      const sKel = kelurahan.length > 10 ? kelurahan.substring(0, 10) : kelurahan;
-      const sKec = kecamatan.length > 9 ? kecamatan.substring(0, 9) : kecamatan;
-      alamat2 = "KEL. " + sKel + ", KEC. " + sKec;
-      if (alamat2.length > 29) {
-        alamat2 = alamat2.substring(0, 29);
-      }
+  const words = combinedAddr.split(' ');
+  let alamat1 = '', alamat2 = '', alamat3 = '';
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (!alamat1 || (alamat1 + ' ' + w).length <= 29) {
+      alamat1 = !alamat1 ? w : alamat1 + ' ' + w;
+    } else if (!alamat2 || (alamat2 + ' ' + w).length <= 29) {
+      alamat2 = !alamat2 ? w : alamat2 + ' ' + w;
+    } else {
+      alamat3 = !alamat3 ? w : alamat3 + ' ' + w;
     }
-  } else if (kelurahan) {
-    alamat2 = "KEL. " + kelurahan.substring(0, 24);
-  } else if (kecamatan) {
-    alamat2 = "KEC. " + kecamatan.substring(0, 24);
   }
 
   const rt          = (data.rt || '').replace(/[^0-9]/g, '');
@@ -334,9 +326,10 @@ function generateCbnDocumentHtml(data) {
     ${telpRumah && telpRumah !== telpSelular ? box(telpRumah, 20.88, 19.19, 1.905, '9pt', 12) : ''}
     ${box(telpSelular, 66.8, 19.19, 1.905, '9pt', 12)}
 
-    <!-- 2. ALAMAT PEMASANGAN (Alamat, Kelurahan, Kecamatan) -->
+    <!-- 2. ALAMAT PEMASANGAN 3 BARIS (Alamat, Kelurahan, Kecamatan Lengkap) -->
     ${box(alamat1, 20.88, 26.51, 1.905, '8.5pt', 29)}
     ${alamat2 ? box(alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) : ''}
+    ${alamat3 ? box(alamat3, 20.88, 30.50, 1.905, '8.5pt', 16) : ''}
     
     ${box(rt, 55.21, 30.50, 1.905, '8.5pt', 3)}
     ${box(rw, 64.73, 30.50, 1.905, '8.5pt', 3)}
@@ -378,11 +371,11 @@ function generateCbnDocumentHtml(data) {
     ${box(usernameCbn, 2.35, 83.91, 1.905, '9pt', 11)}
     ${fld(data.catatan || 'REGULER PROMO JULY 2026 - NAB', 88.80, 51.50, '9.5pt')}
 
-    <!-- 5. TANGGAL & TANDA TANGAN (TEPAT DI ATAS NAMA TANPA SPACE) -->
+    <!-- 5. TANGGAL & TANDA TANGAN (PRESISI MENEMPEL DI ATAS GARIS & NAMA) -->
     ${fld(tglTtd, 92.85, 9.50, '10.5pt')}
 
-    <!-- KOLOM 1: TANDA TANGAN PELANGGAN -->
-    ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:86.5%;left:4.5%;max-height:55px;max-width:140px;z-index:3;'>` : ''}
+    <!-- KOLOM 1: TANDA TANGAN PELANGGAN (DITURUNKAN PAS DI ATAS GARIS PELANGGAN) -->
+    ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:91.5%;left:6.0%;max-height:38px;max-width:130px;z-index:5;' alt='TTD Pelanggan'>` : ''}
 
     <!-- KOLOM 3: TANDA TANGAN SALES (TEPAT DI ATAS NAMA SALES TANPA SPACE) -->
     <img src='${salesSigImg}' style='position:absolute;top:89.5%;left:43.0%;max-height:55px;max-width:130px;z-index:5;' alt='TTD Sales'>

@@ -38,66 +38,32 @@ class CbnDocumentTemplate
         $kelurahan   = strtoupper(trim($data['kelurahan'] ?? ''));
         $kecamatan   = strtoupper(trim($data['kecamatan'] ?? ''));
         
-        // Format Alamat Lengkap: Alamat, Kelurahan, Kecamatan (Presisi 2 Baris Kotak)
-        $cleanKel = preg_replace('/^(KELURAHAN|KEL\\.?)\\s*/i', '', $kelurahan);
-        $cleanKec = preg_replace('/^(KECAMATAN|KEC\\.?)\\s*/i', '', $kecamatan);
+                // Format Alamat Lengkap 3 Baris Kotak: Alamat, Kelurahan, Kecamatan Lengkap
+        $cleanKel = preg_replace('/^(KELURAHAN|KEL\.?)\s*/i', '', $kelurahan);
+        $cleanKec = preg_replace('/^(KECAMATAN|KEC\.?)\s*/i', '', $kecamatan);
 
-        $alamat1 = $alamat;
-        if (strlen($alamat1) > 29) {
-            $pos = strrpos(substr($alamat1, 0, 29), ' ');
-            if ($pos !== false) {
-                $alamat1 = substr($alamat1, 0, $pos);
-            } else {
-                $alamat1 = substr($alamat1, 0, 29);
-            }
-        }
+        $fullAddrParts = [];
+        if (!empty($alamat)) $fullAddrParts[] = $alamat;
+        if (!empty($cleanKel)) $fullAddrParts[] = "KEL. " . $cleanKel;
+        if (!empty($cleanKec)) $fullAddrParts[] = "KEC. " . $cleanKec;
+        $combinedAddr = implode(', ', $fullAddrParts);
 
+        // Split smartly across Line 1 (max 29), Line 2 (max 29), Line 3 (max 16)
+        $words = explode(' ', $combinedAddr);
+        $alamat1 = '';
         $alamat2 = '';
-        if (!empty($cleanKel) && !empty($cleanKec)) {
-            $alamat2 = "KEL. {$cleanKel}, KEC. {$cleanKec}";
-            if (strlen($alamat2) > 29) {
-                $sKel = strlen($cleanKel) > 10 ? substr($cleanKel, 0, 10) : $cleanKel;
-                $sKec = strlen($cleanKec) > 9 ? substr($cleanKec, 0, 9) : $cleanKec;
-                $alamat2 = "KEL. {$sKel}, KEC. {$sKec}";
-                if (strlen($alamat2) > 29) {
-                    $alamat2 = substr($alamat2, 0, 29);
-                }
-            }
-        } elseif (!empty($cleanKel)) {
-            $alamat2 = "KEL. " . substr($cleanKel, 0, 24);
-        } elseif (!empty($cleanKec)) {
-            $alamat2 = "KEC. " . substr($cleanKec, 0, 24);
-        }
-        // Format Alamat Lengkap: Alamat, Kelurahan, Kecamatan (Presisi 2 Baris Kotak)
-        $cleanKel = preg_replace('/^(KELURAHAN|KEL\\.?)\\s*/i', '', $kelurahan);
-        $cleanKec = preg_replace('/^(KECAMATAN|KEC\\.?)\\s*/i', '', $kecamatan);
+        $alamat3 = '';
 
-        $alamat1 = $alamat;
-        if (strlen($alamat1) > 29) {
-            $pos = strrpos(substr($alamat1, 0, 29), ' ');
-            if ($pos !== false) {
-                $alamat1 = substr($alamat1, 0, $pos);
+        foreach ($words as $w) {
+            if (empty($alamat1) || strlen($alamat1 . ' ' . $w) <= 29) {
+                $alamat1 = empty($alamat1) ? $w : $alamat1 . ' ' . $w;
+            } elseif (empty($alamat2) || strlen($alamat2 . ' ' . $w) <= 29) {
+                $alamat2 = empty($alamat2) ? $w : $alamat2 . ' ' . $w;
             } else {
-                $alamat1 = substr($alamat1, 0, 29);
+                $alamat3 = empty($alamat3) ? $w : $alamat3 . ' ' . $w;
             }
         }
 
-        $alamat2 = '';
-        if (!empty($cleanKel) && !empty($cleanKec)) {
-            $alamat2 = "KEL. {$cleanKel}, KEC. {$cleanKec}";
-            if (strlen($alamat2) > 29) {
-                $sKel = strlen($cleanKel) > 10 ? substr($cleanKel, 0, 10) : $cleanKel;
-                $sKec = strlen($cleanKec) > 9 ? substr($cleanKec, 0, 9) : $cleanKec;
-                $alamat2 = "KEL. {$sKel}, KEC. {$sKec}";
-                if (strlen($alamat2) > 29) {
-                    $alamat2 = substr($alamat2, 0, 29);
-                }
-            }
-        } elseif (!empty($cleanKel)) {
-            $alamat2 = "KEL. " . substr($cleanKel, 0, 24);
-        } elseif (!empty($cleanKec)) {
-            $alamat2 = "KEC. " . substr($cleanKec, 0, 24);
-        }
         $rt          = trim($data['rt'] ?? '');
         $rw          = trim($data['rw'] ?? '');
         $kodePos     = trim($data['kode_pos'] ?? '');
@@ -375,10 +341,13 @@ class CbnDocumentTemplate
     <!-- TELEPON SELULAR / WA (Hanya Baris Pertama Sesuai Revisi 3) -->
     <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 66.8, 19.19, 1.905, '9pt', 12) ?>
 
-    <!-- 2. ALAMAT PEMASANGAN (29 kotak × 2 baris - Sudah termasuk Kel & Kec) -->
+    <!-- 2. ALAMAT PEMASANGAN (3 Baris Kotak - Lengkap Alamat, Kelurahan, Kecamatan) -->
     <?= $box($alamat1, 20.88, 26.51, 1.905, '8.5pt', 29) ?>
     <?php if (!empty($alamat2)): ?>
       <?= $box($alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) ?>
+    <?php endif; ?>
+    <?php if (!empty($alamat3)): ?>
+      <?= $box($alamat3, 20.88, 30.50, 1.905, '8.5pt', 16) ?>
     <?php endif; ?>
 
     <!-- RT (3 kotak), RW (3 kotak), KODE POS (5 kotak) -->
@@ -468,9 +437,9 @@ class CbnDocumentTemplate
     <!-- TANGGAL SURAT -->
     <?= $f($tglTtd, 92.85, 9.5, '10.5pt') ?>
 
-    <!-- TANDA TANGAN PELANGGAN -->
+    <!-- TANDA TANGAN PELANGGAN (Ditata pas tepat di atas garis tanda tangan pelanggan) -->
     <?php if (!empty($signatureImg)): ?>
-      <img src="<?= $signatureImg ?>" style="position:absolute;top:87.0%;left:4.5%;max-height:55px;max-width:140px;z-index:3;" alt="TTD Pelanggan">
+      <img src="<?= $signatureImg ?>" style="position:absolute;top:91.5%;left:6.0%;max-height:38px;max-width:130px;z-index:5;" alt="TTD Pelanggan">
     <?php endif; ?>
 
     <?php
