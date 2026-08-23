@@ -555,19 +555,143 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
         }
         .modal-close:hover { color: #fff; }
 
+        /* ================= PACKAGE CARDS & GRIDS ================= */
+        .pkg-main-card {
+            background: var(--bg-card-alt);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 22px;
+            margin-bottom: 22px;
+            position: relative;
+            transition: var(--transition);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+        .pkg-main-card:hover {
+            border-color: rgba(0, 160, 223, 0.35);
+        }
+        .pkg-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 16px;
+            margin-bottom: 18px;
+        }
+        .pkg-header-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .pkg-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .pkg-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+        .pkg-grid-3 {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr;
+            gap: 14px;
+            margin-bottom: 14px;
+            align-items: end;
+        }
+        .pkg-preview-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 14px;
+            margin-top: 12px;
+        }
+
+        .pkg-btn-edit {
+            padding: 8px 16px;
+            font-size: 12.5px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: #fff;
+            border: 1px solid #38bdf8;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .pkg-btn-edit:hover {
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+            transform: translateY(-1px);
+        }
+        .pkg-btn-preview {
+            padding: 8px 16px;
+            font-size: 12.5px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 160, 223, 0.15);
+            border: 1px solid rgba(0, 160, 223, 0.4);
+            color: #67e8f9;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .pkg-btn-preview:hover {
+            background: rgba(0, 160, 223, 0.3);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        .pkg-btn-delete {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 14px;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+        .pkg-btn-delete:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fff;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ================= MOBILE RESPONSIVE ================= */
+        /* ================= RESPONSIVE BREAKPOINTS ================= */
+        @media (max-width: 992px) {
+            .pkg-grid-4 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .pkg-grid-3 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .pkg-preview-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
             body { padding: 0; }
-            .container { padding: 12px; max-width: 100%; box-sizing: border-box; }
+            .wrapper { padding: 14px 12px 60px; max-width: 100%; box-sizing: border-box; }
             
             /* Topbar */
             .topbar {
-                padding: 12px 16px;
+                padding: 12px 14px;
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 12px;
@@ -578,15 +702,13 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             .topbar-sub { font-size: 10.5px; }
             .topbar-right {
                 width: 100%;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
+                display: grid;
+                grid-template-columns: 1fr auto;
                 gap: 8px;
             }
             .btn-view-form {
-                flex: 1;
                 font-size: 11.5px;
-                padding: 8px 10px;
+                padding: 8px 12px;
                 text-align: center;
                 justify-content: center;
                 white-space: nowrap;
@@ -596,7 +718,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             .btn-logout {
                 font-size: 11.5px;
                 padding: 8px 14px;
-                flex-shrink: 0;
+                text-align: center;
             }
 
             /* Stats */
@@ -655,7 +777,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             .panel-header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 10px;
+                gap: 12px;
                 margin-bottom: 14px;
                 padding-bottom: 10px;
             }
@@ -666,11 +788,45 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                 font-size: 11.5px;
             }
 
-            /* Form Grids */
-            .form-grid-2, .form-grid-3 {
-                grid-template-columns: 1fr !important;
-                gap: 10px !important;
+            /* Package Card Mobile */
+            .pkg-main-card {
+                padding: 16px 14px;
+                border-radius: 14px;
             }
+            .pkg-card-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .pkg-header-info {
+                width: 100%;
+            }
+            .pkg-header-actions {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .pkg-btn-edit, .pkg-btn-preview, .pkg-btn-delete {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+                box-sizing: border-box;
+            }
+
+            .pkg-grid-4 {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .pkg-grid-3 {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .pkg-preview-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
             .form-group {
                 margin-bottom: 10px;
                 width: 100%;
@@ -733,8 +889,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                 grid-column: span 1;
             }
             .topbar-right {
-                flex-direction: column;
-                align-items: stretch;
+                grid-template-columns: 1fr;
             }
             .btn-view-form, .btn-logout {
                 width: 100%;
@@ -1017,11 +1172,11 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     $estimasiPpn = round($estimasiSubtotal * 0.11);
                     $estimasiTotal = $estimasiSubtotal + $estimasiPpn;
                 ?>
-                <div class="pkg-main-card" id="pkg-card-<?= $pkgId ?>" style="background:var(--bg-card-alt);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;position:relative;transition:var(--transition);">
+                <div class="pkg-main-card" id="pkg-card-<?= $pkgId ?>">
 
                     <!-- Header Row / Summary Bar -->
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:16px;">
-                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <div class="pkg-card-header">
+                        <div class="pkg-header-info">
                             <span style="font-size:18px;font-weight:900;color:#fff;" id="title-name-<?= $pkgId ?>">🌐 <?= htmlspecialchars($pkg['name']) ?></span>
                             
                             <span id="badge-preview-<?= $pkgId ?>" style="background:<?= htmlspecialchars($badgeColor) ?>;color:#fff;font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:12px;<?= empty($badgeText) ? 'display:none;' : '' ?>">
@@ -1038,19 +1193,16 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                         </div>
 
                         <!-- Action Buttons -->
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <!-- Tombol Edit Paket -->
-                            <button type="button" class="btn-primary" onclick="toggleEditPackage('<?= $pkgId ?>')" style="padding:6px 14px;font-size:12px;display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg, #0284c7, #0369a1);border:1px solid #38bdf8;">
+                        <div class="pkg-header-actions">
+                            <button type="button" class="pkg-btn-edit" onclick="toggleEditPackage('<?= $pkgId ?>')">
                                 ✏️ Edit Paket
                             </button>
 
-                            <!-- Tombol Preview Surat CBN -->
-                            <a href="../preview_cbn.php?pkg_id=<?= urlencode($pkgId) ?>" target="_blank" class="btn-view-form" style="padding:6px 14px;font-size:12px;display:inline-flex;align-items:center;gap:5px;" title="Lihat tampilan paket ini pada Formulir Resmi CBN">
+                            <a href="../preview_cbn.php?pkg_id=<?= urlencode($pkgId) ?>" target="_blank" class="pkg-btn-preview" title="Lihat tampilan paket ini pada Formulir Resmi CBN">
                                 🔍 Preview di Formulir CBN
                             </a>
 
-                            <!-- Tombol Hapus -->
-                            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#fca5a5;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:6px 12px;border-radius:8px;transition:var(--transition);" title="Centang untuk menghapus paket ini saat klik simpan">
+                            <label class="pkg-btn-delete" title="Centang untuk menghapus paket ini saat klik simpan">
                                 <input type="checkbox" name="delete_pkg[]" value="<?= htmlspecialchars($pkgId) ?>"
                                     onchange="document.getElementById('pkg-card-<?= $pkgId ?>').style.opacity=this.checked?'0.35':'1'">
                                 <span>🗑 Hapus</span>
@@ -1062,7 +1214,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     <div id="edit-panel-<?= $pkgId ?>" class="pkg-edit-panel" style="display:block;">
                         
                         <!-- Row 1: Nama Paket + Speed + Price + Biaya Tambahan -->
-                        <div style="display:grid;grid-template-columns:1.5fr 2fr 1.3fr 1.3fr;gap:14px;margin-bottom:14px;">
+                        <div class="pkg-grid-4">
                             <div class="form-group" style="margin-bottom:0;">
                                 <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Nama Paket *</label>
                                 <input type="text" name="pkg_name_<?= $pkgId ?>" id="pkg-name-<?= $pkgId ?>" class="form-control" value="<?= htmlspecialchars($pkg['name']) ?>" style="padding:9px 12px;font-weight:700;" oninput="syncPkgLive('<?= $pkgId ?>')" required>
@@ -1082,7 +1234,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                         </div>
 
                         <!-- Row 2: Badge Label + Badge Color + Status Aktif -->
-                        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:14px;margin-bottom:14px;align-items:end;">
+                        <div class="pkg-grid-3">
                             <div class="form-group" style="margin-bottom:0;">
                                 <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Badge Label (opsional)</label>
                                 <input type="text" name="pkg_badge_<?= $pkgId ?>" id="pkg-badge-<?= $pkgId ?>" class="form-control" value="<?= htmlspecialchars($badgeText) ?>" style="padding:9px 12px;" placeholder="Contoh: POPULAR / BEST VALUE" oninput="syncPkgLive('<?= $pkgId ?>')">
@@ -1105,7 +1257,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
 
                         <!-- Row 3: CBN Package descriptions (Auto Claim) -->
                         <div class="form-group" style="margin-bottom:14px;">
-                            <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px;">
                                 <span style="font-size:12.5px;font-weight:700;color:#cbd5e1;">🏷 Deskripsi Paket CBN yang Termasuk (Auto-Claim di Bagian Add-On TV Surat)</span>
                                 <span style="font-weight:400;font-size:11px;color:#67e8f9;">💡 Satu baris = satu item ter-ceklis. Ketik <code>{BULAN}</code> untuk nama bulan dinamis.</span>
                             </label>
@@ -1117,11 +1269,11 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                         </div>
 
                         <!-- Row 4: LIVE DYNAMIC PREVIEWS -->
-                        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:10px;">
+                        <div class="pkg-preview-grid">
                             
                             <!-- Box 1: Live CBN Package Checkmarks Preview -->
                             <div style="padding:14px;background:rgba(0,0,0,0.3);border:1px solid rgba(0,160,223,0.25);border-radius:10px;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px;">
                                     <span style="font-size:11px;color:#67e8f9;font-weight:800;letter-spacing:0.5px;">📋 LIVE PREVIEW TEKS CEKLIS DI SURAT:</span>
                                     <span style="font-size:10px;color:#94a3b8;">Bulan: <?= $currentMonth . ' ' . $currentYear ?></span>
                                 </div>
@@ -1168,7 +1320,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                 </div>
                 <?php endforeach; ?>
 
-                <div style="position:sticky;bottom:15px;z-index:90;background:rgba(10,17,40,0.95);backdrop-filter:blur(15px);padding:14px 20px;border-radius:12px;border:1px solid rgba(0,160,223,0.3);display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
+                <div style="position:sticky;bottom:15px;z-index:90;background:rgba(10,17,40,0.95);backdrop-filter:blur(15px);padding:14px 20px;border-radius:12px;border:1px solid rgba(0,160,223,0.3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:15px;">
                     <span style="font-size:13px;color:#cbd5e1;">Pastikan semua perubahan sudah sesuai sebelum menyimpan.</span>
                     <button type="submit" class="btn-primary" style="padding:12px 28px;font-size:14px;box-shadow:0 4px 20px rgba(0,160,223,0.4);">
                         💾 Simpan Semua Perubahan Paket
@@ -1189,7 +1341,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             <form method="POST">
                 <input type="hidden" name="action" value="update_packages">
 
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+                <div class="pkg-grid-4">
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Nama Paket *</label>
                         <input type="text" name="new_pkg_name" class="form-control" placeholder="Misal: Fiber 200" required>
@@ -1208,19 +1360,19 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     </div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-                    <div class="form-group" style="margin-bottom:0;">
+                <div class="pkg-grid-4" style="margin-top:14px;">
+                    <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
                         <label>Badge Label (opsional)</label>
                         <input type="text" name="new_pkg_badge" class="form-control" placeholder="ULTRA SPEED / BEST VALUE">
                     </div>
-                    <div class="form-group" style="margin-bottom:0;">
+                    <div class="form-group" style="margin-bottom:0;grid-column:span 2;">
                         <label>Warna Badge</label>
                         <input type="color" name="new_pkg_badge_color" class="form-control" value="#005696" style="height:40px;width:100%;cursor:pointer;padding:2px 4px;">
                     </div>
                 </div>
 
-                <div class="form-group" style="margin-bottom:14px;">
-                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="form-group" style="margin-top:14px;margin-bottom:14px;">
+                    <label style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
                         <span>🏷 Deskripsi Paket CBN (satu baris = satu item yang ter-ceklis di surat formulir)</span>
                         <span style="font-size:11px;color:#64748b;">Gunakan <code>{BULAN}</code> untuk nama bulan otomatis (misal: <?= $currentMonth . ' ' . $currentYear ?>)</span>
                     </label>
