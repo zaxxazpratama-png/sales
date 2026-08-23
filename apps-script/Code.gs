@@ -36,7 +36,7 @@ function doPost(e) {
     let pdfDriveUrl = '';
     let pdfBlob     = null;
 
-    // 1. Simpan Foto KTP ke Google Drive (jika ada)
+    // 1. Simpan Foto KTP ke Google Drive
     if (params.file_data && params.file_name) {
       try {
         ktpDriveUrl = saveBase64ToDrive(
@@ -45,191 +45,195 @@ function doPost(e) {
           params.file_mime || 'image/jpeg',
           targetFolderId
         );
-      } catch (eKtp) {
-        logError('KTP Drive Error: ' + eKtp.toString(), targetSheetId);
+      } catch (ktpErr) {
+        logError('Error upload KTP: ' + ktpErr.message, targetSheetId);
       }
     }
 
-    // 2. Generate PDF Surat Formulir CBN Resmi (Presisi 100%)
+    // 2. Generate PDF Formulir CBN
     try {
-      const cbnHtmlContent = generateCbnDocumentHtml(params);
-      const cleanName = (params.nama_pelanggan || 'Pelanggan').replace(/[^a-zA-Z0-9_\-]/g, '_');
-      const pdfFileName = 'Formulir_CBN_' + cleanName + '_' + Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmm') + '.pdf';
+      const htmlBody = generateCbnDocumentHtml(params);
+      const htmlBlob = Utilities.newBlob(htmlBody, 'text/html', 'temp_cbn_form.html');
       
-      const htmlOutput = HtmlService.createHtmlOutput(cbnHtmlContent);
-      pdfBlob = htmlOutput.getAs('application/pdf').setName(pdfFileName);
+      const fileName = 'FORMULIR_CBN_' +
+        (params.sales_code || 'SEP-001') + '_' +
+        (params.nama_pelanggan || 'PELANGGAN').replace(/[^a-zA-Z0-9]/g, '_').toUpperCase() + '_' +
+        Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd_HHmmss') + '.pdf';
 
-      let folder;
-      try {
-        folder = DriveApp.getFolderById(targetFolderId);
-      } catch (fErr) {
-        folder = DriveApp.getRootFolder();
-      }
-
+      pdfBlob = htmlBlob.getAs('application/pdf').setName(fileName);
+      const folder = DriveApp.getFolderById(targetFolderId);
       const pdfFile = folder.createFile(pdfBlob);
       pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       pdfDriveUrl = pdfFile.getUrl();
-    } catch (driveErr) {
-      logError('PDF Drive Error: ' + driveErr.toString(), targetSheetId);
+    } catch (pdfErr) {
+      logError('Error generate PDF: ' + pdfErr.message, targetSheetId);
     }
 
-    // 3. Simpan Baris Data ke Google Sheets
+    // 3. Simpan ke Google Spreadsheet
     try {
       appendToSheet(params, pdfDriveUrl, ktpDriveUrl, targetSheetId);
     } catch (sheetErr) {
-      logError('Sheet Error: ' + sheetErr.toString(), targetSheetId);
+      logError('Error append Spreadsheet: ' + sheetErr.message, targetSheetId);
     }
 
-    // 4. Kirim Email Notifikasi ke Admin (+ Attachment PDF)
+    // 4. Kirim Email Notifikasi ke Admin
     try {
       sendAdminEmail(params, pdfDriveUrl, ktpDriveUrl, pdfBlob, targetEmail);
     } catch (mailErr) {
-      logError('Mail Admin Error: ' + mailErr.toString(), targetSheetId);
+      logError('Error kirim email admin: ' + mailErr.message, targetSheetId);
     }
 
-    // 5. Kirim Email ke Pelanggan (+ Attachment PDF)
-    if (params.email_pelanggan && params.email_pelanggan.indexOf('@') !== -1) {
+    // 5. Kirim Email Notifikasi ke Pelanggan
+    if (params.email_pelanggan) {
       try {
         sendCustomerEmail(params, pdfDriveUrl, pdfBlob);
       } catch (custMailErr) {
-        logError('Mail Customer Error: ' + custMailErr.toString(), targetSheetId);
+        logError('Error kirim email pelanggan: ' + custMailErr.message, targetSheetId);
       }
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        status:  'success',
-        message: 'Data dan Surat Formulir CBN berhasil disimpan',
-        pdf_url: pdfDriveUrl,
-        ktp_url: ktpDriveUrl
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({
+      status:   'success',
+      message:  'Data berhasil diproses dan disimpan ke sistem CBN.',
+      pdf_url:  pdfDriveUrl,
+      ktp_url:  ktpDriveUrl,
+      data: {
+        sales_code:     params.sales_code,
+        nama_pelanggan: params.nama_pelanggan,
+        service:        params.service,
+        biaya_total:    params.biaya_total
+      }
+    })).setMimeType(ContentService.MimeType.JSON);
 
-  } catch (err) {
-    logError('General Error: ' + err.toString());
-
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        status:  'error',
-        message: err.toString()
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
+  } catch (fatalErr) {
+    logError('FATAL doPost: ' + fatalErr.message, CONFIG.SPREADSHEET_ID);
+    return ContentService.createTextOutput(JSON.stringify({
+      status:  'error',
+      message: fatalErr.message
+    })).setMimeType(ContentService.MimeType.JSON);
   }
-}
-
-function doGet(e) {
-  return ContentService
-    .createTextOutput(JSON.stringify({
-      status:  'ok',
-      message: 'CBN Google Apps Script Web App Aktif & Siap Menerima Data Formulir!',
-      time:    new Date().toISOString()
-    }))
-    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function saveBase64ToDrive(base64Data, fileName, mimeType, folderId) {
-  let folder;
-  try {
-    folder = DriveApp.getFolderById(folderId || CONFIG.DRIVE_FOLDER_ID);
-  } catch (e) {
-    folder = DriveApp.getRootFolder();
+  let rawBase64 = base64Data;
+  if (base64Data.indexOf('base64,') !== -1) {
+    rawBase64 = base64Data.split('base64,')[1];
   }
-  const decoded = Utilities.base64Decode(base64Data);
+  const decoded = Utilities.base64Decode(rawBase64);
   const blob    = Utilities.newBlob(decoded, mimeType, fileName);
+  const folder  = DriveApp.getFolderById(folderId);
   const file    = folder.createFile(blob);
-
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return file.getUrl();
 }
 
-function box(text, startX, startY, stepX, fs, max) {
-  if (!text && text !== '0') return '';
-  const str  = String(text).toUpperCase();
-  const sX   = stepX || 1.905;
-  const size = fs    || '9pt';
-  const limit = max  || 50;
-  let html = '';
-  let col = 0;
-  for (let i = 0; i < str.length && col < limit; i++) {
-    const ch = str[i];
-    if (ch === ' ') { col++; continue; }
-    const bLeft = (startX + col * sX).toFixed(3);
-    const bW    = sX.toFixed(3);
-    const bTop  = Number(startY).toFixed(2);
-    html += `<div class='fld' style='top:${bTop}%;left:${bLeft}%;width:${bW}%;font-size:${size};text-align:center;'>${ch}</div>\n`;
-    col++;
-  }
-  return html;
-}
-
-function fld(text, top, left, fs, extra) {
-  if (!text && text !== 0) return '';
-  fs = fs || '11pt';
-  extra = extra || '';
-  return `<div class='fld' style='top:${top}%;left:${left}%;font-size:${fs};${extra}'>${text}</div>`;
-}
-
 function generateCbnDocumentHtml(data) {
-  const salesMap = {
-    'SEP-001': 'FIRMAN',
-    'SEP-002': 'BUDI SANTOSO',
-    'SEP-003': 'DIMAS PRATAMA',
-    'SEP-004': 'RIAN HIDAYAT',
-    'SEP-005': 'SITI RAHMA',
-    'SEP-006': 'ANDI WIJAYA'
-  };
-
-  const salesCode   = (data.sales_code || 'SEP-001').toUpperCase().trim();
-  const salesName   = (data.sales_name || salesMap[salesCode] || data.ae_name || 'FIRMAN').toUpperCase().trim();
-  const salesSigImg = data.ttd_sales_base64 || DEFAULT_TTD_SALES_B64;
-  const spvSigImg   = data.ttd_spv_base64   || DEFAULT_TTD_SPV_B64;
-
   const nama        = (data.nama_pelanggan || '').toUpperCase().trim();
-  const ttl         = (data.ttl || '').toUpperCase().trim();
-  const ktp         = (data.nomor_ktp || '').replace(/[^0-9]/g, '');
+  const ktp         = (data.nomor_ktp || '').trim();
+  const ttl         = (data.ttl || '').trim();
   const gender      = (data.jenis_kelamin || 'PRIA').toUpperCase().trim();
-  const telpSelular = (data.telp || '').replace(/[^0-9]/g, '');
-  const telpRumah   = (data.telp_rumah || '').replace(/[^0-9]/g, '');
+  const telpSelular = (data.telp || '').trim();
+  const telpRumah   = (data.telp_rumah || '').trim();
+  const email       = (data.email_pelanggan || '').trim();
   
-  const alamat      = (data.alamat || '').toUpperCase().trim();
-  const kelurahan   = (data.kelurahan || '').toUpperCase().trim().replace(/^(KELURAHAN|KEL\.?)\s*/i, '');
-  const kecamatan   = (data.kecamatan || '').toUpperCase().trim().replace(/^(KECAMATAN|KEC\.?)\s*/i, '');
-  
-  const fullAddrParts = [];
-  if (alamat) fullAddrParts.push(alamat);
-  if (kelurahan) fullAddrParts.push("KEL. " + kelurahan);
-  if (kecamatan) fullAddrParts.push("KEC. " + kecamatan);
-  const combinedAddr = fullAddrParts.join(', ');
+  let rt          = (data.rt || '').trim();
+  let rw          = (data.rw || '').trim();
+  let kelurahan   = (data.kelurahan || '').trim();
+  let kecamatan   = (data.kecamatan || '').trim();
+  let kabupaten   = (data.kabupaten || data.kota || '').trim();
+  const kodePos   = (data.kode_pos || '').trim();
+  let rawAlamat   = (data.alamat || '').trim();
 
-  const words = combinedAddr.split(' ');
-  let alamat1 = '', alamat2 = '', alamat3 = '';
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    if (!alamat1 || (alamat1 + ' ' + w).length <= 29) {
-      alamat1 = !alamat1 ? w : alamat1 + ' ' + w;
-    } else if (!alamat2 || (alamat2 + ' ' + w).length <= 29) {
-      alamat2 = !alamat2 ? w : alamat2 + ' ' + w;
+  // Auto-extract RT/RW from raw alamat if present
+  const rtMatch = rawAlamat.match(/\bRT[\s.:]*([0-9]{1,3})\b/i);
+  if (rtMatch) {
+    if (!rt) rt = rtMatch[1];
+    rawAlamat = rawAlamat.replace(/\bRT[\s.:]*[0-9]{1,3}\b/gi, '');
+  }
+  const rwMatch = rawAlamat.match(/\bRW[\s.:]*([0-9]{1,3})\b/i);
+  if (rwMatch) {
+    if (!rw) rw = rwMatch[1];
+    rawAlamat = rawAlamat.replace(/\bRW[\s.:]*[0-9]{1,3}\b/gi, '');
+  }
+  rawAlamat = rawAlamat.replace(/[\/,\s]+$/, '').replace(/\s+/g, ' ').trim();
+  if (rt && /^\d+$/.test(rt)) rt = ('000' + rt).slice(-3);
+  if (rw && /^\d+$/.test(rw)) rw = ('000' + rw).slice(-3);
+
+  // Smart wrap across 3 address lines (29 boxes, 29 boxes, 16 boxes)
+  const addrParts = [];
+  if (rawAlamat) addrParts.push(rawAlamat);
+  if (kelurahan) addrParts.push(kelurahan.toLowerCase().includes('kel') ? kelurahan : ('Kel. ' + kelurahan));
+  if (kecamatan) addrParts.push(kecamatan.toLowerCase().includes('kec') ? kecamatan : ('Kec. ' + kecamatan));
+  if (kabupaten) addrParts.push(kabupaten);
+
+  const fullAddrStr = addrParts.join(', ');
+  const words = fullAddrStr.trim().split(/\s+/);
+
+  let alamat1 = '';
+  let alamat2 = '';
+  let alamat3 = '';
+
+  while (words.length > 0) {
+    const w = words[0];
+    const test = !alamat1 ? w : (alamat1 + ' ' + w);
+    if (test.length <= 29) {
+      alamat1 = test;
+      words.shift();
     } else {
-      alamat3 = !alamat3 ? w : alamat3 + ' ' + w;
+      if (!alamat1) {
+        alamat1 = w.substring(0, 29);
+        words[0] = w.substring(29);
+      }
+      break;
     }
   }
 
-  const rt          = (data.rt || '').replace(/[^0-9]/g, '');
-  const rw          = (data.rw || '').replace(/[^0-9]/g, '');
-  const kodePos     = (data.kode_pos || '').replace(/[^0-9]/g, '');
-  const routerQty   = String(data.router_qty !== undefined && data.router_qty !== '' ? data.router_qty : '1').trim();
-  const smartboxQty = String(data.smartbox_qty !== undefined && data.smartbox_qty !== '' ? data.smartbox_qty : '0').trim();
+  while (words.length > 0) {
+    const w = words[0];
+    const test = !alamat2 ? w : (alamat2 + ' ' + w);
+    if (test.length <= 29) {
+      alamat2 = test;
+      words.shift();
+    } else {
+      if (!alamat2) {
+        alamat2 = w.substring(0, 29);
+        words[0] = w.substring(29);
+      }
+      break;
+    }
+  }
+
+  while (words.length > 0) {
+    const w = words[0];
+    const test = !alamat3 ? w : (alamat3 + ' ' + w);
+    if (test.length <= 16) {
+      alamat3 = test;
+      words.shift();
+    } else {
+      if (!alamat3) {
+        alamat3 = w.substring(0, 16);
+      }
+      break;
+    }
+  }
+
   const kepemilikan = (data.status_kepemilikan || 'PEMILIK').toUpperCase().trim();
-  const email       = (data.email_pelanggan || '').toLowerCase().trim();
-  
-  const service     = (data.service || 'Fiber 100').trim();
+  const service     = (data.service || 'Fiber 50').trim();
+
   const addonTvRaw  = data.addon_tv || '';
   const addonTvArr  = typeof addonTvRaw === 'string' && addonTvRaw
       ? addonTvRaw.split(',').map(s => s.trim()).filter(Boolean)
       : (Array.isArray(addonTvRaw) ? addonTvRaw : []);
   const addonTv     = addonTvArr.join(', ');
-  const hasDensTv   = addonTvArr.some(v => v.toLowerCase().includes('dens'));
-  const hasVisionTv = addonTvArr.some(v => v.toLowerCase().includes('vision'));
+  
+  // Check for Dens.TV and Vision+
+  const tvCombinedStr = (addonTv + ' ' + (typeof data.addon_tv === 'string' ? data.addon_tv : '')).toLowerCase();
+  const hasDensTv   = tvCombinedStr.includes('dens');
+  const hasVisionTv = tvCombinedStr.includes('vision');
+
+  const routerQty   = data.router_qty || '0';
+  const smartboxQty = data.smartbox_qty || '0';
+
   const usernameCbn = (data.username_cbn || (nama.split(' ')[0] || 'user')).toLowerCase().trim();
   
   const fmtRp = (val, def) => {
@@ -248,7 +252,15 @@ function generateCbnDocumentHtml(data) {
   const biayaPpn      = fmtRp(data.biaya_ppn,      'Rp22.440');
   const totalBiaya    = fmtRp(data.biaya_total,     'Rp226.440');
   const tglTtd        = data.so_date || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
-  const signatureImg  = data.signature_data || '';
+  
+  const rawSig        = data.signature_data || data.signature || '';
+  const sigSrc        = rawSig ? (rawSig.startsWith('data:') ? rawSig : ('data:image/png;base64,' + rawSig)) : '';
+
+  const salesSigImg   = data.ttd_sales_base64 || DEFAULT_TTD_SALES_B64;
+  const spvSigImg     = data.ttd_spv_base64   || DEFAULT_TTD_SPV_B64;
+  const salesName     = (data.sales_name || 'FIRMAN').toUpperCase();
+  const defaultNotes  = data.default_notes || 'REGULER PROMO JULY 2026 - NAB';
+  const notesText     = data.catatan || defaultNotes;
 
   const isPria    = (gender === 'PRIA' || gender === 'MALE');
   const isWanita  = (gender === 'WANITA' || gender === 'FEMALE');
@@ -294,6 +306,26 @@ function generateCbnDocumentHtml(data) {
     }
   }
 
+  const box = (text, leftStart, top, charWidth, fontSize, maxChars) => {
+    const s = String(text || '');
+    const len = Math.min(s.length, maxChars);
+    let html = '';
+    for (let i = 0; i < len; i++) {
+      const ch = s.charAt(i);
+      const l = leftStart + (i * charWidth);
+      html += `<div class='fld' style='top:${top}%;left:${l.toFixed(2)}%;font-size:${fontSize};font-weight:bold;width:${charWidth}%;text-align:center;'>${ch}</div>`;
+    }
+    return html;
+  };
+
+  const fld = (text, top, left, fontSize, extra = '') => {
+    const val = String(text || '');
+    return `<div class='fld' style='top:${top}%;left:${left}%;font-size:${fontSize};${extra}'>${val}</div>`;
+  };
+
+  const promoBoxTops  = [50.10, 52.35, 54.50];
+  const promoTextTops = [49.50, 51.80, 54.00];
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -312,7 +344,7 @@ function generateCbnDocumentHtml(data) {
 <div class='page'>
   <img class='bg' src='${DEFAULT_BG_TEMPLATE_B64}'>
   <div class='overlay'>
-    <!-- 1. DATA PELANGGAN (100% Presisi Kotak Asli) -->
+    <!-- 1. DATA PELANGGAN -->
     ${box(nama, 20.88, 11.51, 1.905, '9pt', 29)}
     ${box(ttlKota, 20.88, 14.07, 1.905, '9pt', 15)}
     ${box(ttlDay, 57.0, 14.07, 1.905, '9pt', 2)}
@@ -326,7 +358,7 @@ function generateCbnDocumentHtml(data) {
     ${telpRumah && telpRumah !== telpSelular ? box(telpRumah, 20.88, 19.19, 1.905, '9pt', 12) : ''}
     ${box(telpSelular, 66.8, 19.19, 1.905, '9pt', 12)}
 
-    <!-- 2. ALAMAT PEMASANGAN 3 BARIS (Alamat, Kelurahan, Kecamatan Lengkap) -->
+    <!-- 2. ALAMAT PEMASANGAN (BARIS 1: 29 KOTAK, BARIS 2: 29 KOTAK, BARIS 3: 16 KOTAK) -->
     ${box(alamat1, 20.88, 26.51, 1.905, '8.5pt', 29)}
     ${alamat2 ? box(alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) : ''}
     ${alamat3 ? box(alamat3, 20.88, 30.50, 1.905, '8.5pt', 16) : ''}
@@ -343,22 +375,30 @@ function generateCbnDocumentHtml(data) {
     <div class='fld' style='top:42.25%;left:2.9%;font-size:13pt;font-weight:bold;'>&#10004;</div>
     ${fld(service, 42.25, 11.4, '11.5pt')}
 
+    <!-- PERANGKAT TAMBAHAN -->
     ${parseInt(routerQty) >= 1 ? `
-      <div class='fld' style='top:44.00%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
+      <div class='fld' style='top:43.85%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
       <div class='fld' style='top:43.85%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;'>${routerQty}</div>
     ` : ''}
     ${parseInt(smartboxQty) >= 1 ? `
-      <div class='fld' style='top:46.10%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
+      <div class='fld' style='top:46.00%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
       <div class='fld' style='top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;'>${smartboxQty}</div>
     ` : ''}
 
-    ${hasDensTv ? "<div class='fld' style='top:50.80%;left:73.20%;font-size:9.5pt;font-weight:900;'>&#10004;</div>" : ''}
-    ${hasVisionTv ? "<div class='fld' style='top:52.35%;left:73.20%;font-size:9.5pt;font-weight:900;'>&#10004;</div>" : ''}
+    <!-- ADD-ON TV (KOLOM KANAN - SUBKOLOM KIRI) -->
+    ${hasDensTv ? "<div class='fld' style='top:50.15%;left:49.85%;font-size:10.5pt;font-weight:900;'>&#10004;</div>" : ''}
+    ${hasVisionTv ? "<div class='fld' style='top:52.15%;left:49.85%;font-size:10.5pt;font-weight:900;'>&#10004;</div>" : ''}
 
-    ${cbnPackageLines.map((pkg, idx) => `
-      <div class='fld' style='top:${(51.0 + idx * 1.55).toFixed(2)}%;left:74.00%;font-size:9pt;font-weight:900;'>&#10004;</div>
-      <div class='fld' style='top:${(51.1 + idx * 1.55).toFixed(2)}%;left:76.20%;font-size:5.5pt;font-weight:bold;white-space:nowrap;'>${pkg}</div>
-    `).join('')}
+    <!-- PROMO CBN (KOLOM KANAN - SESUAI KOTAK ASLI) -->
+    ${cbnPackageLines.map((pkg, idx) => {
+      if (idx > 2) return '';
+      const bTop = promoBoxTops[idx] || (50.10 + idx * 2.25);
+      const tTop = promoTextTops[idx] || (bTop - 0.50);
+      return `
+        <div class='fld' style='top:${bTop.toFixed(2)}%;left:74.30%;font-size:9pt;font-weight:900;'>&#10004;</div>
+        <div class='fld' style='top:${tTop.toFixed(2)}%;left:76.80%;width:21.8%;font-size:5.2pt;font-weight:bold;line-height:1.1;overflow:hidden;word-break:break-word;'>${pkg}</div>
+      `;
+    }).join('')}
 
     <!-- 4. RINCIAN BIAYA -->
     ${biayaPasang && biayaPasang !== 'Rp0' && biayaPasang !== 'Rp 0' ? fld(biayaPasang, 58.91, 70.0, '8.5pt') : ''}
@@ -367,21 +407,21 @@ function generateCbnDocumentHtml(data) {
     ${fld(biayaPpn, 67.01, 70.0, '8.5pt')}
     ${fld(totalBiaya, 68.41, 70.0, '10pt', 'font-weight:900;')}
 
-    <!-- USERNAME & NOTES -->
+    <!-- USERNAME & NOTES (ADMIN CONFIGURABLE) -->
     ${box(usernameCbn, 2.35, 83.91, 1.905, '9pt', 11)}
-    ${fld(data.catatan || 'REGULER PROMO JULY 2026 - NAB', 88.80, 51.50, '9.5pt')}
+    ${fld(notesText, 88.80, 51.50, '9.5pt')}
 
-    <!-- 5. TANGGAL & TANDA TANGAN (PRESISI MENEMPEL DI ATAS GARIS & NAMA) -->
+    <!-- 5. TANGGAL & TANDA TANGAN -->
     ${fld(tglTtd, 92.85, 9.50, '10.5pt')}
 
-    <!-- KOLOM 1: TANDA TANGAN PELANGGAN (DITURUNKAN PAS DI ATAS GARIS PELANGGAN) -->
-    ${signatureImg ? `<img src='${signatureImg}' style='position:absolute;top:91.5%;left:6.0%;max-height:38px;max-width:130px;z-index:5;' alt='TTD Pelanggan'>` : ''}
+    <!-- TANDA TANGAN PELANGGAN -->
+    ${sigSrc ? `<img src='${sigSrc}' style='position:absolute;top:89.2%;left:6.0%;max-height:52px;max-width:135px;z-index:10;'>` : ''}
 
-    <!-- KOLOM 3: TANDA TANGAN SALES (TEPAT DI ATAS NAMA SALES TANPA SPACE) -->
+    <!-- TANDA TANGAN SALES -->
     <img src='${salesSigImg}' style='position:absolute;top:89.5%;left:43.0%;max-height:55px;max-width:130px;z-index:5;' alt='TTD Sales'>
     ${fld(salesName, 94.20, 38.0, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;')}
 
-    <!-- KOLOM 4: TANDA TANGAN SPV (TEPAT DI ATAS NAMA TIN006-SUHARTA TANPA SPACE) -->
+    <!-- TANDA TANGAN SPV -->
     <img src='${spvSigImg}' style='position:absolute;top:88.8%;left:78.0%;max-height:60px;max-width:130px;z-index:5;' alt='TTD SPV'>
     ${fld("TIN006-SUHARTA", 94.20, 73.5, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;')}
   </div>
@@ -392,7 +432,7 @@ function generateCbnDocumentHtml(data) {
 
 function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
   const adminRecipient = recipientEmail || CONFIG.NOTIF_EMAIL;
-  const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})`;
+  const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})` ;
 
   const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#005696;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;">📄 Buka Surat Formulir PDF Resmi CBN</a>` : '<em>(PDF terlampir pada email ini)</em>';
   const ktpLink = ktpUrl ? `<a href="${ktpUrl}" target="_blank" style="display:inline-block;background:#0284c7;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;margin-left:8px;">💳 Lihat Foto KTP Pelanggan</a>` : '';
@@ -527,7 +567,7 @@ function sendCustomerEmail(params, pdfUrl, pdfBlob) {
         <tr><td>Nama Lengkap</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor Identitas (KTP)</td><td>${params.nomor_ktp || '-'}</td></tr>
         <tr><td>Paket Layanan</td><td><span class="badge">${params.service || 'CBN Fiber'}</span></td></tr>
-        <tr><td>Alamat Pemasangan</td><td>${params.alamat || '-'}${params.kelurahan ? ', Kel. ' + params.kelurahan : ''}${params.kecamatan ? ', Kec. ' + params.kecamatan : ''} (RT ${params.rt || '-'}/RW ${params.rw || '-'}, Kode Pos: ${params.kode_pos || '-'})</td></tr>
+        <tr><td>Alamat Pemasangan</td><td>${params.alamat || '-'} (RT ${params.rt || '-'}/RW ${params.rw || '-'}, Kode Pos: ${params.kode_pos || '-'})</td></tr>
         <tr><td>Rencana Jadwal Pemasangan</td><td><strong>${params.jadwal_tanggal || '-'}</strong> (Slot: ${params.jadwal_waktu || '-'})</td></tr>
         <tr><td>Estimasi Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
         <tr><td>Sales Code</td><td>${params.sales_code || 'SEP-001'}</td></tr>

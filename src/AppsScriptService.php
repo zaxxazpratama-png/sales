@@ -68,6 +68,7 @@ class AppsScriptService
             'biaya_total'       => $data['biaya_total']       ?? 'Rp 193.140',
             'addon_cbn_package' => $data['addon_cbn_package'] ?? '',
             'signature_data'    => $data['signature_data']    ?? '',
+            'default_notes'     => $settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB',
         ];
 
         // Attach Base64 SPV Signature & Sales Signature

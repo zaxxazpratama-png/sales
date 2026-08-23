@@ -23,7 +23,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function resizeCanvas() {
             const rect = canvas.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
             const ratio = window.devicePixelRatio || 1;
+            
+            // Save existing drawing before resizing
+            let tempCanvas = null;
+            if (hasDrawn && canvas.width > 0 && canvas.height > 0) {
+                tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas, 0, 0);
+            }
+
             canvas.width = rect.width * ratio;
             canvas.height = rect.height * ratio;
             ctx.scale(ratio, ratio);
@@ -31,6 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.strokeStyle = '#002b4d';
+
+            // Restore drawing
+            if (tempCanvas) {
+                ctx.drawImage(tempCanvas, 0, 0, rect.width, rect.height);
+            }
         }
 
         resizeCanvas();

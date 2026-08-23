@@ -122,6 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $settings['call_center']     = trim($_POST['call_center'] ?? $settings['call_center']);
             $settings['wa_helpdesk']     = trim($_POST['wa_helpdesk'] ?? $settings['wa_helpdesk']);
             $settings['admin_email']     = trim($_POST['admin_email'] ?? $settings['admin_email']);
+            $settings['default_notes']   = trim($_POST['default_notes'] ?? ($settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB'));
             
             if (!empty($_FILES['ttd_spv']['name']) && $_FILES['ttd_spv']['error'] === UPLOAD_ERR_OK) {
                 $target = dirname(__DIR__) . '/assets/img/ttd_spv_master.png';
@@ -1419,6 +1420,16 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     <div class="form-group">
                         <label>Ganti Password Login Admin</label>
                         <input type="password" name="admin_password" class="form-control" placeholder="Biarkan kosong jika tidak ingin mengubah">
+                    </div>
+
+                    <div class="form-group" style="grid-column:span 2;">
+                        <label style="color:#cbd5e1;font-weight:700;">📝 Catatan Promo Default (Kolom Notes Surat Formulir CBN)</label>
+                        <input type="text" name="default_notes" class="form-control" 
+                               value="<?= htmlspecialchars($settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB') ?>" 
+                               placeholder="Contoh: REGULER PROMO JULY 2026 - NAB">
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">
+                            💡 Teks promo / catatan ini akan dicetak otomatis di bagian bawah Surat CBN jika pemohon tidak mengisi catatan khusus.
+                        </div>
                     </div>
                 </div>
 
