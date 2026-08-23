@@ -128,8 +128,11 @@ try {
         'timestamp'  => date('d/m/Y H:i:s'),
     ];
 
-    $redirectTarget = !empty($data['sales_code']) ? $data['sales_code'] : $salesCode;
-    header('Location: ' . $redirectTarget);
+    $redirectTarget = !empty($data['sales_code']) ? $data['sales_code'] : ($salesCode ?? 'SEP-001');
+    $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    $cleanBase = preg_replace('#/public$#i', '', $scriptDir);
+    $redirectUrl = ($cleanBase ? $cleanBase : '') . '/' . ltrim($redirectTarget, '/');
+    header('Location: ' . $redirectUrl);
     exit;
 
 } catch (\Exception $e) {
