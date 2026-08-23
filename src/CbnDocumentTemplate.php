@@ -204,10 +204,12 @@ class CbnDocumentTemplate
             return "<div class='cbn-fld' style='top:{$top}%;left:{$left}%;font-size:{$fontSize};{$extra}'>{$text}</div>";
         };
 
-        $bgPath = dirname(__DIR__) . '/asli_template_hd.png';
+        $bgPath = dirname(__DIR__) . '/public/assets/img/asli_bg.jpg';
         $bgBase64 = '';
         if (file_exists($bgPath)) {
-            $bgBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($bgPath));
+            $bgBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($bgPath));
+        } elseif (file_exists(__DIR__ . '/../public/assets/img/asli_bg.jpg')) {
+            $bgBase64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents(__DIR__ . '/../public/assets/img/asli_bg.jpg'));
         }
 
         $spvSigBase64 = $data['ttd_spv_base64'] ?? '';
