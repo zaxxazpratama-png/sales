@@ -64,9 +64,45 @@ class CbnDocumentTemplate
         $waktuPasang = $data['jadwal_waktu'] ?? '09.00-11.00';
         $catatan     = trim($data['catatan'] ?? '');
         
-        $biayaPasang = $data['biaya_pasang'] ?? 'Rp 0';
-        $biayaPaket  = $data['biaya_paket'] ?? 'Rp 299.000';
-        $biayaTotal  = $data['biaya_total'] ?? 'Rp 331.890';
+        // Helper: normalisasi nilai biaya → selalu "Rp X.XXX"
+        // Handles: 199000 | 199.000 | Rp 199.000 | Rp199.000
+        $fmtRp = function(string $val, string $default): string {
+            $val = trim($val);
+            if (empty($val)) return $default;
+            // Hapus prefix Rp (dengan atau tanpa spasi) lalu hapus titik/koma
+            $clean = preg_replace('/[Rr][Pp]\s*/u', '', $val);
+            $clean = preg_replace('/[.,]/', '', $clean);
+            $clean = preg_replace('/\D/', '', $clean);
+            if ($clean === '' || $clean === '0') return $default;
+            return 'Rp' . number_format((int)$clean, 0, ',', '.');
+        };
+
+        $biayaPasang   = $fmtRp($data['biaya_pasang']   ?? '', 'Rp0');
+        $biayaPaket    = $fmtRp($data['biaya_paket']    ?? '', 'Rp169.000');
+        $biayaTambahan = $fmtRp($data['biaya_tambahan'] ?? '', 'Rp5.000');
+        $biayaTotal    = $fmtRp($data['biaya_total']    ?? '', 'Rp193.140');
+        $biayaPpn      = $fmtRp($data['biaya_ppn']      ?? '', 'Rp19.140');
+
+        
+        // Parse addon_cbn_package (JSON array of CBN fiber package descriptions)
+        $addonCbnPackage = [];
+        $rawCbnPkg = $data['addon_cbn_package'] ?? '';
+        if (!empty($rawCbnPkg)) {
+            $decoded = json_decode($rawCbnPkg, true);
+            if (is_array($decoded)) {
+                $addonCbnPackage = $decoded;
+            }
+        }
+        // TIDAK ada fallback ke addonTvText — posisi kanan (74.4%) hanya untuk CBN Package
+        
+        // Flag untuk checkbox TV add-on (kiri form)
+        $hasDensTv = false;
+        $hasVisionTv = false;
+        foreach ($addonTv as $tvItem) {
+            $tvLower = strtolower($tvItem);
+            if (strpos($tvLower, 'dens') !== false) $hasDensTv = true;
+            if (strpos($tvLower, 'vision') !== false) $hasVisionTv = true;
+        }
         
         $tglTtd      = $data['so_date'] ?? date('d/m/Y');
         $signatureImg= $data['signature_data'] ?? '';
@@ -100,6 +136,39 @@ class CbnDocumentTemplate
             if ($pos !== false) {
                 $alamat1 = substr($alamat, 0, $pos);
                 $alamat2 = trim(substr($alamat, $pos));
+            }
+        }
+
+        // Parsing Jadwal Pemasangan (Hari, dd, mm, yyyy)
+        $jadwalHari  = '';
+        $jadwalDay   = '';
+        $jadwalMonth = '';
+        $jadwalYear  = '';
+        if (!empty($tglPasang)) {
+            $timestamp = false;
+            if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $tglPasang, $m)) {
+                $timestamp = mktime(0, 0, 0, (int)$m[2], (int)$m[3], (int)$m[1]);
+                $jadwalDay   = $m[3];
+                $jadwalMonth = $m[2];
+                $jadwalYear  = $m[1];
+            } elseif (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $tglPasang, $m)) {
+                $timestamp = mktime(0, 0, 0, (int)$m[2], (int)$m[1], (int)$m[3]);
+                $jadwalDay   = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+                $jadwalMonth = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+                $jadwalYear  = $m[3];
+            }
+            if ($timestamp !== false) {
+                $dayNames = [
+                    1 => 'SENIN',
+                    2 => 'SELASA',
+                    3 => 'RABU',
+                    4 => 'KAMIS',
+                    5 => 'JUMAT',
+                    6 => 'SABTU',
+                    7 => 'MINGGU'
+                ];
+                $dayNum = (int)date('N', $timestamp);
+                $jadwalHari = $dayNames[$dayNum] ?? '';
             }
         }
 
@@ -253,73 +322,134 @@ class CbnDocumentTemplate
   <!-- DATA LAYER DENGAN PENEMPATAN PRESISI (1 HURUF = 1 KOTAK) -->
   <div class="cbn-data-layer">
 
-    <!-- 0. SALES CODE kanan atas (6 kotak, step=2.15%) -->
-    <?= $box(preg_replace('/[^A-Z0-9]/', '', strtoupper($salesCode)), 74.0, 3.3, 2.15, '9pt', 6) ?>
+    <!-- 0. SALES CODE kanan atas (6 kotak) -->
+    <?= $box($salesCode, 84.3, 2.87, 1.905, '8pt', 6) ?>
 
     <!-- 1. NAMA PELANGGAN (29 kotak) -->
-    <?= $box($nama, 21.15, 11.25, 2.483, '10pt', 29) ?>
+    <?= $box($nama, 20.88, 11.51, 1.905, '9pt', 29) ?>
 
     <!-- TEMPAT LAHIR (15 kotak) -->
-    <?= $box($ttlKota, 21.15, 13.8, 2.483, '10pt', 15) ?>
+    <?= $box($ttlKota, 20.88, 14.07, 1.905, '9pt', 15) ?>
 
-    <!-- TANGGAL LAHIR: DD | MM | YYYY -->
-    <?= $box($ttlDay,   59.0,  13.8, 2.483, '10pt', 2) ?>
-    <?= $box($ttlMonth, 64.45, 13.8, 2.483, '10pt', 2) ?>
-    <?= $box($ttlYear,  69.9,  13.8, 2.483, '10pt', 4) ?>
+    <!-- TANGGAL LAHIR: DD (2), / (1 skip), MM (2), / (1 skip), YYYY (4) -->
+    <?= $box($ttlDay,   57.0, 14.07, 1.905, '9pt', 2) ?>
+    <?= $box($ttlMonth, 62.7, 14.07, 1.905, '9pt', 2) ?>
+    <?= $box($ttlYear,  68.4, 14.07, 1.905, '9pt', 4) ?>
 
     <!-- NOMOR IDENTITAS KTP (16 kotak) -->
-    <?= $box(preg_replace('/[^0-9]/', '', $ktp), 21.15, 16.45, 2.483, '10pt', 16) ?>
+    <?= $box(preg_replace('/[^0-9]/', '', $ktp), 20.88, 16.63, 1.905, '9pt', 16) ?>
 
     <!-- JENIS KELAMIN -->
     <?php if ($isPria): ?>
-      <div class="cbn-fld" style="top:16.35%;left:75.6%;width:2.483%;font-size:12pt;text-align:center;">X</div>
+      <div class="cbn-fld" style="top:16.5%;left:75.6%;font-size:11pt;font-weight:bold;width:1.9%;text-align:center;">X</div>
     <?php elseif ($isWanita): ?>
-      <div class="cbn-fld" style="top:16.35%;left:84.4%;width:2.483%;font-size:12pt;text-align:center;">X</div>
+      <div class="cbn-fld" style="top:16.5%;left:84.4%;font-size:11pt;font-weight:bold;width:1.9%;text-align:center;">X</div>
     <?php endif; ?>
 
     <!-- TELEPON RUMAH -->
     <?php if (!empty($telpRumah) && $telpRumah !== $telpSelular): ?>
-      <?= $box(preg_replace('/[^0-9]/', '', $telpRumah), 21.15, 18.95, 2.483, '10pt', 12) ?>
+      <?= $box(preg_replace('/[^0-9]/', '', $telpRumah), 20.88, 19.19, 1.905, '9pt', 12) ?>
     <?php endif; ?>
 
     <!-- TELEPON SELULAR / WA (2 baris sama) -->
-    <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 68.8, 18.95, 2.483, '10pt', 12) ?>
-    <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 68.8, 20.5,  2.483, '10pt', 12) ?>
+    <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 66.8, 19.19, 1.905, '9pt', 12) ?>
+    <?= $box(preg_replace('/[^0-9]/', '', $telpSelular), 66.8, 20.65, 1.905, '9pt', 12) ?>
 
     <!-- 2. ALAMAT PEMASANGAN (29 kotak × 2 baris) -->
-    <?= $box($alamat1, 21.15, 26.8, 2.483, '9.5pt', 29) ?>
+    <?= $box($alamat1, 20.88, 26.51, 1.905, '8.5pt', 29) ?>
     <?php if (!empty($alamat2)): ?>
-      <?= $box($alamat2, 21.15, 28.7, 2.483, '9.5pt', 29) ?>
+      <?= $box($alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) ?>
     <?php endif; ?>
+
+    <!-- RT (3 kotak), RW (3 kotak), KODE POS (5 kotak) -->
+    <?= $box($rt, 55.21, 30.50, 1.905, '8.5pt', 3) ?>
+    <?= $box($rw, 64.73, 30.50, 1.905, '8.5pt', 3) ?>
+    <?= $box($kodePos, 81.86, 30.50, 1.905, '8.5pt', 5) ?>
 
     <!-- STATUS KEPEMILIKAN -->
     <?php if ($isPemilik): ?>
-      <div class="cbn-fld" style="top:33.15%;left:21.2%;font-size:13pt;font-weight:bold;">&#10004;</div>
+      <div class="cbn-fld" style="top:33.0%;left:20.9%;font-size:12pt;font-weight:bold;">&#10004;</div>
     <?php elseif ($isPenyewa): ?>
-      <div class="cbn-fld" style="top:33.15%;left:34.8%;font-size:13pt;font-weight:bold;">&#10004;</div>
+      <div class="cbn-fld" style="top:33.0%;left:34.4%;font-size:12pt;font-weight:bold;">&#10004;</div>
     <?php endif; ?>
 
     <!-- ALAMAT EMAIL (29 kotak) -->
-    <?= $box(strtolower($email), 21.15, 35.2, 2.483, '9pt', 29) ?>
+    <?= $box(strtolower($email), 20.88, 34.96, 1.905, '8.5pt', 29) ?>
 
     <!-- 3. PILIHAN PAKET LAYANAN -->
     <div class="cbn-fld" style="top:42.25%;left:2.9%;font-size:13pt;font-weight:bold;">&#10004;</div>
     <?= $f($service, 42.25, 11.4, '11.5pt') ?>
 
-    <!-- ADD-ON TV -->
-    <?php if (!empty($addonTvText)): ?>
-      <div class="cbn-fld" style="top:49.25%;left:74.4%;font-size:9pt;font-weight:bold;">
-        &#10004; <?= htmlspecialchars($addonTvText) ?>
-      </div>
+    <!-- PERANGKAT TAMBAHAN (ADDITIONAL DEVICES) -->
+    <!-- Wireless Router (default checked jika qty >= 1) -->
+    <?php if ((int)$routerQty >= 1): ?>
+      <div class="cbn-fld" style="top:44.00%;left:49.85%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+      <div class="cbn-fld" style="top:43.85%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars($routerQty) ?></div>
     <?php endif; ?>
 
-    <!-- RINCIAN BIAYA -->
-    <?= $f($biayaPaket,  60.0, 69.5, '11pt') ?>
-    <?= $f($biayaPasang, 61.5, 69.5, '11pt') ?>
-    <?= $f($biayaTotal,  69.3, 69.5, '13pt') ?>
+    <!-- Smartbox Android TV (jika dipilih) -->
+    <?php if ((int)$smartboxQty >= 1): ?>
+      <div class="cbn-fld" style="top:45.60%;left:49.85%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+      <div class="cbn-fld" style="top:45.35%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars($smartboxQty) ?></div>
+    <?php endif; ?>
+
+    <!-- CHECKMARK DENS TV+ APPS (kotak kiri form, jika dipilih) -->
+    <?php if ($hasDensTv): ?>
+      <div class="cbn-fld" style="top:50.40%;left:49.85%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+    <?php endif; ?>
+
+    <!-- CHECKMARK VISION+ PREMIUM SPORTS (kotak kiri form, jika dipilih) -->
+    <?php if ($hasVisionTv): ?>
+      <div class="cbn-fld" style="top:52.00%;left:49.85%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+    <?php endif; ?>
+
+    <!-- CBN PACKAGE ADD-ON (kolom kanan - auto-claim sesuai paket internet dipilih) -->
+    <?php foreach ($addonCbnPackage as $cbnIdx => $cbnPkg): ?>
+      <!-- Checkmark di kotak kanan (checkbox built-in template) -->
+      <div class="cbn-fld" style="top:<?= number_format(50.8 + ($cbnIdx * 1.6), 2, '.', '') ?>%;left:73.8%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+      <!-- Teks deskripsi paket CBN -->
+      <div class="cbn-fld" style="top:<?= number_format(50.8 + ($cbnIdx * 1.6), 2, '.', '') ?>%;left:75.8%;font-size:4.8pt;font-weight:bold;font-family:Arial,sans-serif;white-space:nowrap;width:60mm;">
+        <?= htmlspecialchars($cbnPkg) ?>
+      </div>
+    <?php endforeach; ?>
+
+    <!-- RINCIAN BIAYA — posisi tepat sesuai baris tabel form CBN -->
+    <!-- Row 1: Biaya Pemasangan (58.91%) - skip jika Rp0 promo -->
+    <?php if (!empty($biayaPasang) && $biayaPasang !== 'Rp0' && $biayaPasang !== 'Rp 0' && $biayaPasang !== 'Rp.0' && $biayaPasang !== 'Rp. 0'): ?>
+    <?= $f($biayaPasang,    58.91,  70.0, '8.5pt') ?>
+    <?php endif; ?>
+    <!-- Row 2: Biaya Paket - monthly charges (60.08%) -->
+    <?= $f($biayaPaket,    60.08, 70.0, '8.5pt') ?>
+    <!-- Row 3: Biaya Tambahan - additional charges (61.24%) -->
+    <?= $f($biayaTambahan, 61.24,  70.0, '8.5pt') ?>
+    <!-- Row 8: PPN 11% (67.01%) -->
+    <?= $f($biayaPpn,      67.01,  70.0, '8.5pt') ?>
+    <!-- Row 9: TOTAL (68.41%) -->
+    <?= $f($biayaTotal,    68.41,  70.0, '10pt', 'font-weight:900;') ?>
+
+    <!-- JADWAL PEMASANGAN -->
+    <!-- Hari (8 kotak) -->
+    <?= $box($jadwalHari, 56.4, 80.8, 1.86, '7.5pt', 8) ?>
+    <!-- Tanggal dd (2 kotak) -->
+    <?= $box($jadwalDay, 79.1, 80.8, 1.86, '7.5pt', 2) ?>
+    <!-- Bulan mm (2 kotak) -->
+    <?= $box($jadwalMonth, 84.7, 80.8, 1.86, '7.5pt', 2) ?>
+    <!-- Tahun yyyy (4 kotak) -->
+    <?= $box($jadwalYear, 90.3, 80.8, 1.86, '7.5pt', 4) ?>
+
+    <!-- Waktu Pemasangan Checkboxes (84.7%) -->
+    <?php if (strpos($waktuPasang, '09.00') !== false): ?>
+      <div class="cbn-fld" style="top:84.7%;left:50.3%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+    <?php elseif (strpos($waktuPasang, '11.00') !== false): ?>
+      <div class="cbn-fld" style="top:84.7%;left:59.8%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+    <?php elseif (strpos($waktuPasang, '13.00') !== false): ?>
+      <div class="cbn-fld" style="top:84.7%;left:69.3%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+    <?php elseif (strpos($waktuPasang, '15.00') !== false): ?>
+      <div class="cbn-fld" style="top:84.7%;left:78.8%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+    <?php endif; ?>
 
     <!-- 4. USERNAME (11 kotak) -->
-    <?= $box(strtolower($usernameCbn), 2.8, 84.5, 2.483, '10pt', 11) ?>
+    <?= $box(strtolower($usernameCbn), 2.35, 83.91, 1.905, '9pt', 11) ?>
 
     <!-- 5. NOTES -->
     <?= $f(!empty($catatan) ? $catatan : 'REGULAR PROMO CBN - PT. SEP', 88.8, 51.5, '9.5pt') ?>

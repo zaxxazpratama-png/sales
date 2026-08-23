@@ -231,16 +231,43 @@ function generateCbnDocumentHtml(data) {
   const telpRumah   = (data.telp_rumah || '').replace(/[^0-9]/g, '');
   
   const alamat      = (data.alamat || '').toUpperCase().trim();
+  const rt          = (data.rt || '').replace(/[^0-9]/g, '');
+  const rw          = (data.rw || '').replace(/[^0-9]/g, '');
+  const kodePos     = (data.kode_pos || '').replace(/[^0-9]/g, '');
+  const routerQty   = String(data.router_qty !== undefined && data.router_qty !== '' ? data.router_qty : '1').trim();
+  const smartboxQty = String(data.smartbox_qty !== undefined && data.smartbox_qty !== '' ? data.smartbox_qty : '0').trim();
   const kepemilikan = (data.status_kepemilikan || 'PEMILIK').toUpperCase().trim();
   const email       = (data.email_pelanggan || '').toUpperCase().trim();
   
-  const service     = (data.service || 'Fiber 50').trim();
-  const addonTv     = data.addon_tv || '';
+  const service     = (data.service || 'Fiber 20').trim();
+  // Parse addon_tv: bisa berupa string comma-separated atau sudah string
+  const addonTvRaw  = data.addon_tv || '';
+  const addonTvArr  = typeof addonTvRaw === 'string' && addonTvRaw
+      ? addonTvRaw.split(',').map(s => s.trim()).filter(Boolean)
+      : (Array.isArray(addonTvRaw) ? addonTvRaw : []);
+  const addonTv     = addonTvArr.join(', ');
+  const hasDensTv   = addonTvArr.some(v => v.toLowerCase().includes('dens'));
+  const hasVisionTv = addonTvArr.some(v => v.toLowerCase().includes('vision'));
   const usernameCbn = (data.username_cbn || (nama.split(' ')[0] || 'user')).toUpperCase().trim();
   
-  const totalBiaya  = data.biaya_total || 'Rp 331.890';
-  const biayaPasang = data.biaya_pasang || 'Rp 0';
-  const biayaPaket  = data.biaya_paket || 'Rp 299.000';
+  // Helper: normalisasi biaya → selalu "RpX.XXX"
+  // Handles: 199000 | 199.000 | Rp 199.000 | Rp199.000
+  const fmtRp = (val, def) => {
+    if (!val && val !== 0) return def;
+    const s = String(val).trim();
+    if (!s) return def;
+    // Hapus prefix Rp lalu hapus semua non-digit
+    const cleaned = s.replace(/[Rr][Pp]\s*/g, '').replace(/[.,]/g, '').replace(/\D/g, '');
+    if (!cleaned || cleaned === '0') return def;
+    const num = parseInt(cleaned, 10);
+    return 'Rp' + num.toLocaleString('id-ID');
+  };
+
+  const biayaPasang   = fmtRp(data.biaya_pasang,   'Rp0');
+  const biayaPaket    = fmtRp(data.biaya_paket,    'Rp169.000');
+  const biayaTambahan = fmtRp(data.biaya_tambahan, 'Rp5.000');
+  const biayaPpn      = fmtRp(data.biaya_ppn,      'Rp19.140');
+  const totalBiaya    = fmtRp(data.biaya_total,     'Rp193.140');
   const tglTtd      = data.so_date || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
   const signatureImg= data.signature_data || '';
 
@@ -271,6 +298,33 @@ function generateCbnDocumentHtml(data) {
     if (pos !== -1) {
       alamat1 = alamat.substring(0, pos);
       alamat2 = alamat.substring(pos).trim();
+    }
+  }
+
+  // Parsing Jadwal Pemasangan (Hari, dd, mm, yyyy)
+  const tglPasang = data.jadwal_tanggal || '';
+  const waktuPasang = data.jadwal_waktu || '09.00-11.00';
+  let jadwalHari = '', jadwalDay = '', jadwalMonth = '', jadwalYear = '';
+  if (tglPasang) {
+    let dateObj = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(tglPasang)) {
+      const p = tglPasang.split('-');
+      dateObj = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+      jadwalDay = p[2];
+      jadwalMonth = p[1];
+      jadwalYear = p[0];
+    } else {
+      const p = tglPasang.split(/[\/\-\s]+/);
+      if (p.length >= 3) {
+        dateObj = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
+        jadwalDay = ('0' + p[0]).slice(-2);
+        jadwalMonth = ('0' + p[1]).slice(-2);
+        jadwalYear = p[2];
+      }
+    }
+    if (dateObj && !isNaN(dateObj.getTime())) {
+      const dayNames = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+      jadwalHari = dayNames[dateObj.getDay()] || '';
     }
   }
 
@@ -330,7 +384,9 @@ function generateCbnDocumentHtml(data) {
     color: #000;
     font-family: Arial, Helvetica, sans-serif;
     white-space: nowrap;
-    line-height: 1.15;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
   }
 </style>
 </head>
@@ -338,60 +394,120 @@ function generateCbnDocumentHtml(data) {
   ${bgTemplate ? `<img class='bg-img' src='data:image/jpeg;base64,${bgTemplate}'>` : `<img class='bg-img' src='https://sales-sales.up.railway.app/assets/img/asli_bg.jpg'>`}
   <div class='layer'>
 
-    <!-- 0. SALES CODE kanan atas (6 kotak, step=2.15%) -->
-    ${box(salesCode, 74.0, 3.3, 2.15, '9pt', 6)}
+    <!-- 0. SALES CODE kanan atas (6 kotak) -->
+    ${box(salesCode, 84.3, 2.87, 1.905, '8pt', 6)}
 
-    <!-- 1. NAMA PELANGGAN (29 kotak, step=2.483%) -->
-    ${box(nama, 21.15, 11.25, 2.483, '10pt', 29)}
+    <!-- 1. NAMA PELANGGAN (29 kotak) -->
+    ${box(nama, 20.88, 11.51, 1.905, '9pt', 29)}
 
     <!-- TEMPAT LAHIR (15 kotak) -->
-    ${box(ttlKota, 21.15, 13.8, 2.483, '10pt', 15)}
+    ${box(ttlKota, 20.88, 14.07, 1.905, '9pt', 15)}
 
     <!-- TANGGAL LAHIR: DD (2), / (1 skip), MM (2), / (1 skip), YYYY (4) -->
-    ${box(ttlDay,   59.0,  13.8, 2.483, '10pt', 2)}
-    ${box(ttlMonth, 64.45, 13.8, 2.483, '10pt', 2)}
-    ${box(ttlYear,  69.9,  13.8, 2.483, '10pt', 4)}
+    ${box(ttlDay,   57.0, 14.07, 1.905, '9pt', 2)}
+    ${box(ttlMonth, 62.7, 14.07, 1.905, '9pt', 2)}
+    ${box(ttlYear,  68.4, 14.07, 1.905, '9pt', 4)}
 
     <!-- NOMOR IDENTITAS KTP (16 kotak) -->
-    ${box(ktp, 21.15, 16.45, 2.483, '10pt', 16)}
+    ${box(ktp, 20.88, 16.63, 1.905, '9pt', 16)}
 
     <!-- JENIS KELAMIN -->
-    ${isPria   ? fld('X', 16.35, 75.6, '12pt', 'width:2.483%;text-align:center;') : ''}
-    ${isWanita ? fld('X', 16.35, 84.4, '12pt', 'width:2.483%;text-align:center;') : ''}
+    ${isPria   ? fld('X', 16.5, 75.6, '11pt', 'font-weight:bold;width:1.9%;text-align:center;') : ''}
+    ${isWanita ? fld('X', 16.5, 84.4, '11pt', 'font-weight:bold;width:1.9%;text-align:center;') : ''}
 
     <!-- TELEPON RUMAH -->
-    ${telpRumah ? box(telpRumah, 21.15, 18.95, 2.483, '10pt', 12) : ''}
+    ${telpRumah ? box(telpRumah, 20.88, 19.19, 1.905, '9pt', 12) : ''}
 
     <!-- TELEPON SELULAR / WA (2 baris sama) -->
-    ${box(telpSelular, 68.8, 18.95, 2.483, '10pt', 12)}
-    ${box(telpSelular, 68.8, 20.5,  2.483, '10pt', 12)}
+    ${box(telpSelular, 66.8, 19.19, 1.905, '9pt', 12)}
+    ${box(telpSelular, 66.8, 20.65, 1.905, '9pt', 12)}
 
     <!-- 2. ALAMAT PEMASANGAN (29 kotak × 2 baris) -->
-    ${box(alamat1, 21.15, 26.8, 2.483, '9.5pt', 29)}
-    ${alamat2 ? box(alamat2, 21.15, 28.7, 2.483, '9.5pt', 29) : ''}
+    ${box(alamat1, 20.88, 26.51, 1.905, '8.5pt', 29)}
+    ${alamat2 ? box(alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) : ''}
+
+    <!-- RT (3 kotak), RW (3 kotak), KODE POS (5 kotak) -->
+    ${box(rt, 55.21, 30.50, 1.905, '8.5pt', 3)}
+    ${box(rw, 64.73, 30.50, 1.905, '8.5pt', 3)}
+    ${box(kodePos, 81.86, 30.50, 1.905, '8.5pt', 5)}
 
     <!-- STATUS KEPEMILIKAN -->
-    ${isPemilik ? fld('\u2714', 33.15, 21.2, '13pt') : ''}
-    ${isPenyewa ? fld('\u2714', 33.15, 34.8, '13pt') : ''}
+    ${isPemilik ? fld('\u2714', 33.0, 20.9, '12pt', 'font-weight:bold;') : ''}
+    ${isPenyewa ? fld('\u2714', 33.0, 34.4, '12pt', 'font-weight:bold;') : ''}
 
     <!-- ALAMAT EMAIL (29 kotak) -->
-    ${box(email.toLowerCase(), 21.15, 35.2, 2.483, '9pt', 29)}
+    ${box(email.toLowerCase(), 20.88, 34.96, 1.905, '8.5pt', 29)}
 
     <!-- 3. PILIHAN PAKET LAYANAN -->
     ${fld('\u2714', 42.25, 2.9, '13pt')}
     ${fld(service, 42.25, 11.4, '11.5pt')}
 
-    <!-- ADD-ON TV -->
-    ${addonTv ? fld('\u2714 ' + addonTv, 49.25, 74.4, '9pt') : ''}
+    <!-- PERANGKAT TAMBAHAN (ADDITIONAL DEVICES) -->
+    <!-- Wireless Router (default checked jika qty >= 1) -->
+    ${parseInt(routerQty, 10) >= 1 ? `
+      ${fld('\u2714', 44.00, 49.85, '10pt', 'font-weight:900;color:#000;')}
+      ${fld(routerQty, 43.85, 79.06, '9.5pt', 'width:3.42%;text-align:center;font-weight:bold;')}
+    ` : ''}
 
-    <!-- RINCIAN BIAYA -->
-    ${fld(biayaPaket,                 60.0, 69.5, '11pt')}
-    ${fld(biayaPasang,                61.5, 69.5, '11pt')}
-    ${fld(data.biaya_ppn || 'Rp19.140', 67.4, 69.5, '11pt')}
-    ${fld(totalBiaya,                 69.3, 69.5, '13pt')}
+    <!-- Smartbox Android TV (jika dipilih) -->
+    ${parseInt(smartboxQty, 10) >= 1 ? `
+      ${fld('\u2714', 45.60, 49.85, '10pt', 'font-weight:900;color:#000;')}
+      ${fld(smartboxQty, 45.35, 79.06, '9.5pt', 'width:3.42%;text-align:center;font-weight:bold;')}
+    ` : ''}
+
+    <!-- CHECKMARK DENS TV+ APPS (kotak kiri form, jika dipilih) -->
+    ${hasDensTv ? fld('\u2714', 50.40, 49.85, '10pt', 'font-weight:900;color:#000;') : ''}
+
+    <!-- CHECKMARK VISION+ PREMIUM SPORTS (kotak kiri form, jika dipilih) -->
+    ${hasVisionTv ? fld('\u2714', 52.00, 49.85, '10pt', 'font-weight:900;color:#000;') : ''}
+
+    <!-- CBN PACKAGE ADD-ON (kolom kanan - auto-claim sesuai paket internet dipilih) -->
+    ${(() => {
+      let addonCbnPkgs = [];
+      if (data.addon_cbn_package) {
+        try { addonCbnPkgs = JSON.parse(data.addon_cbn_package); } catch(e) {}
+      }
+      if (!Array.isArray(addonCbnPkgs)) addonCbnPkgs = [];
+      return addonCbnPkgs.map((pkg, idx) => {
+        const top = 50.8 + (idx * 1.6);
+        // Checkmark di kotak kanan (built-in checkbox template)
+        const chk = fld('\u2714', top, 73.8, '10pt', 'font-weight:900;color:#000;');
+        // Teks deskripsi paket CBN di sebelah kanan checkmark
+        const txt = `<div class='fld' style='top:${top}%;left:75.8%;font-size:4.8pt;font-weight:bold;font-family:Arial,sans-serif;white-space:nowrap;width:60mm;'>${pkg}</div>`;
+        return chk + txt;
+      }).join('');
+    })()}
+
+    <!-- RINCIAN BIAYA — posisi tepat sesuai baris tabel form CBN -->
+    <!-- Row 1: Biaya Pemasangan (58.91%) - skip jika Rp0 promo -->
+    ${(biayaPasang && biayaPasang !== 'Rp0' && biayaPasang !== 'Rp 0' && biayaPasang !== 'Rp.0' && biayaPasang !== 'Rp. 0') ? fld(biayaPasang, 58.91, 70.0, '8.5pt') : ''}
+    <!-- Row 2: Biaya Paket - monthly charges (60.08%) -->
+    ${fld(biayaPaket,    60.08, 70.0, '8.5pt')}
+    <!-- Row 3: Biaya Tambahan - additional charges (61.24%) -->
+    ${fld(biayaTambahan, 61.24, 70.0, '8.5pt')}
+    <!-- Row 8: PPN 11% (67.01%) -->
+    ${fld(biayaPpn,      67.01, 70.0, '8.5pt')}
+    <!-- Row 9: TOTAL (68.41%) -->
+    ${fld(totalBiaya,    68.41, 70.0, '10pt', 'font-weight:900;')}
+
+    <!-- JADWAL PEMASANGAN -->
+    <!-- Hari (8 kotak) -->
+    ${box(jadwalHari, 56.4, 80.8, 1.86, '7.5pt', 8)}
+    <!-- Tanggal dd (2 kotak) -->
+    ${box(jadwalDay, 79.1, 80.8, 1.86, '7.5pt', 2)}
+    <!-- Bulan mm (2 kotak) -->
+    ${box(jadwalMonth, 84.7, 80.8, 1.86, '7.5pt', 2)}
+    <!-- Tahun yyyy (4 kotak) -->
+    ${box(jadwalYear, 90.3, 80.8, 1.86, '7.5pt', 4)}
+
+    <!-- Waktu Pemasangan Checkboxes (84.7%) -->
+    ${waktuPasang.includes('09.00') ? fld('\u2714', 84.7, 50.3, '10pt', 'font-weight:900;color:#000;') : ''}
+    ${waktuPasang.includes('11.00') ? fld('\u2714', 84.7, 59.8, '10pt', 'font-weight:900;color:#000;') : ''}
+    ${waktuPasang.includes('13.00') ? fld('\u2714', 84.7, 69.3, '10pt', 'font-weight:900;color:#000;') : ''}
+    ${waktuPasang.includes('15.00') ? fld('\u2714', 84.7, 78.8, '10pt', 'font-weight:900;color:#000;') : ''}
 
     <!-- 4. USERNAME (11 kotak) -->
-    ${box(usernameCbn.toLowerCase(), 2.8, 84.5, 2.483, '10pt', 11)}
+    ${box(usernameCbn.toLowerCase(), 2.35, 83.91, 1.905, '9pt', 11)}
 
     <!-- NOTES -->
     ${fld(data.catatan || 'REGULAR PROMO CBN - PT. SEP', 88.8, 51.5, '9.5pt')}
@@ -741,6 +857,46 @@ function sendCustomerEmail(params, pdfUrl, pdfBlob) {
 
 
 /**
+ * Simpan data pendaftaran ke Google Spreadsheet (Sheet1)
+ */
+function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
+  const ssId  = sheetId || CONFIG.SPREADSHEET_ID;
+  const ss    = SpreadsheetApp.openById(ssId);
+  let sheet = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
+  
+  const now = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+  const rowData = [
+    now,                                            // A: Timestamp
+    params.sales_code || 'SEP-001',                // B: Sales Code
+    'PT. SINERGI EMAS PERDANA',                    // C: Vendor
+    params.nama_pelanggan || '',                   // D: Nama Pelanggan
+    params.nomor_ktp || '',                        // E: Nomor KTP
+    params.ttl || '',                              // F: TTL
+    params.jenis_kelamin || 'PRIA',                // G: Jenis Kelamin
+    params.telp_rumah || '',                       // H: Telepon Rumah
+    params.telp || '',                             // I: No. WhatsApp / HP
+    params.alamat || '',                           // J: Alamat Pemasangan
+    params.rt || '',                               // K: RT
+    params.rw || '',                               // L: RW
+    params.kode_pos || '',                         // M: Kode Pos
+    params.status_kepemilikan || 'PEMILIK',        // N: Status Rumah
+    params.tikor || '',                            // O: Titik GPS
+    params.service || 'CBN Fiber',                 // P: Paket Layanan
+    params.addon_tv || '',                         // Q: Add-On TV
+    params.addon_device || '',                     // R: Perangkat Tambahan
+    params.username_cbn ? params.username_cbn + '@cbn.net.id' : '', // S: Username
+    (params.jadwal_tanggal || '') + ' (' + (params.jadwal_waktu || '') + ')', // T: Jadwal
+    params.catatan || '',                          // U: Catatan
+    params.biaya_total || '',                      // V: Estimasi Total Biaya
+    pdfUrl || '',                                  // W: Link PDF Surat CBN
+    ktpUrl || ''                                   // X: Link Foto KTP
+  ];
+
+  sheet.appendRow(rowData);
+}
+
+
+/**
  * Log error jika ada kendala
  */
 function logError(msg, sheetId) {
@@ -758,3 +914,4 @@ function logError(msg, sheetId) {
     // silent
   }
 }
+

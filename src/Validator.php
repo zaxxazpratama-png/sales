@@ -73,11 +73,13 @@ class Validator
         $this->data['smartbox_qty']      = htmlspecialchars(trim($input['smartbox_qty'] ?? '0'), ENT_QUOTES, 'UTF-8');
 
         // Pricing estimation
-        $this->data['biaya_pasang']      = htmlspecialchars(trim($input['biaya_pasang'] ?? 'Rp 0 (Promo Gratis)'), ENT_QUOTES, 'UTF-8');
-        $this->data['biaya_paket']       = htmlspecialchars(trim($input['biaya_paket'] ?? 'Rp 299.000'), ENT_QUOTES, 'UTF-8');
+        $this->data['biaya_pasang']      = htmlspecialchars(trim($input['biaya_pasang'] ?? 'Rp 0'), ENT_QUOTES, 'UTF-8');
+        $this->data['biaya_paket']       = htmlspecialchars(trim($input['biaya_paket'] ?? 'Rp 169.000'), ENT_QUOTES, 'UTF-8');
+        $this->data['biaya_tambahan']    = htmlspecialchars(trim($input['biaya_tambahan'] ?? 'Rp 5.000'), ENT_QUOTES, 'UTF-8');
         $this->data['biaya_addon']       = htmlspecialchars(trim($input['biaya_addon'] ?? 'Rp 0'), ENT_QUOTES, 'UTF-8');
-        $this->data['biaya_ppn']         = htmlspecialchars(trim($input['biaya_ppn'] ?? 'Rp 32.890'), ENT_QUOTES, 'UTF-8');
-        $this->data['biaya_total']       = htmlspecialchars(trim($input['biaya_total'] ?? 'Rp 331.890'), ENT_QUOTES, 'UTF-8');
+        $this->data['biaya_ppn']         = htmlspecialchars(trim($input['biaya_ppn'] ?? 'Rp 19.140'), ENT_QUOTES, 'UTF-8');
+        $this->data['biaya_total']       = htmlspecialchars(trim($input['biaya_total'] ?? 'Rp 193.140'), ENT_QUOTES, 'UTF-8');
+        $this->data['addon_cbn_package'] = trim($input['addon_cbn_package'] ?? '');
 
         // --- 4. Validasi Format & Struktur Data ---
         if (!empty($input['nomor_ktp'])) {

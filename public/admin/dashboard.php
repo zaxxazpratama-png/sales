@@ -146,27 +146,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             foreach ($packages as $idx => &$pkg) {
                 $pid = $pkg['id'];
-                if (isset($_POST['pkg_price_' . $pid])) {
-                    $pkg['price']  = (int) preg_replace('/\D/', '', $_POST['pkg_price_' . $pid]);
-                    $pkg['speed']  = trim($_POST['pkg_speed_' . $pid] ?? $pkg['speed']);
-                    $pkg['active'] = isset($_POST['pkg_active_' . $pid]);
+                if (isset($_POST['pkg_price_' . $pid]) || isset($_POST['pkg_name_' . $pid])) {
+                    $pkg['name']          = trim($_POST['pkg_name_' . $pid] ?? $pkg['name']);
+                    $pkg['price']         = (int) preg_replace('/\D/', '', $_POST['pkg_price_' . $pid] ?? (string)$pkg['price']);
+                    $pkg['speed']         = trim($_POST['pkg_speed_' . $pid] ?? $pkg['speed']);
+                    $pkg['active']        = isset($_POST['pkg_active_' . $pid]);
+                    $pkg['biaya_tambahan']= (int) preg_replace('/\D/', '', $_POST['pkg_biaya_tambahan_' . $pid] ?? '5000');
+                    $pkg['badge']         = trim($_POST['pkg_badge_' . $pid] ?? ($pkg['badge'] ?? ''));
+                    $pkg['badge_color']   = trim($_POST['pkg_badge_color_' . $pid] ?? ($pkg['badge_color'] ?? '#005696'));
+
+                    // Parse CBN package lines (baris per baris, pisah dengan newline)
+                    $rawCbn = trim($_POST['pkg_cbn_package_' . $pid] ?? '');
+                    if (!empty($rawCbn)) {
+                        $lines = array_filter(array_map('trim', explode("\n", $rawCbn)));
+                        $pkg['cbn_package'] = array_values($lines);
+                    } else {
+                        $pkg['cbn_package'] = [];
+                    }
                 }
             }
+            unset($pkg);
 
             // Tambah paket baru jika diisi
             $newPkgName = trim($_POST['new_pkg_name'] ?? '');
             if (!empty($newPkgName)) {
-                $newPkgSpeed = trim($_POST['new_pkg_speed'] ?? 'Speed up to 50 Mbps');
-                $newPkgPrice = (int) preg_replace('/\D/', '', $_POST['new_pkg_price'] ?? '299000');
+                $newPkgSpeed    = trim($_POST['new_pkg_speed'] ?? 'Speed up to 50 Mbps');
+                $newPkgPrice    = (int) preg_replace('/\D/', '', $_POST['new_pkg_price'] ?? '169000');
+                $newPkgTambahan = (int) preg_replace('/\D/', '', $_POST['new_pkg_biaya_tambahan'] ?? '5000');
+                $newPkgBadge    = trim($_POST['new_pkg_badge'] ?? '');
+                $newPkgBadgeClr = trim($_POST['new_pkg_badge_color'] ?? '#005696');
+                $rawNewCbn      = trim($_POST['new_pkg_cbn_package'] ?? '');
+                $newCbnLines    = !empty($rawNewCbn)
+                    ? array_values(array_filter(array_map('trim', explode("\n", $rawNewCbn))))
+                    : [];
+
                 $packages[] = [
-                    'id'          => 'pkg_' . time(),
-                    'name'        => $newPkgName,
-                    'speed'       => $newPkgSpeed,
-                    'price'       => $newPkgPrice,
-                    'badge'       => trim($_POST['new_pkg_badge'] ?? ''),
-                    'badge_color' => '#005696',
-                    'active'      => true
+                    'id'            => 'pkg_' . time(),
+                    'name'          => $newPkgName,
+                    'speed'         => $newPkgSpeed,
+                    'price'         => $newPkgPrice,
+                    'biaya_tambahan'=> $newPkgTambahan,
+                    'badge'         => $newPkgBadge,
+                    'badge_color'   => $newPkgBadgeClr ?: '#005696',
+                    'active'        => true,
+                    'cbn_package'   => $newCbnLines
                 ];
+            }
+
+            // Hapus paket yang ditandai untuk dihapus
+            if (!empty($_POST['delete_pkg'])) {
+                $toDelete = (array)$_POST['delete_pkg'];
+                $packages = array_values(array_filter($packages, fn($p) => !in_array($p['id'], $toDelete)));
             }
 
             $settings['packages'] = $packages;
@@ -931,68 +961,277 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
 
     <!-- ================= TAB 3: PENGATURAN PAKET & FORM ================= -->
     <div id="packages-tab" class="tab-content">
+
+        <!-- INFO BULAN OTOMATIS -->
+        <div style="background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(0,160,223,0.12));border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:26px;">📅</span>
+                <div>
+                    <strong style="color:#6ee7b7;font-size:13.5px;">Bulan Otomatis &amp; Sinkronisasi Formulir CBN</strong>
+                    <p style="font-size:12px;color:#cbd5e1;margin-top:2px;line-height:1.5;">
+                        Gunakan placeholder <code style="background:rgba(0,0,0,0.4);color:#67e8f9;padding:2px 6px;border-radius:4px;font-weight:700;">{BULAN}</code> pada Deskripsi Paket CBN agar nama bulan selalu otomatis terisi sesuai bulan berjalan.<br>
+                        Bulan saat ini: <strong style="color:#34d399;font-size:13px;"><?= date('F Y') ?></strong>
+                    </p>
+                </div>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <a href="#tambah-paket-card" class="btn-primary" style="padding:8px 16px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                    ➕ Tambah Paket Baru
+                </a>
+            </div>
+        </div>
+
         <div class="panel-card">
+            <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+                <div>
+                    <div class="panel-title" style="font-size:17px;font-weight:800;color:#fff;">Daftar Paket Internet CBN — Kelola Harga &amp; CBN Package</div>
+                    <div class="panel-desc">Setiap paket dapat diedit secara langsung (Nama, Kecepatan, Harga, Biaya Tambahan, Badge, dan teks CBN Package Auto-Claim) serta dapat di-preview langsung ke Surat Formulir CBN.</div>
+                </div>
+                <button type="submit" form="form-packages" class="btn-primary" style="padding:9px 18px;font-size:13px;box-shadow:0 4px 15px rgba(0,160,223,0.35);">
+                    💾 Simpan Semua Perubahan
+                </button>
+            </div>
+
+            <form method="POST" id="form-packages">
+                <input type="hidden" name="action" value="update_packages">
+
+                <?php
+                $monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+                $currentMonth = $monthNames[(int)date('n')];
+                $currentYear  = date('Y');
+                ?>
+
+                <?php foreach ($packages as $idx => $pkg):
+                    $cbnLines = $pkg['cbn_package'] ?? [];
+                    if (!is_array($cbnLines)) $cbnLines = !empty($cbnLines) ? [$cbnLines] : [];
+                    $cbnLinesDisplay = array_map(fn($l) => str_replace('{BULAN}', $currentMonth . ' ' . $currentYear, $l), $cbnLines);
+                    $cbnRaw = implode("\n", $cbnLines);
+                    $biayaTambahan = (int)($pkg['biaya_tambahan'] ?? 5000);
+                    $price = (int)($pkg['price'] ?? 0);
+                    $badgeColor = $pkg['badge_color'] ?? '#005696';
+                    $badgeText = $pkg['badge'] ?? '';
+                    $isActive = !empty($pkg['active']);
+                    $pkgId = $pkg['id'];
+
+                    $estimasiSubtotal = $price + $biayaTambahan;
+                    $estimasiPpn = round($estimasiSubtotal * 0.11);
+                    $estimasiTotal = $estimasiSubtotal + $estimasiPpn;
+                ?>
+                <div class="pkg-main-card" id="pkg-card-<?= $pkgId ?>" style="background:var(--bg-card-alt);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:20px;position:relative;transition:var(--transition);">
+
+                    <!-- Header Row / Summary Bar -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:16px;">
+                        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                            <span style="font-size:18px;font-weight:900;color:#fff;" id="title-name-<?= $pkgId ?>">🌐 <?= htmlspecialchars($pkg['name']) ?></span>
+                            
+                            <span id="badge-preview-<?= $pkgId ?>" style="background:<?= htmlspecialchars($badgeColor) ?>;color:#fff;font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:12px;<?= empty($badgeText) ? 'display:none;' : '' ?>">
+                                <?= htmlspecialchars($badgeText) ?>
+                            </span>
+
+                            <span id="status-pill-<?= $pkgId ?>" style="background:<?= $isActive ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)' ?>;color:<?= $isActive ? '#6ee7b7' : '#fca5a5' ?>;border:1px solid <?= $isActive ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)' ?>;font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:12px;">
+                                <?= $isActive ? '● AKTIF' : '○ NON-AKTIF' ?>
+                            </span>
+
+                            <span style="font-size:12.5px;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:3px 10px;border-radius:8px;">
+                                🚀 <span id="summary-speed-<?= $pkgId ?>"><?= htmlspecialchars($pkg['speed']) ?></span> • <strong style="color:#67e8f9;" id="summary-price-<?= $pkgId ?>">Rp <?= number_format($price, 0, ',', '.') ?>/bln</strong>
+                            </span>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <!-- Tombol Edit Paket -->
+                            <button type="button" class="btn-primary" onclick="toggleEditPackage('<?= $pkgId ?>')" style="padding:6px 14px;font-size:12px;display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg, #0284c7, #0369a1);border:1px solid #38bdf8;">
+                                ✏️ Edit Paket
+                            </button>
+
+                            <!-- Tombol Preview Surat CBN -->
+                            <a href="../preview_cbn.php?pkg_id=<?= urlencode($pkgId) ?>" target="_blank" class="btn-view-form" style="padding:6px 14px;font-size:12px;display:inline-flex;align-items:center;gap:5px;" title="Lihat tampilan paket ini pada Formulir Resmi CBN">
+                                🔍 Preview di Formulir CBN
+                            </a>
+
+                            <!-- Tombol Hapus -->
+                            <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:#fca5a5;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:6px 12px;border-radius:8px;transition:var(--transition);" title="Centang untuk menghapus paket ini saat klik simpan">
+                                <input type="checkbox" name="delete_pkg[]" value="<?= htmlspecialchars($pkgId) ?>"
+                                    onchange="document.getElementById('pkg-card-<?= $pkgId ?>').style.opacity=this.checked?'0.35':'1'">
+                                <span>🗑 Hapus</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Collapsible / Editable Form Content -->
+                    <div id="edit-panel-<?= $pkgId ?>" class="pkg-edit-panel" style="display:block;">
+                        
+                        <!-- Row 1: Nama Paket + Speed + Price + Biaya Tambahan -->
+                        <div style="display:grid;grid-template-columns:1.5fr 2fr 1.3fr 1.3fr;gap:14px;margin-bottom:14px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Nama Paket *</label>
+                                <input type="text" name="pkg_name_<?= $pkgId ?>" id="pkg-name-<?= $pkgId ?>" class="form-control" value="<?= htmlspecialchars($pkg['name']) ?>" style="padding:9px 12px;font-weight:700;" oninput="syncPkgLive('<?= $pkgId ?>')" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Deskripsi Kecepatan *</label>
+                                <input type="text" name="pkg_speed_<?= $pkgId ?>" id="pkg-speed-<?= $pkgId ?>" class="form-control" value="<?= htmlspecialchars($pkg['speed']) ?>" style="padding:9px 12px;" oninput="syncPkgLive('<?= $pkgId ?>')" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Harga Paket Bulanan (Rp) *</label>
+                                <input type="text" name="pkg_price_<?= $pkgId ?>" id="pkg-price-<?= $pkgId ?>" class="form-control" value="<?= number_format($price, 0, ',', '.') ?>" style="padding:9px 12px;font-weight:700;color:#67e8f9;" oninput="syncPkgLive('<?= $pkgId ?>')" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Biaya Tambahan (Rp)</label>
+                                <input type="text" name="pkg_biaya_tambahan_<?= $pkgId ?>" id="pkg-tambahan-<?= $pkgId ?>" class="form-control" value="<?= number_format($biayaTambahan, 0, ',', '.') ?>" style="padding:9px 12px;" oninput="syncPkgLive('<?= $pkgId ?>')" placeholder="5000">
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Badge Label + Badge Color + Status Aktif -->
+                        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:14px;margin-bottom:14px;align-items:end;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Badge Label (opsional)</label>
+                                <input type="text" name="pkg_badge_<?= $pkgId ?>" id="pkg-badge-<?= $pkgId ?>" class="form-control" value="<?= htmlspecialchars($badgeText) ?>" style="padding:9px 12px;" placeholder="Contoh: POPULAR / BEST VALUE" oninput="syncPkgLive('<?= $pkgId ?>')">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Warna Badge</label>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="color" name="pkg_badge_color_<?= $pkgId ?>" id="pkg-badge-color-<?= $pkgId ?>" class="form-control" value="<?= htmlspecialchars($badgeColor) ?>" style="height:40px;width:55px;padding:2px 4px;cursor:pointer;" onchange="syncPkgLive('<?= $pkgId ?>')">
+                                    <input type="text" class="form-control" value="<?= htmlspecialchars($badgeColor) ?>" id="pkg-badge-color-text-<?= $pkgId ?>" style="padding:9px 10px;font-family:monospace;font-size:12px;" oninput="document.getElementById('pkg-badge-color-<?= $pkgId ?>').value=this.value; syncPkgLive('<?= $pkgId ?>');">
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Status Tampil di Form</label>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;height:40px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:0 14px;">
+                                    <input type="checkbox" name="pkg_active_<?= $pkgId ?>" id="pkg-active-<?= $pkgId ?>" value="1" <?= $isActive ? 'checked' : '' ?> onchange="syncPkgLive('<?= $pkgId ?>')">
+                                    <span style="font-size:13px;font-weight:700;color:#6ee7b7;">Aktifkan Paket Ini</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: CBN Package descriptions (Auto Claim) -->
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                <span style="font-size:12.5px;font-weight:700;color:#cbd5e1;">🏷 Deskripsi Paket CBN yang Termasuk (Auto-Claim di Bagian Add-On TV Surat)</span>
+                                <span style="font-weight:400;font-size:11px;color:#67e8f9;">💡 Satu baris = satu item ter-ceklis. Ketik <code>{BULAN}</code> untuk nama bulan dinamis.</span>
+                            </label>
+                            <textarea name="pkg_cbn_package_<?= $pkgId ?>" id="pkg-cbn-<?= $pkgId ?>" class="form-control"
+                                rows="<?= max(2, count($cbnLines)) ?>"
+                                placeholder="Contoh:&#10;CBN Fiber {BULAN} Package 2 (100, 150 &amp; 200 Mbps) [1]&#10;Trend Micro Maximum Security 1 Months - 1 Device (Free) [1]"
+                                style="font-size:12.5px;line-height:1.6;resize:vertical;"
+                                oninput="syncPkgLive('<?= $pkgId ?>')"><?= htmlspecialchars($cbnRaw) ?></textarea>
+                        </div>
+
+                        <!-- Row 4: LIVE DYNAMIC PREVIEWS -->
+                        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:10px;">
+                            
+                            <!-- Box 1: Live CBN Package Checkmarks Preview -->
+                            <div style="padding:14px;background:rgba(0,0,0,0.3);border:1px solid rgba(0,160,223,0.25);border-radius:10px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                    <span style="font-size:11px;color:#67e8f9;font-weight:800;letter-spacing:0.5px;">📋 LIVE PREVIEW TEKS CEKLIS DI SURAT:</span>
+                                    <span style="font-size:10px;color:#94a3b8;">Bulan: <?= $currentMonth . ' ' . $currentYear ?></span>
+                                </div>
+                                <div id="live-cbn-preview-<?= $pkgId ?>" style="min-height:48px;display:flex;flex-direction:column;gap:6px;">
+                                    <?php if (!empty($cbnLinesDisplay)): ?>
+                                        <?php foreach ($cbnLinesDisplay as $line): ?>
+                                            <div style="font-size:12px;color:#86efac;display:flex;align-items:flex-start;gap:6px;line-height:1.4;">
+                                                <span style="color:#10b981;font-weight:900;">✓</span>
+                                                <span><?= htmlspecialchars($line) ?></span>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <span style="font-size:12px;color:#64748b;font-style:italic;">(Tidak ada item CBN Package untuk paket ini)</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <!-- Box 2: Live Real-time Perincian Biaya Preview -->
+                            <div style="padding:14px;background:linear-gradient(135deg, rgba(0,86,150,0.18), rgba(0,160,223,0.1));border:1px solid rgba(0,160,223,0.3);border-radius:10px;">
+                                <div style="font-size:11px;color:#67e8f9;font-weight:800;letter-spacing:0.5px;margin-bottom:8px;">💰 LIVE ESTIMASI PERINCIAN BIAYA FORMULIR:</div>
+                                <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:#cbd5e1;">
+                                    <div style="display:flex;justify-content:space-between;">
+                                        <span>Biaya Paket:</span>
+                                        <strong style="color:#fff;" id="live-calc-paket-<?= $pkgId ?>">Rp <?= number_format($price, 0, ',', '.') ?></strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;">
+                                        <span>Biaya Tambahan:</span>
+                                        <strong style="color:#fff;" id="live-calc-tambahan-<?= $pkgId ?>">Rp <?= number_format($biayaTambahan, 0, ',', '.') ?></strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;">
+                                        <span>PPN 11%:</span>
+                                        <strong style="color:#fff;" id="live-calc-ppn-<?= $pkgId ?>">Rp <?= number_format($estimasiPpn, 0, ',', '.') ?></strong>
+                                    </div>
+                                    <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.12);padding-top:5px;margin-top:2px;">
+                                        <span style="font-weight:700;color:#fff;">TOTAL:</span>
+                                        <strong style="color:#67e8f9;font-size:13.5px;" id="live-calc-total-<?= $pkgId ?>">Rp <?= number_format($estimasiTotal, 0, ',', '.') ?></strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+                <?php endforeach; ?>
+
+                <div style="position:sticky;bottom:15px;z-index:90;background:rgba(10,17,40,0.95);backdrop-filter:blur(15px);padding:14px 20px;border-radius:12px;border:1px solid rgba(0,160,223,0.3);display:flex;justify-content:space-between;align-items:center;margin-top:15px;">
+                    <span style="font-size:13px;color:#cbd5e1;">Pastikan semua perubahan sudah sesuai sebelum menyimpan.</span>
+                    <button type="submit" class="btn-primary" style="padding:12px 28px;font-size:14px;box-shadow:0 4px 20px rgba(0,160,223,0.4);">
+                        💾 Simpan Semua Perubahan Paket
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- TAMBAH PAKET BARU -->
+        <div class="panel-card" id="tambah-paket-card">
             <div class="panel-header">
                 <div>
-                    <div class="panel-title">Daftar Paket Internet Fiber CBN</div>
-                    <div class="panel-desc">Kelola nama paket, kecepatan (speed), harga bulanan, dan status tampil di form</div>
+                    <div class="panel-title" style="font-size:16px;font-weight:800;color:#fff;">➕ Tambah Paket CBN Baru</div>
+                    <div class="panel-desc">Isi kolom di bawah untuk menambahkan paket internet baru ke dalam sistem dan formulir pendaftaran</div>
                 </div>
             </div>
 
             <form method="POST">
                 <input type="hidden" name="action" value="update_packages">
 
-                <div class="table-responsive" style="margin-bottom:24px;">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Nama Paket</th>
-                                <th>Deskripsi Kecepatan</th>
-                                <th>Harga Bulanan (Rp)</th>
-                                <th>Status Aktif</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($packages as $pkg): ?>
-                            <tr>
-                                <td><strong><?= htmlspecialchars($pkg['name']) ?></strong></td>
-                                <td>
-                                    <input type="text" name="pkg_speed_<?= $pkg['id'] ?>" class="form-control" value="<?= htmlspecialchars($pkg['speed']) ?>" style="padding:6px 10px;">
-                                </td>
-                                <td>
-                                    <input type="text" name="pkg_price_<?= $pkg['id'] ?>" class="form-control" value="<?= number_format($pkg['price'], 0, ',', '.') ?>" style="padding:6px 10px;width:160px;">
-                                </td>
-                                <td>
-                                    <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-                                        <input type="checkbox" name="pkg_active_<?= $pkg['id'] ?>" value="1" <?= !empty($pkg['active']) ? 'checked' : '' ?>>
-                                        <span>Aktif</span>
-                                    </label>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div style="border-top:1px solid var(--border);padding-top:20px;margin-top:20px;">
-                    <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:#fff;">+ Tambah Paket Baru</div>
-                    <div class="form-grid-3">
-                        <div class="form-group">
-                            <label>Nama Paket</label>
-                            <input type="text" name="new_pkg_name" class="form-control" placeholder="Misal: Fiber 500">
-                        </div>
-                        <div class="form-group">
-                            <label>Kecepatan</label>
-                            <input type="text" name="new_pkg_speed" class="form-control" placeholder="Misal: Speed up to 500 Mbps">
-                        </div>
-                        <div class="form-group">
-                            <label>Harga Bulanan (Rp)</label>
-                            <input type="text" name="new_pkg_price" class="form-control" placeholder="Misal: 1199000">
-                        </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Nama Paket *</label>
+                        <input type="text" name="new_pkg_name" class="form-control" placeholder="Misal: Fiber 200" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Deskripsi Kecepatan *</label>
+                        <input type="text" name="new_pkg_speed" class="form-control" placeholder="Speed up to 200 Mbps" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Harga Bulanan (Rp) *</label>
+                        <input type="text" name="new_pkg_price" class="form-control" placeholder="349000" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Biaya Tambahan (Rp)</label>
+                        <input type="text" name="new_pkg_biaya_tambahan" class="form-control" placeholder="5000" value="5000">
                     </div>
                 </div>
 
-                <button type="submit" class="btn-primary" style="margin-top:12px;">Simpan Perubahan Paket</button>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Badge Label (opsional)</label>
+                        <input type="text" name="new_pkg_badge" class="form-control" placeholder="ULTRA SPEED / BEST VALUE">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Warna Badge</label>
+                        <input type="color" name="new_pkg_badge_color" class="form-control" value="#005696" style="height:40px;width:100%;cursor:pointer;padding:2px 4px;">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>🏷 Deskripsi Paket CBN (satu baris = satu item yang ter-ceklis di surat formulir)</span>
+                        <span style="font-size:11px;color:#64748b;">Gunakan <code>{BULAN}</code> untuk nama bulan otomatis (misal: <?= $currentMonth . ' ' . $currentYear ?>)</span>
+                    </label>
+                    <textarea name="new_pkg_cbn_package" class="form-control" rows="3"
+                        placeholder="CBN Fiber {BULAN} Package 2 (100, 150 &amp; 200 Mbps) [1]&#10;Trend Micro Maximum Security 1 Months - 1 Device (Free) [1]"
+                        style="font-size:12.5px;line-height:1.6;resize:vertical;"></textarea>
+                </div>
+
+                <button type="submit" class="btn-primary" style="padding:11px 24px;font-size:13px;">
+                    ➕ Tambah Paket Baru Sekarang
+                </button>
             </form>
         </div>
     </div>
@@ -1144,11 +1383,20 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
 <div id="toast" class="toast">Link berhasil disalin ke clipboard!</div>
 
 <script>
-function switchTab(tabId) {
+function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
+    const content = document.getElementById(tabId);
+    if (content) content.classList.add('active');
+    
+    if (btn) {
+        btn.classList.add('active');
+    } else if (typeof event !== 'undefined' && event && event.target && event.target.classList) {
+        event.target.classList.add('active');
+    } else {
+        const matchingBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
+        if (matchingBtn) matchingBtn.classList.add('active');
+    }
 }
 
 function openAddModal() {
@@ -1222,6 +1470,135 @@ function filterSales() {
             row.style.display = 'none';
         }
     });
+}
+
+// === FITUR EDIT & LIVE PREVIEW PAKET CBN ===
+const CURRENT_MONTH_YEAR = '<?= $currentMonth . " " . $currentYear ?>';
+
+function toggleEditPackage(pkgId) {
+    const panel = document.getElementById('edit-panel-' + pkgId);
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const firstInput = document.getElementById('pkg-name-' + pkgId);
+        if (firstInput) firstInput.focus();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function formatRupiahJs(num) {
+    return 'Rp ' + Number(num).toLocaleString('id-ID');
+}
+
+function syncPkgLive(pkgId) {
+    const nameEl = document.getElementById('pkg-name-' + pkgId);
+    const speedEl = document.getElementById('pkg-speed-' + pkgId);
+    const priceEl = document.getElementById('pkg-price-' + pkgId);
+    const tambahanEl = document.getElementById('pkg-tambahan-' + pkgId);
+    const badgeEl = document.getElementById('pkg-badge-' + pkgId);
+    const badgeColorEl = document.getElementById('pkg-badge-color-' + pkgId);
+    const badgeColorTextEl = document.getElementById('pkg-badge-color-text-' + pkgId);
+    const activeEl = document.getElementById('pkg-active-' + pkgId);
+    const cbnEl = document.getElementById('pkg-cbn-' + pkgId);
+
+    // 1. Update Title & Header Summaries
+    if (nameEl) {
+        const titleName = document.getElementById('title-name-' + pkgId);
+        if (titleName) titleName.textContent = '🌐 ' + (nameEl.value.trim() || 'Paket');
+    }
+    if (speedEl) {
+        const summarySpeed = document.getElementById('summary-speed-' + pkgId);
+        if (summarySpeed) summarySpeed.textContent = speedEl.value.trim();
+    }
+
+    // 2. Parse numbers & calculate pricing
+    const rawPrice = (priceEl ? priceEl.value : '0').replace(/\D/g, '');
+    const price = parseInt(rawPrice, 10) || 0;
+
+    const rawTambahan = (tambahanEl ? tambahanEl.value : '0').replace(/\D/g, '');
+    const tambahan = parseInt(rawTambahan, 10) || 0;
+
+    const subtotal = price + tambahan;
+    const ppn = Math.round(subtotal * 0.11);
+    const total = subtotal + ppn;
+
+    // Update Header Price Summary
+    const summaryPrice = document.getElementById('summary-price-' + pkgId);
+    if (summaryPrice) summaryPrice.textContent = formatRupiahJs(price) + '/bln';
+
+    // Update Live Calculation Box
+    const calcPaket = document.getElementById('live-calc-paket-' + pkgId);
+    const calcTambahan = document.getElementById('live-calc-tambahan-' + pkgId);
+    const calcPpn = document.getElementById('live-calc-ppn-' + pkgId);
+    const calcTotal = document.getElementById('live-calc-total-' + pkgId);
+
+    if (calcPaket) calcPaket.textContent = formatRupiahJs(price);
+    if (calcTambahan) calcTambahan.textContent = formatRupiahJs(tambahan);
+    if (calcPpn) calcPpn.textContent = formatRupiahJs(ppn);
+    if (calcTotal) calcTotal.textContent = formatRupiahJs(total);
+
+    // 3. Update Badge & Color
+    const badgePreview = document.getElementById('badge-preview-' + pkgId);
+    if (badgePreview && badgeEl) {
+        const bText = badgeEl.value.trim();
+        const bColor = badgeColorEl ? badgeColorEl.value : '#005696';
+        if (badgeColorTextEl && badgeColorEl) badgeColorTextEl.value = bColor;
+        badgePreview.style.backgroundColor = bColor;
+        if (bText) {
+            badgePreview.textContent = bText;
+            badgePreview.style.display = 'inline-block';
+        } else {
+            badgePreview.style.display = 'none';
+        }
+    }
+
+    // 4. Update Active Status Pill
+    const statusPill = document.getElementById('status-pill-' + pkgId);
+    if (statusPill && activeEl) {
+        if (activeEl.checked) {
+            statusPill.textContent = '● AKTIF';
+            statusPill.style.background = 'rgba(16,185,129,0.2)';
+            statusPill.style.color = '#6ee7b7';
+            statusPill.style.borderColor = 'rgba(16,185,129,0.4)';
+        } else {
+            statusPill.textContent = '○ NON-AKTIF';
+            statusPill.style.background = 'rgba(239,68,68,0.2)';
+            statusPill.style.color = '#fca5a5';
+            statusPill.style.borderColor = 'rgba(239,68,68,0.4)';
+        }
+    }
+
+    // 5. Update CBN Package Text Live Preview
+    const cbnPreviewBox = document.getElementById('live-cbn-preview-' + pkgId);
+    if (cbnPreviewBox && cbnEl) {
+        const lines = cbnEl.value.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length > 0) {
+            cbnPreviewBox.innerHTML = lines.map(line => {
+                const formatted = line.replace(/\{BULAN\}/gi, CURRENT_MONTH_YEAR);
+                return `
+                    <div style="font-size:12px;color:#86efac;display:flex;align-items:flex-start;gap:6px;line-height:1.4;">
+                        <span style="color:#10b981;font-weight:900;">✓</span>
+                        <span>${escapeHtml(formatted)}</span>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            cbnPreviewBox.innerHTML = '<span style="font-size:12px;color:#64748b;font-style:italic;">(Tidak ada item CBN Package untuk paket ini)</span>';
+        }
+    }
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
 }
 </script>
 

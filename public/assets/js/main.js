@@ -104,39 +104,57 @@ document.addEventListener('DOMContentLoaded', () => {
     const addonTvCheckboxes = document.querySelectorAll('.addon-tv-check');
     const smartboxQtyInput = document.getElementById('smartbox_qty');
     
-    const displayPaket = document.getElementById('summary-biaya-paket');
-    const displayAddon = document.getElementById('summary-biaya-addon');
-    const displayPpn   = document.getElementById('summary-biaya-ppn');
-    const displayTotal = document.getElementById('summary-biaya-total');
+    const displayPaket    = document.getElementById('summary-biaya-paket');
+    const displayTambahan = document.getElementById('summary-biaya-tambahan');
+    const displayAddon    = document.getElementById('summary-biaya-addon');
+    const displayPpn      = document.getElementById('summary-biaya-ppn');
+    const displayTotal    = document.getElementById('summary-biaya-total');
 
-    const hiddenBiayaPasang = document.getElementById('biaya_pasang');
-    const hiddenBiayaPaket  = document.getElementById('biaya_paket');
-    const hiddenBiayaAddon  = document.getElementById('biaya_addon');
-    const hiddenBiayaPpn    = document.getElementById('biaya_ppn');
-    const hiddenBiayaTotal  = document.getElementById('biaya_total');
+    const hiddenBiayaPasang    = document.getElementById('biaya_pasang');
+    const hiddenBiayaPaket     = document.getElementById('biaya_paket');
+    const hiddenBiayaTambahan  = document.getElementById('biaya_tambahan');
+    const hiddenBiayaAddon     = document.getElementById('biaya_addon');
+    const hiddenBiayaPpn       = document.getElementById('biaya_ppn');
+    const hiddenBiayaTotal     = document.getElementById('biaya_total');
+    const hiddenAddonCbnPkg    = document.getElementById('addon_cbn_package');
 
-    const packagePrices = {
-        'Fiber 50': 299000,
-        'Fiber 100': 399000,
-        'Fiber 200': 599000,
-        'Fiber 250': 799000,
-        'Fiber 1Gbps': 1499000,
-        'Fiber PRO 100': 699000,
-        'Fiber PRO 200': 999000
-    };
+    // === Package config from admin (injected by PHP as window.CBN_PACKAGES) ===
+    const PKG_CONFIG = window.CBN_PACKAGES || {};
+
+    // Build lookup maps from the admin-managed config
+    function getPkgValue(pkgName, key, fallback) {
+        return (PKG_CONFIG[pkgName] && PKG_CONFIG[pkgName][key] !== undefined)
+            ? PKG_CONFIG[pkgName][key] : fallback;
+    }
 
     function formatRupiah(num) {
         return 'Rp ' + num.toLocaleString('id-ID');
     }
 
+    function updateCbnPackageDisplay(service, cbnPackages) {
+        const container = document.getElementById('cbn-package-list');
+        if (!container) return;
+        if (!cbnPackages || cbnPackages.length === 0) {
+            container.innerHTML = '<span style="color:#94a3b8;font-style:italic;font-size:12px;">Tidak ada paket CBN otomatis untuk paket ini.</span>';
+            return;
+        }
+        container.innerHTML = cbnPackages.map(pkg =>
+            `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;">
+               <span style="color:#10b981;font-weight:900;font-size:13px;flex-shrink:0;margin-top:1px;">&#10003;</span>
+               <span style="font-size:12.5px;color:#e2e8f0;font-weight:600;line-height:1.4;">${pkg}</span>
+             </div>`
+        ).join('');
+    }
+
     function calculatePricing() {
-        const selectedService = serviceInput.value || 'Fiber 50';
-        const basePrice = packagePrices[selectedService] || 299000;
+        const selectedService = serviceInput ? serviceInput.value || '' : '';
+        const basePrice       = getPkgValue(selectedService, 'price', 169000);
+        const biayaTambahan   = getPkgValue(selectedService, 'biaya_tambahan', 5000);
 
         let addonPrice = 0;
         addonTvCheckboxes.forEach(cb => {
             if (cb.checked) {
-                if (cb.value.includes('Dens')) addonPrice += 30000;
+                if (cb.value.includes('Dens'))   addonPrice += 30000;
                 if (cb.value.includes('Vision')) addonPrice += 40000;
             }
         });
@@ -146,21 +164,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (qty > 0) addonPrice += (qty * 35000);
         }
 
-        const subtotal = basePrice + addonPrice;
-        const ppn = Math.round(subtotal * 0.11);
-        const total = subtotal + ppn;
+        const subtotal = basePrice + biayaTambahan + addonPrice;
+        const ppn      = Math.round(subtotal * 0.11);
+        const total    = subtotal + ppn;
 
         // Update displays
-        if (displayPaket) displayPaket.textContent = formatRupiah(basePrice);
-        if (displayAddon) displayAddon.textContent = formatRupiah(addonPrice);
-        if (displayPpn)   displayPpn.textContent   = formatRupiah(ppn);
-        if (displayTotal) displayTotal.textContent = formatRupiah(total);
+        if (displayPaket)    displayPaket.textContent    = formatRupiah(basePrice);
+        if (displayTambahan) displayTambahan.textContent = formatRupiah(biayaTambahan);
+        if (displayAddon)    displayAddon.textContent    = formatRupiah(addonPrice);
+        if (displayPpn)      displayPpn.textContent      = formatRupiah(ppn);
+        if (displayTotal)    displayTotal.textContent    = formatRupiah(total);
 
         // Update hidden inputs for backend
-        if (hiddenBiayaPaket) hiddenBiayaPaket.value = formatRupiah(basePrice);
-        if (hiddenBiayaAddon) hiddenBiayaAddon.value = formatRupiah(addonPrice);
-        if (hiddenBiayaPpn)   hiddenBiayaPpn.value   = formatRupiah(ppn);
-        if (hiddenBiayaTotal) hiddenBiayaTotal.value = formatRupiah(total);
+        if (hiddenBiayaPasang)   hiddenBiayaPasang.value   = 'Rp 0';
+        if (hiddenBiayaPaket)    hiddenBiayaPaket.value    = formatRupiah(basePrice);
+        if (hiddenBiayaTambahan) hiddenBiayaTambahan.value = formatRupiah(biayaTambahan);
+        if (hiddenBiayaAddon)    hiddenBiayaAddon.value    = formatRupiah(addonPrice);
+        if (hiddenBiayaPpn)      hiddenBiayaPpn.value      = formatRupiah(ppn);
+        if (hiddenBiayaTotal)    hiddenBiayaTotal.value    = formatRupiah(total);
+
+        // Update CBN package add-on info (from admin config)
+        const cbnPackages = getPkgValue(selectedService, 'cbn_package', []);
+        if (hiddenAddonCbnPkg) hiddenAddonCbnPkg.value = JSON.stringify(cbnPackages);
+        updateCbnPackageDisplay(selectedService, cbnPackages);
     }
 
     packageCards.forEach(card => {
@@ -168,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             packageCards.forEach(c => c.classList.remove('selected'));
             card.classList.add('selected');
             const pkgName = card.getAttribute('data-package');
-            serviceInput.value = pkgName;
+            if (serviceInput) serviceInput.value = pkgName;
             calculatePricing();
         });
     });
@@ -494,7 +520,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 8. Tanda Tangan Digital
             const signBox = document.querySelector('.signature-box');
-            if (!signatureInput || !signatureInput.value || !hasDrawn) {
+            if (canvas && hasDrawn && (!signatureInput.value || signatureInput.value.length < 50)) {
+                signatureInput.value = canvas.toDataURL('image/png');
+            }
+            const hasValidSign = (signatureInput && signatureInput.value && signatureInput.value.startsWith('data:image/') && signatureInput.value.length > 200) || hasDrawn;
+            if (!hasValidSign) {
                 if (signBox) {
                     signBox.classList.add('error');
                     const errDiv = document.createElement('div');

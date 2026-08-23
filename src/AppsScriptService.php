@@ -61,7 +61,12 @@ class AppsScriptService
             'jadwal_tanggal'    => $data['jadwal_tanggal']    ?? '',
             'jadwal_waktu'      => $data['jadwal_waktu']      ?? '09.00-11.00',
             'catatan'           => $data['catatan']           ?? '',
-            'biaya_total'       => $data['biaya_total']       ?? 'Rp 331.890',
+            'biaya_pasang'      => $data['biaya_pasang']      ?? 'Rp 0',
+            'biaya_paket'       => $data['biaya_paket']       ?? 'Rp 169.000',
+            'biaya_tambahan'    => $data['biaya_tambahan']    ?? 'Rp 5.000',
+            'biaya_ppn'         => $data['biaya_ppn']         ?? 'Rp 19.140',
+            'biaya_total'       => $data['biaya_total']       ?? 'Rp 193.140',
+            'addon_cbn_package' => $data['addon_cbn_package'] ?? '',
             'signature_data'    => $data['signature_data']    ?? '',
         ];
 

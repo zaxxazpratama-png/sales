@@ -5,74 +5,75 @@
     "call_center": "1500 780",
     "wa_helpdesk": "+6287729154041",
     "admin_email": "pujapangestu02@gmail.com",
-    "apps_script_url": "https:\/\/script.google.com\/macros\/s\/AKfycbzFeAQPhkqhGikRwVu5d8pErvwWFXDkaX9OdpoF_xCxok80mDNEX_GI1sLg2rjKoz1x\/exec",
+    "apps_script_url": "https:\/\/script.google.com\/macros\/s\/AKfycbyRzHjjTXYSg6ILlivvlkcqN3Z9dTl80D7Mjql2ILoppo1ysqk8wLupg5l6SQi9vTNe\/exec",
     "spreadsheet_id": "1cXeq5CkL4QqhsOnAg7bvV7JQvz5gxXnXE1H1JwF9PmQ",
     "drive_folder_id": "12q5pLGP9og9rcfVs_CKwKhTxfufvsN1A",
     "admin_username": "admin",
     "admin_password": "admin",
     "packages": [
         {
-            "id": "f50",
-            "name": "Fiber 50",
-            "speed": "Speed up to 50 Mbps",
-            "price": 299000,
-            "badge": "POPULAR",
+            "id": "cbn_p1_20",
+            "name": "Fiber 20",
+            "speed": "Speed up to 20 Mbps",
+            "price": 169000,
+            "biaya_tambahan": 5000,
+            "badge": "PROMO",
             "badge_color": "#005696",
-            "active": true
+            "active": true,
+            "cbn_package": [
+                "CBN Fiber July 2026 Package 1 (15 & 20 Mbps) [1]"
+            ]
         },
         {
-            "id": "f100",
+            "id": "cbn_p2_100",
             "name": "Fiber 100",
             "speed": "Speed up to 100 Mbps",
-            "price": 399000,
+            "price": 199000,
+            "biaya_tambahan": 5000,
             "badge": "BEST VALUE",
             "badge_color": "#00a0df",
-            "active": true
+            "active": true,
+            "cbn_package": [
+                "CBN Fiber July 2026 Package 2 (100, 150 & 200 Mbps) [1]",
+                "Trend Micro Maximum Security 1 Months - 1 Device (Free) [1]",
+                "Free Biaya Pemasangan"
+            ]
         },
         {
             "id": "f200",
             "name": "Fiber 200",
             "speed": "Speed up to 200 Mbps",
-            "price": 599000,
+            "price": 199000,
+            "biaya_tambahan": 5000,
             "badge": "",
-            "badge_color": "",
-            "active": true
-        },
-        {
-            "id": "f250",
-            "name": "Fiber 250",
-            "speed": "Speed up to 250 Mbps",
-            "price": 799000,
-            "badge": "",
-            "badge_color": "",
-            "active": true
+            "badge_color": "#000000",
+            "active": false,
+            "cbn_package": [
+                "CBN Fiber July 2026 Package 2 (100, 150 & 200 Mbps) [1]",
+                "Trend Micro Maximum Security 1 Months - 1 Device (Free) [1]"
+            ]
         },
         {
             "id": "f1g",
             "name": "Fiber 1Gbps",
             "speed": "Speed up to 1.000 Mbps",
             "price": 1499000,
+            "biaya_tambahan": 5000,
             "badge": "ULTRA",
             "badge_color": "#8b5cf6",
-            "active": true
+            "active": false,
+            "cbn_package": []
         },
         {
             "id": "pro100",
             "name": "Fiber PRO 100",
             "speed": "Simetris 100 Mbps (1:1)",
             "price": 699000,
+            "biaya_tambahan": 5000,
             "badge": "PRO 1:1",
             "badge_color": "#0284c7",
-            "active": true
-        },
-        {
-            "id": "pro200",
-            "name": "Fiber PRO 200",
-            "speed": "Simetris 200 Mbps (1:1)",
-            "price": 999000,
-            "badge": "PRO 1:1",
-            "badge_color": "#0284c7",
-            "active": true
+            "active": false,
+            "cbn_package": []
         }
     ],
     "addons": {

@@ -26,43 +26,29 @@ if (empty($_SESSION['csrf_token'])) {
 // 1. Cek parameter Sales dari URL
 $paramSales = trim($_GET['sales'] ?? $_GET['s'] ?? $_GET['code'] ?? '');
 
-// 2. Jika ada di URL, cari dan simpan ke Session
-if (!empty($paramSales) && $paramSales !== 'index.php') {
-    $foundSales = SalesManager::findByCode($paramSales);
-    if ($foundSales) {
-        $_SESSION['sales_code']   = $foundSales['sales_code'];
-        $_SESSION['active_sales'] = $foundSales;
-    } else {
-        $_SESSION['sales_code']   = strtoupper($paramSales);
-        $_SESSION['active_sales'] = null;
-    }
-}
-
-// 3. Ambil dari Session jika tidak ada di URL (persistent saat refresh / kembali ke form)
-$salesCode   = $_SESSION['sales_code']   ?? ($old['sales_code'] ?? '');
-$activeSales = $_SESSION['active_sales'] ?? null;
-$salesName   = '';
-$tlCode      = 'TL-MEDAN-01';
-
-if ($activeSales) {
-    $salesCode = $activeSales['sales_code'];
-    $salesName = $activeSales['nama_sales'];
-    $tlCode    = $activeSales['tl_code'] ?: 'TL-MEDAN-01';
-} elseif (!empty($salesCode)) {
-    $found = SalesManager::findByCode($salesCode);
-    if ($found) {
-        $activeSales = $found;
-        $_SESSION['active_sales'] = $found;
-        $salesName   = $found['nama_sales'];
-        $tlCode      = $found['tl_code'] ?: 'TL-MEDAN-01';
-    }
-}
-
-// JIKA TIDAK ADA SALES CODE ATAU KODE TIDAK VALID -> TAMPILKAN 404 NOT FOUND
-if (!$activeSales || ($activeSales['status'] ?? 'active') !== 'active') {
+// 2. JIKA TIDAK ADA PARAMETER SALES DI URL ATAU AKSES LANGSUNG KE /public/ -> TAMPILKAN 404
+if (empty($paramSales) || $paramSales === 'index.php' || $paramSales === 'public') {
+    unset($_SESSION['sales_code'], $_SESSION['active_sales']);
     require __DIR__ . '/404.php';
     exit;
 }
+
+// 3. Validasi kode sales ke sistem
+$foundSales = SalesManager::findByCode($paramSales);
+if (!$foundSales || ($foundSales['status'] ?? 'active') !== 'active') {
+    unset($_SESSION['sales_code'], $_SESSION['active_sales']);
+    require __DIR__ . '/404.php';
+    exit;
+}
+
+// 4. Simpan ke Session aktif
+$_SESSION['sales_code']   = $foundSales['sales_code'];
+$_SESSION['active_sales'] = $foundSales;
+
+$activeSales = $foundSales;
+$salesCode   = $foundSales['sales_code'];
+$salesName   = $foundSales['nama_sales'];
+$tlCode      = $foundSales['tl_code'] ?: 'TL-MEDAN-01';
 
 // Ambil paket dan pengaturan dinamis
 $settings = SettingsManager::get();
@@ -203,11 +189,13 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
             <input type="hidden" name="home_id"         value="PENDING">
             <input type="hidden" id="service"           name="service" value="<?= htmlspecialchars($selectedService) ?>">
             <input type="hidden" id="signature_data"    name="signature_data" value="">
-            <input type="hidden" id="biaya_pasang"      name="biaya_pasang" value="Rp 0 (Promo Gratis)">
-            <input type="hidden" id="biaya_paket"       name="biaya_paket" value="Rp 299.000">
+            <input type="hidden" id="biaya_pasang"      name="biaya_pasang" value="Rp 0">
+            <input type="hidden" id="biaya_paket"       name="biaya_paket" value="Rp 169.000">
+            <input type="hidden" id="biaya_tambahan"    name="biaya_tambahan" value="Rp 5.000">
             <input type="hidden" id="biaya_addon"       name="biaya_addon" value="Rp 0">
-            <input type="hidden" id="biaya_ppn"         name="biaya_ppn" value="Rp 32.890">
-            <input type="hidden" id="biaya_total"       name="biaya_total" value="Rp 331.890">
+            <input type="hidden" id="biaya_ppn"         name="biaya_ppn" value="Rp 19.140">
+            <input type="hidden" id="biaya_total"       name="biaya_total" value="Rp 193.140">
+            <input type="hidden" id="addon_cbn_package" name="addon_cbn_package" value="">
 
             <!-- ================= SEKSI 1: DATA PELANGGAN ================= -->
             <div class="form-section">
@@ -457,7 +445,7 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                 <div class="grid-2" style="margin-top:22px;">
                     <!-- Add-on TV -->
                     <div class="form-group">
-                        <label class="form-label">Paket Add-On TV & Hiburan</label>
+                        <label class="form-label">Paket Add-On TV & Hiburan <em style="color:#94a3b8;font-weight:normal;">(opsional)</em></label>
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <label class="checkbox-label-card" style="justify-content:flex-start;">
                                 <input type="checkbox" name="addon_tv[]" value="Dens TV+ Apps" class="addon-tv-check">
@@ -468,6 +456,17 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                                 Vision - Premium Sports (+Rp 40.000/bln)
                             </label>
                         </div>
+                    </div>
+
+                    <!-- CBN Package Auto-Info (ditentukan otomatis berdasarkan paket yang dipilih) -->
+                    <div class="form-group">
+                        <label class="form-label">Paket CBN yang Termasuk <em style="color:#10b981;font-weight:600;font-size:11px;">(Otomatis)</em></label>
+                        <div id="cbn-package-info" style="background:rgba(0,160,223,0.08);border:1px solid rgba(0,160,223,0.25);border-radius:10px;padding:12px 14px;">
+                            <div id="cbn-package-list">
+                                <span style="color:#94a3b8;font-style:italic;font-size:12px;">Pilih paket internet di atas untuk melihat paket CBN yang termasuk.</span>
+                            </div>
+                        </div>
+                        <div style="font-size:11px;color:#64748b;margin-top:5px;">📋 Teks ini akan otomatis muncul ter-ceklis di bagian Add-On TV pada Surat Formulir CBN.</div>
                     </div>
 
                     <!-- Perangkat Tambahan -->
@@ -510,19 +509,23 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                     </div>
                     <div class="pricing-summary-row">
                         <span>Biaya Paket Internet Bulanan</span>
-                        <span id="summary-biaya-paket">Rp 299.000</span>
+                        <span id="summary-biaya-paket">Rp 169.000</span>
                     </div>
                     <div class="pricing-summary-row">
-                        <span>Biaya Layanan Tambahan (Add-On / Device)</span>
+                        <span>Biaya Tambahan (Service Fee)</span>
+                        <span id="summary-biaya-tambahan">Rp 5.000</span>
+                    </div>
+                    <div class="pricing-summary-row">
+                        <span>Biaya Add-On TV / Device</span>
                         <span id="summary-biaya-addon">Rp 0</span>
                     </div>
                     <div class="pricing-summary-row">
                         <span>PPN 11%</span>
-                        <span id="summary-biaya-ppn">Rp 32.890</span>
+                        <span id="summary-biaya-ppn">Rp 19.140</span>
                     </div>
                     <div class="pricing-summary-row total-row">
                         <span>ESTIMASI TOTAL BULAN PERTAMA</span>
-                        <span id="summary-biaya-total">Rp 331.890</span>
+                        <span id="summary-biaya-total">Rp 193.140</span>
                     </div>
                 </div>
             </div>
@@ -640,6 +643,29 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Package config injected from admin settings (settings.json)
+// Allows main.js to use dynamic pricing and CBN package descriptions
+window.CBN_PACKAGES = <?php
+    $monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+    $curMonth   = $monthNames[(int)date('n')];
+    $curYear    = date('Y');
+    $pkgMap = [];
+    foreach ($settings['packages'] as $pkg) {
+        $cbnLines = $pkg['cbn_package'] ?? [];
+        if (!is_array($cbnLines)) $cbnLines = [];
+        // Replace {BULAN} placeholder with current month+year
+        $cbnLines = array_map(fn($l) => str_replace('{BULAN}', $curMonth . ' ' . $curYear, $l), $cbnLines);
+        $pkgMap[$pkg['name']] = [
+            'price'          => (int)($pkg['price'] ?? 0),
+            'biaya_tambahan' => (int)($pkg['biaya_tambahan'] ?? 5000),
+            'cbn_package'    => array_values($cbnLines),
+            'active'         => !empty($pkg['active']),
+        ];
+    }
+    echo json_encode($pkgMap, JSON_UNESCAPED_UNICODE);
+?>;
+</script>
 <script src="<?= $baseUrl ?>/assets/js/main.js"></script>
 </body>
 </html>
