@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `password` VARCHAR(255) NOT NULL,
     `role` VARCHAR(50) NOT NULL DEFAULT 'admin',
     `tl_code` VARCHAR(50) NOT NULL DEFAULT '',
+    `admin_email` VARCHAR(150) NOT NULL DEFAULT '',
     `status` ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -25,10 +26,10 @@ CREATE TABLE IF NOT EXISTS `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Data Akun Default
-INSERT INTO `users` (`id`, `username`, `password`, `role`, `tl_code`, `status`, `created_at`) VALUES
-('usr_superadmin', 'superadmin', '$2y$10$RmRfNIJe0xhlkMlQnRcOi.1IYXHxoB8gM2m0PhSnLrLqkGixlv39C', 'superadmin', '', 'active', '2026-08-20 10:00:00'),
-('usr_suharta', 'suharta', '$2y$10$omHg7MBAhAW14LnXSQBVLeH7RvaDqBejEZ6KG5rlSwUR2wfnIXw02', 'tl', 'TIN-SUHARTA', 'active', '2026-08-26 10:23:52')
-ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
+INSERT INTO `users` (`id`, `username`, `password`, `role`, `tl_code`, `admin_email`, `status`, `created_at`) VALUES
+('usr_superadmin', 'superadmin', '$2y$10$RmRfNIJe0xhlkMlQnRcOi.1IYXHxoB8gM2m0PhSnLrLqkGixlv39C', 'superadmin', '', '', 'active', '2026-08-20 10:00:00'),
+('usr_suharta', 'suharta', '$2y$10$omHg7MBAhAW14LnXSQBVLeH7RvaDqBejEZ6KG5rlSwUR2wfnIXw02', 'tl', 'TIN-SUHARTA', '1seopageone@gmail.com', 'active', '2026-08-26 10:23:52')
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `admin_email` = VALUES(`admin_email`);
 
 -- ------------------------------------------------------------------------------
 -- 2. TABEL SALES (Data Tim Sales Mitra)

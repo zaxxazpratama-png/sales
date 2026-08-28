@@ -84,12 +84,15 @@ class AppsScriptService
         $salesCode = $data['sales_code'] ?? 'SEP-001';
         $salesData = SalesManager::findByCode($salesCode);
         $payload['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
-        foreach (\App\AuthManager::getUsers() as $account) {
-            if (($account['role'] ?? '') === 'tl' && ($account['tl_code'] ?? '') === ($data['tl_code'] ?? '')) {
-                $payload['team_leader'] = $account['username'] ?? $data['tl_code'];
-                break;
-            }
+
+        $tlCode = $data['tl_code'] ?? ($salesData['tl_code'] ?? '');
+        $tlAccount = \App\AuthManager::getTlByCode($tlCode);
+        $tlAdminEmail = '';
+        if ($tlAccount) {
+            $payload['team_leader'] = $tlAccount['username'] ?? $tlCode;
+            $tlAdminEmail = trim((string)($tlAccount['admin_email'] ?? ''));
         }
+
         $salesTtdPath = !empty($salesData['ttd_path']) ? dirname(__DIR__) . '/public/' . $salesData['ttd_path'] : '';
         if (empty($salesTtdPath) || !file_exists($salesTtdPath)) {
             $salesTtdPath = dirname(__DIR__) . '/public/assets/img/ttd_sales_master.png';
@@ -107,7 +110,7 @@ class AppsScriptService
 
         // Konfigurasi dinamis dari Dashboard Admin
         $masterEmail = trim((string)($settings['master_email'] ?? 'pujapangestu02@gmail.com'));
-        $adminEmail  = trim((string)($settings['admin_email'] ?? '1seopageone@gmail.com'));
+        $adminEmail  = $tlAdminEmail ?: trim((string)($settings['admin_email'] ?? '1seopageone@gmail.com'));
         $customerEmailEnabled = isset($salesData['email_customer_enabled']) ? (bool)$salesData['email_customer_enabled'] : true;
 
         $payload['spreadsheet_id']            = $settings['spreadsheet_id']  ?? '';

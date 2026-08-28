@@ -86,7 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             AuthManager::addTeamLeader(
                 $_POST['tl_username'] ?? '',
                 $_POST['tl_password'] ?? '',
-                $_POST['tl_code'] ?? ''
+                $_POST['tl_code'] ?? '',
+                $_POST['tl_admin_email'] ?? ''
             );
             $msgSuccess = 'Akun team leader berhasil dibuat.';
         } catch (\Exception $e) {
@@ -110,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['tl_username'] ?? '',
                 $_POST['tl_password'] ?? '',
                 $newTlCode,
+                $_POST['tl_admin_email'] ?? '',
                 $_POST['tl_status'] ?? 'active'
             );
             if ($oldTlCode !== '' && $oldTlCode !== $newTlCode) {
@@ -1630,15 +1632,10 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     </div>
 
                     <div class="form-group">
-                        <label>Email Master Penerima Notifikasi SO</label>
+                        <label>Email Master Penerima Notifikasi SO (Super Admin)</label>
                         <input type="email" name="master_email" class="form-control"
-                            value="<?= htmlspecialchars($settings['master_email'] ?? ($settings['admin_email'] ?? 'pujapangestu02@gmail.com')) ?>" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Email Admin / Penerima Notifikasi Tambahan</label>
-                        <input type="email" name="admin_email" class="form-control" 
-                            value="<?= htmlspecialchars($settings['admin_email'] ?? ($settings['master_email'] ?? 'pujapangestu02@gmail.com')) ?>" required>
+                            value="<?= htmlspecialchars($settings['master_email'] ?? 'pujapangestu02@gmail.com') ?>" required>
+                        <small style="color:var(--text-muted);font-size:11px;">Menerima tembusan seluruh notifikasi pendaftaran dari semua Team Leader.</small>
                     </div>
 
                     <div class="form-group">
@@ -1990,8 +1987,8 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
         <div class="panel-card">
             <div class="panel-header">
                 <div>
-                    <div class="panel-title">Akun Team Leader</div>
-                    <div class="panel-desc">Buat akun TL untuk mengelola sales yang memakai kode team leader tersebut.</div>
+                    <div class="panel-title">Akun Team Leader & Email Admin Notifikasi</div>
+                    <div class="panel-desc">Buat akun TL dan tentukan Email Admin khusus untuk masing-masing Team Leader penerima notifikasi order.</div>
                 </div>
             </div>
             <form method="POST">
@@ -2007,7 +2004,12 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     </div>
                     <div class="form-group">
                         <label>Kode Team Leader *</label>
-                        <input type="text" name="tl_code" class="form-control" placeholder="TL-MEDAN-04" required>
+                        <input type="text" name="tl_code" class="form-control" placeholder="TIN-SUHARTA" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Admin Notifikasi Order TL *</label>
+                        <input type="email" name="tl_admin_email" class="form-control" placeholder="admin.suharta@gmail.com" required>
+                        <small style="color:var(--text-muted);font-size:11px;">Notifikasi email order dari sales di bawah TL ini akan dikirim ke email ini.</small>
                     </div>
                 </div>
                 <button type="submit" class="btn-primary">Buat Akun Team Leader</button>
@@ -2015,11 +2017,12 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             <?php if ($teamLeaders): ?>
                 <div class="table-responsive" style="margin-top:20px;">
                     <table class="admin-table">
-                        <thead><tr><th>Username</th><th>Kode TL</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <thead><tr><th>Username</th><th>Kode TL</th><th>Email Admin Notifikasi</th><th>Status</th><th>Aksi</th></tr></thead>
                         <tbody><?php foreach ($teamLeaders as $leader): ?>
                             <tr>
-                                <td><?= htmlspecialchars($leader['username']) ?></td>
-                                <td><?= htmlspecialchars($leader['tl_code'] ?? '-') ?></td>
+                                <td><strong><?= htmlspecialchars($leader['username']) ?></strong></td>
+                                <td><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#38bdf8;"><?= htmlspecialchars($leader['tl_code'] ?? '-') ?></span></td>
+                                <td><span style="color:#6ee7b7;font-weight:600;"><?= htmlspecialchars(!empty($leader['admin_email']) ? $leader['admin_email'] : '-') ?></span></td>
                                 <td><span class="status-badge <?= ($leader['status'] ?? 'active') === 'active' ? 'status-active' : 'status-inactive' ?>"><?= ($leader['status'] ?? 'active') === 'active' ? 'Aktif' : 'Non-aktif' ?></span></td>
                                 <td><button type="button" class="btn-action" onclick="openEditTeamLeader(<?= htmlspecialchars(json_encode($leader)) ?>)">Edit Data</button></td>
                             </tr>
@@ -2180,6 +2183,10 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                 <input type="text" id="edit-tl-code" name="tl_code" class="form-control" required>
             </div>
             <div class="form-group">
+                <label>Email Admin Notifikasi Order TL</label>
+                <input type="email" id="edit-tl-admin-email" name="tl_admin_email" class="form-control" placeholder="admin.tl@gmail.com">
+            </div>
+            <div class="form-group">
                 <label>Status</label>
                 <select id="edit-tl-status" name="tl_status" class="form-control form-select">
                     <option value="active">Aktif</option>
@@ -2331,6 +2338,7 @@ function openEditTeamLeader(leader) {
     document.getElementById('edit-tl-id').value = leader.id || leader.username;
     document.getElementById('edit-tl-username').value = leader.username || '';
     document.getElementById('edit-tl-code').value = leader.tl_code || '';
+    document.getElementById('edit-tl-admin-email').value = leader.admin_email || '';
     document.getElementById('edit-tl-status').value = leader.status || 'active';
     document.getElementById('modal-edit-team-leader').classList.add('active');
 }

@@ -456,6 +456,7 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
 SO Date = ${soDateVal}
 TL Code/Nama = ${tlVal}
 AE Name = ${aeVal}
+====================
 Home ID: ${params.home_id || '-'}
 Nama: ${params.nama_pelanggan || '-'}
 Nomor KTP: ${params.nomor_ktp || '-'}
@@ -508,6 +509,7 @@ Email: ${params.email_pelanggan || '-'}`;
         <tr><td>SO Date</td><td>${soDateVal}</td></tr>
         <tr><td>TL Code/Nama</td><td><strong>${tlVal}</strong></td></tr>
         <tr><td>AE Name</td><td><strong>${aeVal}</strong></td></tr>
+        <tr style="border-top:2px solid #cbd5e1;"><td colspan="2" style="background:#f8fafc;padding:4px 8px;font-size:11px;font-weight:bold;color:#64748b;text-transform:uppercase;">Data Pelanggan</td></tr>
         <tr><td>Home ID</td><td><strong>${params.home_id || '-'}</strong></td></tr>
         <tr><td>Nama</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor KTP</td><td>${params.nomor_ktp || '-'}</td></tr>
@@ -520,9 +522,11 @@ Email: ${params.email_pelanggan || '-'}`;
         <tr><td>Tikor</td><td>${tikorLink}</td></tr>
         <tr><td>Telp</td><td><strong>${params.telp || '-'}</strong></td></tr>
         <tr><td>Telp2</td><td>${params.telp2 || params.telp_rumah || '-'}</td></tr>
+        <tr style="border-top:2px solid #cbd5e1;"><td colspan="2" style="background:#f8fafc;padding:4px 8px;font-size:11px;font-weight:bold;color:#64748b;text-transform:uppercase;">Paket &amp; Perangkat</td></tr>
         <tr><td>Username</td><td><strong>${usernameClean}</strong></td></tr>
         <tr><td>Paket</td><td><span class="badge">${params.service || '-'}</span></td></tr>
-        <tr><td>STB</td><td><strong>${stbVal}</strong></td></tr>
+        <tr><td>STB (Smartbox)</td><td><strong>${stbVal}</strong></td></tr>
+        ${parseInt(params.router_qty, 10) > 0 ? `<tr><td>Router Tambahan</td><td><strong>Wireless Router (${params.router_qty} Unit)</strong></td></tr>` : ''}
         <tr><td>Email</td><td>${params.email_pelanggan || '-'}</td></tr>
         <tr><td>Estimasi Total Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
       </table>

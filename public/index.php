@@ -581,18 +581,29 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                     <!-- Perangkat Tambahan -->
                     <div class="form-group">
                         <label class="form-label">Perangkat Tambahan (Additional Devices)</label>
-                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;">
                             <div>
-                                <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Wireless Router (Unit)</label>
-                                <input type="number" name="router_qty" class="form-input" value="<?= htmlspecialchars($old['router_qty'] ?? '0') ?>" min="0" max="5">
+                                <label style="font-size:12px;color:#cbd5e1;font-weight:600;display:block;margin-bottom:6px;">Wireless Router</label>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="number" id="router_qty" name="router_qty" class="form-input" value="<?= htmlspecialchars($old['router_qty'] ?? '0') ?>" min="0" max="5" style="width:100%;">
+                                    <span style="color:#94a3b8;font-size:12px;white-space:nowrap;">Unit</span>
+                                </div>
                             </div>
                             <div>
-                                <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Smartbox Android (+45rb)</label>
-                                <input type="number" id="smartbox_qty" name="smartbox_qty" class="form-input" value="<?= htmlspecialchars($old['smartbox_qty'] ?? '0') ?>" min="0" max="5">
-                            </div>
-                            <div>
-                                <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Smartbox Android V3 (+55rb)</label>
-                                <input type="number" id="smartbox_v3_qty" name="smartbox_v3_qty" class="form-input" value="<?= htmlspecialchars($old['smartbox_v3_qty'] ?? '0') ?>" min="0" max="5">
+                                <label style="font-size:12px;color:#cbd5e1;font-weight:600;display:block;margin-bottom:6px;">Tipe Smartbox (Pilih Salah Satu)</label>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <select id="smartbox_type" name="smartbox_type" class="form-input" style="flex:2;">
+                                        <option value="" <?= (empty($old['smartbox_type']) && (int)($old['smartbox_qty'] ?? 0) === 0 && (int)($old['smartbox_v3_qty'] ?? 0) === 0) ? 'selected' : '' ?>>Tanpa Smartbox (Rp 0)</option>
+                                        <option value="android" <?= (($old['smartbox_type'] ?? '') === 'android' || (int)($old['smartbox_qty'] ?? 0) > 0) ? 'selected' : '' ?>>Smartbox Android (+Rp 45rb)</option>
+                                        <option value="android_v3" <?= (($old['smartbox_type'] ?? '') === 'android_v3' || (int)($old['smartbox_v3_qty'] ?? 0) > 0) ? 'selected' : '' ?>>Smartbox Android V3 (+Rp 55rb)</option>
+                                    </select>
+                                    <div id="smartbox-unit-wrapper" style="display:<?= ((int)($old['smartbox_qty'] ?? 0) > 0 || (int)($old['smartbox_v3_qty'] ?? 0) > 0 || !empty($old['smartbox_type'])) ? 'flex' : 'none' ?>;align-items:center;gap:4px;flex:1;min-width:75px;">
+                                        <input type="number" id="smartbox_qty_input" name="smartbox_qty_input" class="form-input" value="<?= htmlspecialchars(!empty($old['smartbox_qty_input']) ? $old['smartbox_qty_input'] : ((int)($old['smartbox_qty'] ?? 0) ?: ((int)($old['smartbox_v3_qty'] ?? 0) ?: 1))) ?>" min="1" max="5" style="width:100%;text-align:center;">
+                                        <span style="color:#94a3b8;font-size:11px;">Unit</span>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="smartbox_qty" name="smartbox_qty" value="<?= htmlspecialchars($old['smartbox_qty'] ?? '0') ?>">
+                                <input type="hidden" id="smartbox_v3_qty" name="smartbox_v3_qty" value="<?= htmlspecialchars($old['smartbox_v3_qty'] ?? '0') ?>">
                             </div>
                         </div>
                     </div>

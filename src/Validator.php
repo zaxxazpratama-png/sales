@@ -60,24 +60,41 @@ class Validator
 
         // Arrays (Add-on TV & Devices)
         $this->data['addon_tv']          = isset($input['addon_tv']) && is_array($input['addon_tv']) ? $input['addon_tv'] : [];
-        $this->data['addon_device']      = isset($input['addon_device']) && is_array($input['addon_device']) ? $input['addon_device'] : [];
-        $this->data['router_qty']        = htmlspecialchars(trim($input['router_qty'] ?? '0'), ENT_QUOTES, 'UTF-8');
-        $this->data['smartbox_qty']      = htmlspecialchars(trim($input['smartbox_qty'] ?? '0'), ENT_QUOTES, 'UTF-8');
-        $this->data['smartbox_v3_qty']   = htmlspecialchars(trim($input['smartbox_v3_qty'] ?? '0'), ENT_QUOTES, 'UTF-8');
+        
+        $sbType = trim($input['smartbox_type'] ?? '');
+        $sbQtyInput = max(1, min(5, (int)($input['smartbox_qty_input'] ?? 1)));
+        $rQty   = max(0, min(5, (int)($input['router_qty'] ?? 0)));
+        $sQty   = max(0, min(5, (int)($input['smartbox_qty'] ?? 0)));
+        $sV3Qty = max(0, min(5, (int)($input['smartbox_v3_qty'] ?? 0)));
+
+        if ($sbType === 'android') {
+            $sQty   = $sbQtyInput;
+            $sV3Qty = 0;
+        } elseif ($sbType === 'android_v3') {
+            $sQty   = 0;
+            $sV3Qty = $sbQtyInput;
+        } elseif ($sbType === 'none' || ($sbType === '' && isset($input['smartbox_type']))) {
+            $sQty   = 0;
+            $sV3Qty = 0;
+        } elseif ($sQty > 0 && $sV3Qty > 0) {
+            // Jika dikirim via API/direct submit dengan 2 smartbox -> batasi hanya salah satu
+            $sV3Qty = 0;
+        }
+
+        $this->data['router_qty']        = (string)$rQty;
+        $this->data['smartbox_qty']      = (string)$sQty;
+        $this->data['smartbox_v3_qty']   = (string)$sV3Qty;
 
         $devList = [];
-        if ((int)$this->data['router_qty'] > 0) {
-            $devList[] = 'Wireless Router (' . $this->data['router_qty'] . ' Unit)';
+        if ($rQty > 0) {
+            $devList[] = 'Wireless Router (' . $rQty . ' Unit)';
         }
-        if ((int)$this->data['smartbox_qty'] > 0) {
-            $devList[] = 'Smartbox Android (' . $this->data['smartbox_qty'] . ' Unit)';
+        if ($sQty > 0) {
+            $devList[] = 'Smartbox Android (' . $sQty . ' Unit)';
+        } elseif ($sV3Qty > 0) {
+            $devList[] = 'Smartbox Android V3 (' . $sV3Qty . ' Unit)';
         }
-        if ((int)$this->data['smartbox_v3_qty'] > 0) {
-            $devList[] = 'Smartbox Android V3 (' . $this->data['smartbox_v3_qty'] . ' Unit)';
-        }
-        if (!empty($devList)) {
-            $this->data['addon_device'] = $devList;
-        }
+        $this->data['addon_device'] = $devList;
 
         // Pricing estimation
         $this->data['biaya_pasang']      = htmlspecialchars(trim($input['biaya_pasang'] ?? 'Rp 0'), ENT_QUOTES, 'UTF-8');

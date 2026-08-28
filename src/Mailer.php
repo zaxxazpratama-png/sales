@@ -47,6 +47,20 @@ class Mailer
         $vendorName = $data['vendor'] ?? ($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL');
         $data['vendor'] = $vendorName;
 
+        // Tentukan penerima: Master Email & TL Admin Email
+        $masterEmail = trim((string)($settings['master_email'] ?? 'pujapangestu02@gmail.com'));
+        $tlCode = $data['tl_code'] ?? ($data['team_leader'] ?? '');
+        $tlAccount = \App\AuthManager::getTlByCode($tlCode);
+        $tlAdminEmail = !empty($tlAccount['admin_email']) ? trim($tlAccount['admin_email']) : '';
+
+        $this->mail->clearAddresses();
+        if (!empty($masterEmail)) {
+            $this->mail->addAddress($masterEmail, 'Master Admin CBN');
+        }
+        if (!empty($tlAdminEmail) && strtolower($tlAdminEmail) !== strtolower($masterEmail)) {
+            $this->mail->addAddress($tlAdminEmail, 'TL Admin (' . ($tlAccount['username'] ?? $tlCode) . ')');
+        }
+
         $this->mail->isHTML(true);
         $this->mail->Subject = "[SALES ORDER CBN] " . ($data['sales_code'] ?? 'SEP-001') . " - " . ($data['nama_pelanggan'] ?? 'Pelanggan') . " (" . ($data['service'] ?? 'Fiber') . ")";
         $this->mail->Body    = $this->buildEmailBody($data, $driveUrl);

@@ -137,10 +137,11 @@ class AuthManager
         return null;
     }
 
-    public static function addTeamLeader(string $username, string $password, string $tlCode): bool
+    public static function addTeamLeader(string $username, string $password, string $tlCode, string $adminEmail = ''): bool
     {
-        $username = trim($username);
-        $tlCode   = strtoupper(trim($tlCode));
+        $username   = trim($username);
+        $tlCode     = strtoupper(trim($tlCode));
+        $adminEmail = trim($adminEmail);
         if ($username === '' || $password === '' || $tlCode === '') {
             throw new \InvalidArgumentException('Username, password, dan kode team leader wajib diisi.');
         }
@@ -148,6 +149,11 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
+                // Pastikan kolom admin_email ada di tabel users
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $colIgnored) {}
+
                 $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR tl_code = ? LIMIT 1");
                 $checkStmt->execute([$username, $tlCode]);
                 if ($checkStmt->fetch()) {
@@ -156,8 +162,8 @@ class AuthManager
 
                 $id = 'usr_' . time() . random_int(100, 999);
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, tl_code, status, created_at) VALUES (?, ?, ?, 'tl', ?, 'active', NOW())");
-                return $insertStmt->execute([$id, $username, $hash, $tlCode]);
+                $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, tl_code, admin_email, status, created_at) VALUES (?, ?, ?, 'tl', ?, ?, 'active', NOW())");
+                return $insertStmt->execute([$id, $username, $hash, $tlCode, $adminEmail]);
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
             } catch (\Exception $e) {
@@ -173,22 +179,24 @@ class AuthManager
             }
         }
         $users[] = [
-            'id'         => (string)(time() . random_int(100, 999)),
-            'username'   => $username,
-            'password'   => password_hash($password, PASSWORD_DEFAULT),
-            'role'       => 'tl',
-            'tl_code'    => $tlCode,
-            'status'     => 'active',
-            'created_at' => date('Y-m-d H:i:s'),
+            'id'          => (string)(time() . random_int(100, 999)),
+            'username'    => $username,
+            'password'    => password_hash($password, PASSWORD_DEFAULT),
+            'role'        => 'tl',
+            'tl_code'     => $tlCode,
+            'admin_email' => $adminEmail,
+            'status'      => 'active',
+            'created_at'  => date('Y-m-d H:i:s'),
         ];
         return self::saveUsers($users);
     }
 
-    public static function updateTeamLeader(string $id, string $username, string $password, string $tlCode, string $status): bool
+    public static function updateTeamLeader(string $id, string $username, string $password, string $tlCode, string $adminEmail = '', string $status = 'active'): bool
     {
-        $username = trim($username);
-        $tlCode   = strtoupper(trim($tlCode));
-        $status   = $status === 'inactive' ? 'inactive' : 'active';
+        $username   = trim($username);
+        $tlCode     = strtoupper(trim($tlCode));
+        $adminEmail = trim($adminEmail);
+        $status     = $status === 'inactive' ? 'inactive' : 'active';
         if ($username === '' || $tlCode === '') {
             throw new \InvalidArgumentException('Username dan kode team leader wajib diisi.');
         }
@@ -196,6 +204,11 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
+                // Pastikan kolom admin_email ada di tabel users
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $colIgnored) {}
+
                 $checkStmt = $pdo->prepare("SELECT id FROM users WHERE (username = ? OR tl_code = ?) AND id != ? LIMIT 1");
                 $checkStmt->execute([$username, $tlCode, $id]);
                 if ($checkStmt->fetch()) {
@@ -204,11 +217,11 @@ class AuthManager
 
                 if ($password !== '') {
                     $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, status = ? WHERE id = ? AND role = 'tl'");
-                    return $stmt->execute([$username, $hash, $tlCode, $status, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, admin_email = ?, status = ? WHERE id = ? AND role = 'tl'");
+                    return $stmt->execute([$username, $hash, $tlCode, $adminEmail, $status, $id]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, status = ? WHERE id = ? AND role = 'tl'");
-                    return $stmt->execute([$username, $tlCode, $status, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ? WHERE id = ? AND role = 'tl'");
+                    return $stmt->execute([$username, $tlCode, $adminEmail, $status, $id]);
                 }
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
@@ -225,10 +238,11 @@ class AuthManager
                 continue;
             }
             if (($user['id'] ?? $user['username'] ?? '') === $id) {
-                $found             = true;
-                $user['username']  = $username;
-                $user['tl_code']   = $tlCode;
-                $user['status']    = $status;
+                $found               = true;
+                $user['username']    = $username;
+                $user['tl_code']     = $tlCode;
+                $user['admin_email'] = $adminEmail;
+                $user['status']      = $status;
                 if ($password !== '') {
                     $user['password'] = password_hash($password, PASSWORD_DEFAULT);
                 }
@@ -244,6 +258,35 @@ class AuthManager
             throw new \InvalidArgumentException('Akun team leader tidak ditemukan.');
         }
         return self::saveUsers($users);
+    }
+
+    public static function getTlByCode(string $tlCode): ?array
+    {
+        $tlCode = strtoupper(trim($tlCode));
+        if ($tlCode === '') {
+            return null;
+        }
+
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE role = 'tl' AND UPPER(tl_code) = ? LIMIT 1");
+                $stmt->execute([$tlCode]);
+                $user = $stmt->fetch();
+                if ($user) {
+                    return $user;
+                }
+            } catch (\Exception $e) {
+                error_log("DB getTlByCode Error: " . $e->getMessage());
+            }
+        }
+
+        foreach (self::getUsers() as $user) {
+            if (($user['role'] ?? '') === 'tl' && strtoupper($user['tl_code'] ?? '') === $tlCode) {
+                return $user;
+            }
+        }
+        return null;
     }
 
     public static function getUserByUsername(string $username): ?array

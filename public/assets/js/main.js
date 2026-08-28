@@ -119,6 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const packageCards = document.querySelectorAll('.package-card');
     const serviceInput = document.getElementById('service');
     const addonTvCheckboxes = document.querySelectorAll('.addon-tv-check');
+    const smartboxTypeSelect = document.getElementById('smartbox_type');
+    const smartboxUnitWrapper = document.getElementById('smartbox-unit-wrapper');
+    const smartboxQtyNumber = document.getElementById('smartbox_qty_input');
     const smartboxQtyInput   = document.getElementById('smartbox_qty');
     const smartboxV3QtyInput = document.getElementById('smartbox_v3_qty');
     
@@ -164,7 +167,30 @@ document.addEventListener('DOMContentLoaded', () => {
         ).join('');
     }
 
+    function syncSmartboxInputs() {
+        const type = smartboxTypeSelect ? smartboxTypeSelect.value : '';
+        const qty = smartboxQtyNumber ? Math.max(1, Math.min(5, parseInt(smartboxQtyNumber.value, 10) || 1)) : 1;
+
+        if (smartboxUnitWrapper) {
+            smartboxUnitWrapper.style.display = type ? 'flex' : 'none';
+        }
+
+        if (smartboxQtyInput && smartboxV3QtyInput) {
+            if (type === 'android') {
+                smartboxQtyInput.value = qty;
+                smartboxV3QtyInput.value = 0;
+            } else if (type === 'android_v3') {
+                smartboxQtyInput.value = 0;
+                smartboxV3QtyInput.value = qty;
+            } else {
+                smartboxQtyInput.value = 0;
+                smartboxV3QtyInput.value = 0;
+            }
+        }
+    }
+
     function calculatePricing() {
+        syncSmartboxInputs();
         const selectedService = serviceInput ? serviceInput.value || '' : '';
         const basePrice       = getPkgValue(selectedService, 'price', 169000);
         const biayaTambahan   = getPkgValue(selectedService, 'biaya_tambahan', 5000);
@@ -177,14 +203,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        if (smartboxQtyInput) {
-            const qty = parseInt(smartboxQtyInput.value, 10) || 0;
-            if (qty > 0) addonPrice += (qty * 45000);
-        }
+        const sbType = smartboxTypeSelect ? smartboxTypeSelect.value : '';
+        const sbQty  = smartboxQtyNumber ? Math.max(1, Math.min(5, parseInt(smartboxQtyNumber.value, 10) || 1)) : 1;
 
-        if (smartboxV3QtyInput) {
-            const qtyV3 = parseInt(smartboxV3QtyInput.value, 10) || 0;
-            if (qtyV3 > 0) addonPrice += (qtyV3 * 55000);
+        if (sbType === 'android') {
+            addonPrice += (sbQty * 45000);
+        } else if (sbType === 'android_v3') {
+            addonPrice += (sbQty * 55000);
         }
 
         const ppnRate  = (typeof window.PPN_PERCENT !== 'undefined' ? parseFloat(window.PPN_PERCENT) : 11) / 100;
@@ -230,8 +255,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     addonTvCheckboxes.forEach(cb => cb.addEventListener('change', calculatePricing));
-    if (smartboxQtyInput) smartboxQtyInput.addEventListener('input', calculatePricing);
-    if (smartboxV3QtyInput) smartboxV3QtyInput.addEventListener('input', calculatePricing);
+    if (smartboxTypeSelect) smartboxTypeSelect.addEventListener('change', calculatePricing);
+    if (smartboxQtyNumber)  smartboxQtyNumber.addEventListener('input', calculatePricing);
 
     // Initial pricing run
     calculatePricing();
