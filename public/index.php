@@ -814,7 +814,7 @@ window.CBN_PACKAGES = <?php
     }
     echo json_encode($pkgMap, JSON_UNESCAPED_UNICODE);
 ?>;
-</script>
 <script src="<?= $baseUrl ?>/assets/js/main.js?v=<?= time() ?>"></script>
+<script src="<?= $baseUrl ?>/assets/js/cookie_consent.js?v=<?= time() ?>"></script>
 </body>
 </html>

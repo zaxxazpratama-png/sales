@@ -161,5 +161,6 @@ $waHelpdesk = $settings['wa_helpdesk'] ?? '';
     </div>
 </div>
 
+<script src="<?= $baseUrl ?>/assets/js/cookie_consent.js?v=<?= time() ?>"></script>
 </body>
 </html>

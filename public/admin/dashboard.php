@@ -3520,9 +3520,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedProv && window.ADMIN_ALL_PROVINCE_PROMOS && window.ADMIN_ALL_PROVINCE_PROMOS[savedProv]) {
             changeProvince(savedProv);
         }
-    } catch(e) {}
 });
 </script>
-
+<script src="../assets/js/cookie_consent.js?v=<?= time() ?>"></script>
 </body>
 </html>

@@ -195,7 +195,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <a href="../index.php" class="btn-back-form">Kembali ke Formulir Pendaftaran</a>
-</div>
-
+    <script src="../assets/js/cookie_consent.js?v=<?= time() ?>"></script>
 </body>
 </html>
