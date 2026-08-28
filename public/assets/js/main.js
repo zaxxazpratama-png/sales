@@ -139,17 +139,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const hiddenBiayaTotal     = document.getElementById('biaya_total');
     const hiddenAddonCbnPkg    = document.getElementById('addon_cbn_package');
 
-    // === Package config from admin (injected by PHP as window.CBN_PACKAGES) ===
-    const PKG_CONFIG = window.CBN_PACKAGES || {};
+    // Helper escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
-    // Build lookup maps from the admin-managed config
+    // Build lookup maps from the admin-managed config (dynamically reads window.CBN_PACKAGES)
     function getPkgValue(pkgName, key, fallback) {
-        return (PKG_CONFIG[pkgName] && PKG_CONFIG[pkgName][key] !== undefined)
-            ? PKG_CONFIG[pkgName][key] : fallback;
+        const cfg = window.CBN_PACKAGES || {};
+        return (cfg[pkgName] && cfg[pkgName][key] !== undefined)
+            ? cfg[pkgName][key] : fallback;
     }
 
     function formatRupiah(num) {
-        return 'Rp ' + num.toLocaleString('id-ID');
+        return 'Rp ' + Number(num).toLocaleString('id-ID');
     }
 
     function updateCbnPackageDisplay(service, cbnPackages) {
@@ -162,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = cbnPackages.map(pkg =>
             `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;">
                <span style="color:#10b981;font-weight:900;font-size:13px;flex-shrink:0;margin-top:1px;">&#10003;</span>
-               <span style="font-size:12.5px;color:#e2e8f0;font-weight:600;line-height:1.4;">${pkg}</span>
+               <span style="font-size:12.5px;color:#e2e8f0;font-weight:600;line-height:1.4;">${escapeHtml(pkg)}</span>
              </div>`
         ).join('');
     }
@@ -244,15 +253,67 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCbnPackageDisplay(selectedService, cbnPackages);
     }
 
-    packageCards.forEach(card => {
-        card.addEventListener('click', () => {
-            packageCards.forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
-            const pkgName = card.getAttribute('data-package');
-            if (serviceInput) serviceInput.value = pkgName;
-            calculatePricing();
+    function bindPackageCards() {
+        const cards = document.querySelectorAll('.package-card');
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                cards.forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                const pkgName = card.getAttribute('data-package');
+                if (serviceInput) serviceInput.value = pkgName;
+                calculatePricing();
+            });
         });
-    });
+    }
+
+    // Dynamic Province Package Renderer
+    window.renderProvincePackages = function(provinceName) {
+        const allPromos = window.ALL_PROVINCE_PROMOS || {};
+        const provData = allPromos[provinceName] || { packages: [] };
+        const pkgs = provData.packages || [];
+
+        // Update lookup
+        window.CBN_PACKAGES = {};
+        pkgs.forEach(p => {
+            window.CBN_PACKAGES[p.name] = {
+                price: p.price,
+                biaya_tambahan: p.biaya_tambahan || 5000,
+                cbn_package: p.cbn_package || [],
+                active: p.active
+            };
+        });
+
+        const grid = document.querySelector('.package-grid');
+        if (grid) {
+            const activePkgs = pkgs.filter(p => p.active);
+            if (activePkgs.length > 0) {
+                let currentSelected = serviceInput ? serviceInput.value : '';
+                let hasMatch = activePkgs.some(p => p.name === currentSelected);
+                if (!hasMatch) {
+                    currentSelected = activePkgs[0].name;
+                    if (serviceInput) serviceInput.value = currentSelected;
+                }
+
+                grid.innerHTML = activePkgs.map(pkg => {
+                    const isSel = (pkg.name === currentSelected);
+                    return `
+                        <div class="package-card ${isSel ? 'selected' : ''}" data-package="${escapeHtml(pkg.name)}">
+                            ${pkg.badge ? `<span class="package-badge" style="background:${escapeHtml(pkg.badge_color || '#005696')};">${escapeHtml(pkg.badge)}</span>` : ''}
+                            <div class="package-name">${escapeHtml(pkg.name)}</div>
+                            <div class="package-speed">${escapeHtml(pkg.speed)}</div>
+                            <div class="package-price">Rp ${Number(pkg.price).toLocaleString('id-ID')} <span class="package-period">/ bln</span></div>
+                        </div>
+                    `;
+                }).join('');
+
+                bindPackageCards();
+            }
+        }
+
+        calculatePricing();
+    };
+
+    bindPackageCards();
 
     addonTvCheckboxes.forEach(cb => cb.addEventListener('change', calculatePricing));
     if (smartboxTypeSelect) smartboxTypeSelect.addEventListener('change', calculatePricing);

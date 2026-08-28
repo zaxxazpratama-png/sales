@@ -51,10 +51,15 @@ $salesCode   = $foundSales['sales_code'];
 $salesName   = $foundSales['nama_sales'];
 $tlCode      = $foundSales['tl_code'] ?: 'TIN-SUHARTA';
 
-// Ambil paket dan pengaturan dinamis
-$settings = SettingsManager::get();
-$packages = $settings['packages'] ?? [];
-$selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
+// Ambil paket dan pengaturan dinamis per provinsi
+$settings          = SettingsManager::get();
+$allProvinces      = SettingsManager::PROVINCES;
+$selectedProvince  = trim($old['provinsi'] ?? $_GET['provinsi'] ?? 'Sumatera Utara');
+if (!in_array($selectedProvince, $allProvinces, true)) {
+    $selectedProvince = 'Sumatera Utara';
+}
+$packages          = SettingsManager::getPackagesForProvince($selectedProvince);
+$selectedService   = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
 
 // Ambil Akun Team Leader Resmi yang Terdaftar & Aktif
 $activeTeamLeaders = array_values(array_filter(AuthManager::getUsers(), static function (array $user): bool {
@@ -433,6 +438,17 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                 </div>
 
                 <div class="grid-2">
+                    <!-- Provinsi Pemasangan (38 Provinsi) -->
+                    <div class="form-group col-full">
+                        <label class="form-label" for="provinsi">Provinsi Pemasangan <span class="req">*</span></label>
+                        <select id="provinsi" name="provinsi" class="form-input form-select" required onchange="if(window.renderProvincePackages) window.renderProvincePackages(this.value);" style="font-weight:700;color:#67e8f9;background:rgba(10,17,40,0.85);">
+                            <?php foreach ($allProvinces as $prov): ?>
+                                <option value="<?= htmlspecialchars($prov) ?>" <?= ($selectedProvince === $prov) ? 'selected' : '' ?>><?= htmlspecialchars($prov) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small style="color:#94a3b8;font-size:11.5px;margin-top:4px;display:block;">💡 Pilihan paket &amp; promo di bawah otomatis disesuaikan dengan wilayah provinsi yang dipilih.</small>
+                    </div>
+
                     <!-- Alamat Lengkap -->
                     <div class="form-group col-full">
                         <label class="form-label" for="alamat">Alamat Lengkap Rumah / Gedung <span class="req">*</span></label>
@@ -745,17 +761,48 @@ salesPicker.addEventListener('change', () => {
 
 populateSalesPicker(leaderPicker.value, activeSalesCode);
 
-// Package config injected from admin settings (settings.json)
-// Allows main.js to use dynamic pricing and CBN package descriptions
-window.CBN_PACKAGES = <?php
+// Package config injected from admin settings
+// Allows main.js to dynamically switch packages per province & calculate pricing
+window.CURRENT_PROVINCE = <?= json_encode($selectedProvince) ?>;
+window.PPN_PERCENT      = <?= json_encode((float)($settings['ppn_percent'] ?? 11)) ?>;
+window.ALL_PROVINCE_PROMOS = <?php
     $monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
     $curMonth   = $monthNames[(int)date('n')];
     $curYear    = date('Y');
+    $allPromosJson = [];
+    foreach ($allProvinces as $prov) {
+        $provPkgs  = SettingsManager::getPackagesForProvince($prov);
+        $provNotes = SettingsManager::getPromoNotesForProvince($prov);
+        $mappedPkgs = [];
+        foreach ($provPkgs as $pkg) {
+            $cbnLines = $pkg['cbn_package'] ?? [];
+            if (!is_array($cbnLines)) $cbnLines = [];
+            $cbnLines = array_map(fn($l) => str_replace('{BULAN}', $curMonth . ' ' . $curYear, $l), $cbnLines);
+            $mappedPkgs[] = [
+                'id'             => $pkg['id'],
+                'name'           => $pkg['name'],
+                'speed'          => $pkg['speed'],
+                'price'          => (int)($pkg['price'] ?? 0),
+                'biaya_tambahan' => (int)($pkg['biaya_tambahan'] ?? 5000),
+                'badge'          => $pkg['badge'] ?? '',
+                'badge_color'    => $pkg['badge_color'] ?? '#005696',
+                'active'         => !empty($pkg['active']),
+                'cbn_package'    => array_values($cbnLines),
+            ];
+        }
+        $allPromosJson[$prov] = [
+            'packages'      => $mappedPkgs,
+            'default_notes' => $provNotes,
+        ];
+    }
+    echo json_encode($allPromosJson, JSON_UNESCAPED_UNICODE);
+?>;
+
+window.CBN_PACKAGES = <?php
     $pkgMap = [];
-    foreach ($settings['packages'] as $pkg) {
+    foreach ($packages as $pkg) {
         $cbnLines = $pkg['cbn_package'] ?? [];
         if (!is_array($cbnLines)) $cbnLines = [];
-        // Replace {BULAN} placeholder with current month+year
         $cbnLines = array_map(fn($l) => str_replace('{BULAN}', $curMonth . ' ' . $curYear, $l), $cbnLines);
         $pkgMap[$pkg['name']] = [
             'price'          => (int)($pkg['price'] ?? 0),
@@ -766,7 +813,6 @@ window.CBN_PACKAGES = <?php
     }
     echo json_encode($pkgMap, JSON_UNESCAPED_UNICODE);
 ?>;
-window.PPN_PERCENT = <?= json_encode((float)($settings['ppn_percent'] ?? 11)) ?>;
 </script>
 <script src="<?= $baseUrl ?>/assets/js/main.js?v=<?= time() ?>"></script>
 </body>

@@ -344,11 +344,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // 5. UPDATE PAKET LAYANAN
-    elseif ($action === 'update_packages') {
+    // 5. UPDATE PAKET LAYANAN & PROMO PER PROVINSI (KHUSUS SUPER ADMIN)
+    elseif ($action === 'update_packages' && $currentRole === 'superadmin') {
+        $activeTab = 'packages-tab';
         try {
-            $settings = SettingsManager::get();
-            $packages = $settings['packages'] ?? [];
+            $targetProvince = trim($_POST['selected_province'] ?? 'Sumatera Utara');
+            $targetNotes    = trim($_POST['province_default_notes'] ?? '');
+            $packages       = SettingsManager::getPackagesForProvince($targetProvince);
 
             foreach ($packages as $idx => &$pkg) {
                 $pid = $pkg['id'];
@@ -387,7 +389,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     : [];
 
                 $packages[] = [
-                    'id'            => 'pkg_' . time(),
+                    'id'            => 'pkg_' . time() . rand(10, 99),
                     'name'          => $newPkgName,
                     'speed'         => $newPkgSpeed,
                     'price'         => $newPkgPrice,
@@ -405,9 +407,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $packages = array_values(array_filter($packages, fn($p) => !in_array($p['id'], $toDelete)));
             }
 
-            $settings['packages'] = $packages;
-            SettingsManager::update($settings);
-            $msgSuccess = "Daftar paket layanan berhasil diperbarui!";
+            SettingsManager::saveProvincePromo($targetProvince, $packages, $targetNotes);
+            $msgSuccess = "Daftar paket layanan & catatan promo untuk <strong>{$targetProvince}</strong> berhasil diperbarui!";
+        } catch (\Exception $e) {
+            $msgError = $e->getMessage();
+        }
+    }
+
+    // 5B. SALIN PENGATURAN PROMO KE PROVINSI LAIN
+    elseif ($action === 'copy_province_promo' && $currentRole === 'superadmin') {
+        $activeTab = 'packages-tab';
+        try {
+            $fromProv = trim($_POST['from_province'] ?? '');
+            $toProv   = trim($_POST['to_province'] ?? '');
+            if ($fromProv === '' || $toProv === '') {
+                throw new \InvalidArgumentException('Pilih provinsi asal dan provinsi tujuan salin.');
+            }
+            SettingsManager::copyProvincePromo($fromProv, $toProv);
+            $targetLabel = $toProv === 'ALL' ? 'Seluruh 38 Provinsi di Indonesia' : "Provinsi {$toProv}";
+            $msgSuccess = "Pengaturan promo dari <strong>{$fromProv}</strong> berhasil disalin ke <strong>{$targetLabel}</strong>!";
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
@@ -557,7 +575,17 @@ if ($currentRole === 'tl') {
 $settings      = SettingsManager::get();
 $teamLeaders   = array_values(array_filter(AuthManager::getUsers(), fn($user) => ($user['role'] ?? '') === 'tl'));
 $currentTlAccount = ($currentRole === 'tl' && $currentTlCode) ? AuthManager::getTlByCode($currentTlCode) : null;
-$packages      = $settings['packages'] ?? [];
+
+// Province Promos Configuration (38 Provinsi)
+$allProvinces     = SettingsManager::PROVINCES;
+$selectedProvince = trim($_GET['provinsi'] ?? $_POST['selected_province'] ?? 'Sumatera Utara');
+if (!in_array($selectedProvince, $allProvinces, true)) {
+    $selectedProvince = 'Sumatera Utara';
+}
+$provincePromos   = SettingsManager::getProvincePromos();
+$packages         = SettingsManager::getPackagesForProvince($selectedProvince);
+$provinceNotes    = SettingsManager::getPromoNotesForProvince($selectedProvince);
+
 $codeGsPath    = dirname(__DIR__, 2) . '/apps-script/Code.gs';
 $codeGsContent = file_exists($codeGsPath) ? file_get_contents($codeGsPath) : '';
 
@@ -1421,8 +1449,8 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
         </button>
         <?php if ($currentRole === 'superadmin'): ?>
             <button type="button" class="tab-btn <?= $activeTab === 'google-tab' ? 'active' : '' ?>" onclick="switchTab('google-tab', this)">Integrasi Google & Apps Script</button>
+            <button type="button" class="tab-btn <?= $activeTab === 'packages-tab' ? 'active' : '' ?>" onclick="switchTab('packages-tab', this)">Pengaturan Paket & Promo (38 Provinsi)</button>
         <?php endif; ?>
-        <button type="button" class="tab-btn <?= $activeTab === 'packages-tab' ? 'active' : '' ?>" onclick="switchTab('packages-tab', this)">Pengaturan Paket & Form</button>
         <button type="button" class="tab-btn <?= $activeTab === 'settings-tab' ? 'active' : '' ?>" onclick="switchTab('settings-tab', this)"><?= $currentRole === 'superadmin' ? 'Profil Perusahaan & Super Admin' : 'Profil & Keamanan Team Leader' ?></button>
     </div>
 
@@ -1700,10 +1728,60 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
     </div>
     <?php endif; ?>
 
-    <!-- ================= TAB 3: PENGATURAN PAKET & FORM ================= -->
+    <!-- ================= TAB 3: PENGATURAN PAKET & PROMO (38 PROVINSI) ================= -->
+    <?php if ($currentRole === 'superadmin'): ?>
     <div id="packages-tab" class="tab-content <?= $activeTab === 'packages-tab' ? 'active' : '' ?>">
 
         <?php $ppnPercent = (float)($settings['ppn_percent'] ?? 11); ?>
+
+        <!-- CARD PILIH PROVINSI (38 PROVINSI) -->
+        <div class="panel-card" style="margin-bottom:20px;background:linear-gradient(135deg, rgba(0,86,150,0.3), rgba(15,23,42,0.9));border:2px solid rgba(0,160,223,0.5);border-radius:14px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,0.4);">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">
+                <div style="flex:1;min-width:280px;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                        <span style="font-size:24px;">📍</span>
+                        <span style="font-size:17px;font-weight:900;color:#fff;">Pilih Provinsi untuk Mengatur Promo &amp; Paket</span>
+                    </div>
+                    <div style="font-size:12.5px;color:#cbd5e1;line-height:1.5;">
+                        Pilih salah satu dari <strong>38 Provinsi</strong> di bawah untuk mengonfigurasi paket internet, add-on, harga, dan catatan promo khusus provinsi tersebut.
+                    </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <div style="display:flex;flex-direction:column;gap:4px;">
+                        <label style="font-size:11px;font-weight:700;color:#67e8f9;">PILIH PROVINSI (TOTAL 38):</label>
+                        <select id="select-province-filter" class="form-control form-select" style="min-width:280px;font-size:14px;font-weight:800;color:#67e8f9;background:#090d1a;border:2px solid #00a0df;padding:10px 14px;border-radius:10px;" onchange="changeProvince(this.value)">
+                            <?php foreach ($allProvinces as $prov): 
+                                $hasCustom = !empty($provincePromos[$prov]);
+                            ?>
+                                <option value="<?= htmlspecialchars($prov) ?>" <?= ($selectedProvince === $prov) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($prov) ?><?= $hasCustom ? ' ★ (Promo Khusus)' : '' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div style="padding-top:18px;">
+                        <button type="button" class="btn-primary" onclick="openModal('modal-copy-promo')" style="padding:11px 18px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#059669,#10b981);border:none;">
+                            📋 Salin ke Provinsi Lain
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Banner Info Provinsi Aktif -->
+            <div style="margin-top:16px;padding:12px 18px;background:rgba(0,0,0,0.4);border-radius:10px;border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="status-badge status-active" style="font-size:12.5px;padding:5px 14px;background:#00a0df;color:#fff;font-weight:800;">
+                        PROVINSI AKTIF: <?= htmlspecialchars($selectedProvince) ?>
+                    </span>
+                    <span style="font-size:12px;color:#cbd5e1;">Jumlah Paket: <strong style="color:#67e8f9;"><?= count($packages) ?></strong> (<?= count(array_filter($packages, fn($p) => !empty($p['active']))) ?> Aktif)</span>
+                </div>
+                <div style="font-size:11.5px;color:#94a3b8;">
+                    💡 Seluruh pendaftar di provinsi <strong><?= htmlspecialchars($selectedProvince) ?></strong> akan melihat paket &amp; promo ini.
+                </div>
+            </div>
+        </div>
 
         <!-- CARD PENGATURAN TARIF PPN SISTEM -->
         <div class="panel-card" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(0,160,223,0.1),rgba(15,23,42,0.6));border:1px solid rgba(0,160,223,0.3);">
@@ -1721,20 +1799,14 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     <div style="position:relative;display:flex;align-items:center;">
                         <input type="number" step="0.1" min="0" max="100" name="ppn_percent" id="input-ppn-percent" class="form-control" 
                                value="<?= htmlspecialchars($ppnPercent) ?>" 
-                               <?= $currentRole !== 'superadmin' ? 'readonly style="background:rgba(0,0,0,0.4);color:#94a3b8;"' : 'required' ?>
+                               required
                                style="padding-right:38px;font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;">
                         <span style="position:absolute;right:14px;color:#67e8f9;font-weight:800;font-size:14px;">%</span>
                     </div>
                 </div>
-                <?php if ($currentRole === 'superadmin'): ?>
                 <button type="submit" id="btn-save-ppn" class="btn-primary" style="padding:10px 22px;">
                     Simpan Tarif PPN
                 </button>
-                <?php else: ?>
-                <div style="font-size:12px;color:#fbbf24;display:flex;align-items:center;gap:6px;padding-bottom:10px;">
-                    ℹ️ Tarif PPN dikonfigurasi secara terpusat oleh Super Admin (Otomatis Tersinkron)
-                </div>
-                <?php endif; ?>
             </form>
         </div>
 
@@ -1757,19 +1829,35 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             </div>
         </div>
 
+        <!-- FORM PAKET LAYANAN PER PROVINSI -->
         <div class="panel-card">
             <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
                 <div>
-                    <div class="panel-title" style="font-size:17px;font-weight:800;color:#fff;">Daftar Paket Internet CBN — Kelola Harga &amp; CBN Package</div>
+                    <div class="panel-title" style="font-size:17px;font-weight:800;color:#fff;">Daftar Paket Internet CBN — Provinsi <?= htmlspecialchars($selectedProvince) ?></div>
                     <div class="panel-desc">Setiap paket dapat diedit secara langsung (Nama, Kecepatan, Harga, Biaya Tambahan, Badge, dan teks CBN Package Auto-Claim) serta dapat di-preview langsung ke Surat Formulir CBN.</div>
                 </div>
                 <button type="submit" form="form-packages" class="btn-primary" style="padding:9px 18px;font-size:13px;box-shadow:0 4px 15px rgba(0,160,223,0.35);">
-                    💾 Simpan Semua Perubahan
+                    💾 Simpan Semua Perubahan Provinsi <?= htmlspecialchars($selectedProvince) ?>
                 </button>
             </div>
 
             <form method="POST" id="form-packages">
                 <input type="hidden" name="action" value="update_packages">
+                <input type="hidden" name="selected_province" value="<?= htmlspecialchars($selectedProvince) ?>">
+
+                <!-- CATATAN PROMO KHUSUS PROVINSI -->
+                <div style="margin-bottom:20px;background:rgba(0,160,223,0.08);border:1px solid rgba(0,160,223,0.3);border-radius:10px;padding:14px 18px;">
+                    <label style="font-size:13px;font-weight:700;color:#67e8f9;display:block;margin-bottom:6px;">
+                        📝 Catatan Promo Default untuk Provinsi <?= htmlspecialchars($selectedProvince) ?> (Notes Formulir PDF) *
+                    </label>
+                    <input type="text" name="province_default_notes" class="form-control" 
+                           value="<?= htmlspecialchars($provinceNotes) ?>" 
+                           placeholder="Contoh: REGULER PROMO <?= strtoupper($selectedProvince) ?> JULY 2026 - NAB" 
+                           style="font-size:13px;font-weight:700;">
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                        Catatan ini akan otomatis muncul pada kolom Notes di formulir PDF Surat CBN untuk pendaftar di provinsi <?= htmlspecialchars($selectedProvince) ?>.
+                    </div>
+                </div>
 
                 <?php
                 $monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1961,6 +2049,8 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
 
             <form method="POST">
                 <input type="hidden" name="action" value="update_packages">
+                <input type="hidden" name="selected_province" value="<?= htmlspecialchars($selectedProvince) ?>">
+                <input type="hidden" name="province_default_notes" value="<?= htmlspecialchars($provinceNotes) ?>">
 
                 <div class="pkg-grid-4">
                     <div class="form-group" style="margin-bottom:0;">
@@ -2003,11 +2093,12 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                 </div>
 
                 <button type="submit" class="btn-primary" style="padding:11px 24px;font-size:13px;">
-                    ➕ Tambah Paket Baru Sekarang
+                    ➕ Tambah Paket Baru untuk <?= htmlspecialchars($selectedProvince) ?>
                 </button>
             </form>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- ================= TAB 4: PROFIL PERUSAHAAN & ADMIN / TEAM LEADER ================= -->
     <div id="settings-tab" class="tab-content <?= $activeTab === 'settings-tab' ? 'active' : '' ?>">
@@ -2366,6 +2457,44 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
     </div>
 </div>
 
+<!-- MODAL SALIN PROMO PROVINSI -->
+<div id="modal-copy-promo" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">📋 Salin Pengaturan Promo &amp; Paket</div>
+            <button type="button" class="modal-close" onclick="closeModal('modal-copy-promo')">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="copy_province_promo">
+            <input type="hidden" name="selected_province" value="<?= htmlspecialchars($selectedProvince) ?>">
+
+            <div class="form-group">
+                <label>Salin Dari Provinsi Asal *</label>
+                <select name="from_province" class="form-control form-select" required>
+                    <?php foreach ($allProvinces as $prov): ?>
+                        <option value="<?= htmlspecialchars($prov) ?>" <?= ($selectedProvince === $prov) ? 'selected' : '' ?>><?= htmlspecialchars($prov) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Salin Ke Provinsi Tujuan *</label>
+                <select name="to_province" class="form-control form-select" required>
+                    <option value="ALL" style="font-weight:bold;color:#67e8f9;">★ SELURUH 38 PROVINSI (Semua Provinsi di Indonesia)</option>
+                    <?php foreach ($allProvinces as $prov): ?>
+                        <option value="<?= htmlspecialchars($prov) ?>" <?= ($selectedProvince !== $prov && $prov === 'DKI Jakarta') ? 'selected' : '' ?>><?= htmlspecialchars($prov) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <small style="color:var(--text-muted);font-size:11px;margin-top:4px;">Semua paket dan catatan promo provinsi asal akan langsung disalin ke provinsi tujuan yang dipilih.</small>
+            </div>
+
+            <button type="submit" class="btn-primary" style="width:100%;margin-top:10px;padding:12px;font-weight:800;">
+                🚀 Salin Pengaturan Sekarang
+            </button>
+        </form>
+    </div>
+</div>
+
 <!-- MODAL QR CODE -->
 <div id="modal-qr" class="modal">
     <div class="modal-content" style="text-align:center;">
@@ -2383,6 +2512,10 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
 
 <script>
 const PPN_PERCENT = <?= (float)($settings['ppn_percent'] ?? 11) ?>;
+
+function changeProvince(prov) {
+    window.location.href = '?provinsi=' + encodeURIComponent(prov) + '&tab=packages-tab';
+}
 
 function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));

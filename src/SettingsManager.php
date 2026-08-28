@@ -97,8 +97,148 @@ class SettingsManager
         return (bool) file_put_contents($path, $jsonStr);
     }
 
+    public const PROVINCES = [
+        'Sumatera Utara',
+        'DKI Jakarta',
+        'Aceh',
+        'Sumatera Barat',
+        'Riau',
+        'Kepulauan Riau',
+        'Jambi',
+        'Sumatera Selatan',
+        'Kepulauan Bangka Belitung',
+        'Bengkulu',
+        'Lampung',
+        'Jawa Barat',
+        'Banten',
+        'Jawa Tengah',
+        'DI Yogyakarta',
+        'Jawa Timur',
+        'Bali',
+        'Nusa Tenggara Barat',
+        'Nusa Tenggara Timur',
+        'Kalimantan Barat',
+        'Kalimantan Tengah',
+        'Kalimantan Selatan',
+        'Kalimantan Timur',
+        'Kalimantan Utara',
+        'Sulawesi Utara',
+        'Gorontalo',
+        'Sulawesi Tengah',
+        'Sulawesi Barat',
+        'Sulawesi Selatan',
+        'Sulawesi Tenggara',
+        'Maluku',
+        'Maluku Utara',
+        'Papua',
+        'Papua Barat',
+        'Papua Selatan',
+        'Papua Tengah',
+        'Papua Pegunungan',
+        'Papua Barat Daya'
+    ];
+
     /**
-     * Simpan paket layanan
+     * Ambil data promo per provinsi.
+     */
+    public static function getProvincePromos(): array
+    {
+        $settings = self::get();
+        return $settings['province_promos'] ?? [];
+    }
+
+    /**
+     * Ambil daftar paket untuk provinsi tertentu (fallback ke paket default).
+     */
+    public static function getPackagesForProvince(string $province = 'Sumatera Utara'): array
+    {
+        $settings = self::get();
+        $promos   = $settings['province_promos'] ?? [];
+        $province = trim($province);
+
+        if (!empty($promos[$province]['packages']) && is_array($promos[$province]['packages'])) {
+            return $promos[$province]['packages'];
+        }
+
+        // Cek case-insensitive
+        foreach ($promos as $pName => $pData) {
+            if (strcasecmp($pName, $province) === 0 && !empty($pData['packages'])) {
+                return $pData['packages'];
+            }
+        }
+
+        return $settings['packages'] ?? [];
+    }
+
+    /**
+     * Ambil catatan promo untuk provinsi tertentu.
+     */
+    public static function getPromoNotesForProvince(string $province = 'Sumatera Utara'): string
+    {
+        $settings = self::get();
+        $promos   = $settings['province_promos'] ?? [];
+        $province = trim($province);
+
+        if (isset($promos[$province]['default_notes']) && $promos[$province]['default_notes'] !== '') {
+            return $promos[$province]['default_notes'];
+        }
+
+        foreach ($promos as $pName => $pData) {
+            if (strcasecmp($pName, $province) === 0 && !empty($pData['default_notes'])) {
+                return $pData['default_notes'];
+            }
+        }
+
+        return $settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB';
+    }
+
+    /**
+     * Simpan promo dan paket untuk provinsi tertentu.
+     */
+    public static function saveProvincePromo(string $province, array $packages, string $defaultNotes = ''): bool
+    {
+        $settings = self::get();
+        $promos   = $settings['province_promos'] ?? [];
+        $province = trim($province);
+        if ($province === '') {
+            $province = 'Sumatera Utara';
+        }
+
+        $promos[$province] = [
+            'default_notes' => $defaultNotes ?: ($settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB'),
+            'packages'      => $packages,
+            'updated_at'    => date('Y-m-d H:i:s'),
+        ];
+
+        $settings['province_promos'] = $promos;
+        // Jika provinsi adalah Sumatera Utara atau DKI Jakarta atau default, update juga global packages jika belum ada
+        if (empty($settings['packages'])) {
+            $settings['packages'] = $packages;
+        }
+
+        return self::update($settings);
+    }
+
+    /**
+     * Salin pengaturan promo dari satu provinsi ke provinsi lain atau ke semua provinsi.
+     */
+    public static function copyProvincePromo(string $fromProvince, string $toProvince): bool
+    {
+        $fromPackages = self::getPackagesForProvince($fromProvince);
+        $fromNotes    = self::getPromoNotesForProvince($fromProvince);
+
+        if ($toProvince === 'ALL') {
+            foreach (self::PROVINCES as $prov) {
+                self::saveProvincePromo($prov, $fromPackages, $fromNotes);
+            }
+            return true;
+        }
+
+        return self::saveProvincePromo($toProvince, $fromPackages, $fromNotes);
+    }
+
+    /**
+     * Simpan paket layanan default
      */
     public static function savePackages(array $packages): bool
     {

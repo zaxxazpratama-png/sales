@@ -65,6 +65,15 @@ $data['team_leader'] = $tlCode;
 $data['ae_name']     = $aeName;
 $data['sales_name']  = $aeName;
 
+// Dynamic Province Promo Note
+$selectedProv = trim($data['provinsi'] ?? 'Sumatera Utara');
+$provNotes    = \App\SettingsManager::getPromoNotesForProvince($selectedProv);
+if (empty($data['catatan'])) {
+    $data['catatan'] = $provNotes;
+}
+$data['provinsi']      = $selectedProv;
+$data['default_notes'] = $provNotes;
+
 // Buat Nomor Tiket Resmi menggunakan Kode Team Leader (contoh: CBN-TIN-SUHARTA-260826-1234)
 $cleanTlCode  = strtoupper(trim(preg_replace('/[^a-zA-Z0-9\-]/', '', $tlCode)));
 $ticketNumber = 'CBN-' . $cleanTlCode . '-' . date('ymd') . '-' . rand(1000, 9999);

@@ -71,8 +71,8 @@ class AppsScriptService
             'biaya_ppn'         => $data['biaya_ppn']         ?? 'Rp 19.140',
             'biaya_total'       => $data['biaya_total']       ?? 'Rp 193.140',
             'addon_cbn_package' => $data['addon_cbn_package'] ?? '',
-            'signature_data'    => $data['signature_data']    ?? '',
-            'default_notes'     => $settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB',
+            'default_notes'     => !empty($data['default_notes']) ? $data['default_notes'] : ($settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB'),
+            'provinsi'          => $data['provinsi'] ?? 'Sumatera Utara',
         ];
 
         $salesCode = $data['sales_code'] ?? 'SEP-001';
