@@ -416,15 +416,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        if ($targetOrder === null) {
+            $msgError = "Order tiket {$ticketNo} tidak ditemukan.";
+        } else {
             $syncInfo = $gsheetSynced ? " (Otomatis Tersinkron ke Google Spreadsheet)" : "";
             $msgSuccess = "Status order <strong>{$ticketNo}</strong> berhasil diubah ke <strong>{$newStatus}</strong>{$syncInfo}.";
-        } else {
-            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['success' => false, 'message' => 'File orders tidak ditemukan.']);
-                exit;
-            }
-            $msgError = "File orders tidak ditemukan.";
         }
     }
 
