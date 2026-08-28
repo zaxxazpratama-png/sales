@@ -188,8 +188,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 3. HAPUS SALES
     elseif ($action === 'delete_sales') {
-        $id = trim($_POST['sales_id'] ?? '');
-        if (SalesManager::delete($id)) {
+        $id   = trim($_POST['sales_id'] ?? '');
+        $code = trim($_POST['sales_code'] ?? '');
+        if (($id !== '' && SalesManager::delete($id)) || ($code !== '' && SalesManager::delete($code))) {
             $msgSuccess = "Sales berhasil dihapus.";
         } else {
             $msgError = "Gagal menghapus sales.";
@@ -1567,10 +1568,11 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                                 <div style="display:flex;align-items:center;gap:4px;">
                                     <button type="button" class="btn-action btn-action-wa" onclick="shareWa('<?= htmlspecialchars($sales['nama_sales']) ?>', '<?= htmlspecialchars($salesUrl) ?>', '<?= htmlspecialchars($sales['no_wa']) ?>')">Share WA</button>
                                     <button type="button" class="btn-action btn-action-qr" onclick="showQr('<?= htmlspecialchars($sales['nama_sales']) ?>', '<?= htmlspecialchars($sales['sales_code']) ?>', '<?= htmlspecialchars($salesUrl) ?>')">QR Code</button>
-                                    <button type="button" class="btn-action" onclick="openEditModal(<?= htmlspecialchars(json_encode($sales)) ?>)">Edit</button>
-                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Hapus sales ini?')">
+                                    <button type="button" class="btn-action" data-sales='<?= htmlspecialchars(json_encode($sales), ENT_QUOTES, 'UTF-8') ?>' onclick="openEditModal(JSON.parse(this.getAttribute('data-sales')))">Edit</button>
+                                    <form method="POST" style="display:inline;" onsubmit="return confirm('Yakin ingin menghapus sales <?= htmlspecialchars($sales['nama_sales'], ENT_QUOTES) ?> (<?= htmlspecialchars($sales['sales_code'], ENT_QUOTES) ?>)?')">
                                         <input type="hidden" name="action" value="delete_sales">
                                         <input type="hidden" name="sales_id" value="<?= htmlspecialchars($sales['id']) ?>">
+                                        <input type="hidden" name="sales_code" value="<?= htmlspecialchars($sales['sales_code']) ?>">
                                         <button type="submit" class="btn-action btn-action-danger">Hapus</button>
                                     </form>
                                 </div>

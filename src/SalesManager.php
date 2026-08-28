@@ -93,28 +93,30 @@ class SalesManager
     }
 
     /**
-     * Cari sales berdasarkan ID
+     * Cari sales berdasarkan ID atau Sales Code
      */
     public static function findById(string $id): ?array
     {
+        $id = trim($id);
+        if ($id === '') return null;
+
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                $stmt = $pdo->prepare("SELECT * FROM sales WHERE id = ? LIMIT 1");
-                $stmt->execute([$id]);
+                $stmt = $pdo->prepare("SELECT * FROM sales WHERE id = ? OR UPPER(sales_code) = UPPER(?) LIMIT 1");
+                $stmt->execute([$id, $id]);
                 $row = $stmt->fetch();
                 if ($row) {
                     $row['email_customer_enabled'] = (bool)($row['email_customer_enabled'] ?? true);
                     return $row;
                 }
-                return null;
             } catch (\Exception $e) {
                 error_log("DB Sales findById Error: " . $e->getMessage());
             }
         }
 
         foreach (self::getAll() as $item) {
-            if (($item['id'] ?? '') === $id) {
+            if (($item['id'] ?? '') === $id || strtoupper($item['sales_code'] ?? '') === strtoupper($id)) {
                 return $item;
             }
         }
@@ -139,7 +141,7 @@ class SalesManager
             'nama_sales'             => trim($data['nama_sales'] ?? ''),
             'no_wa'                  => trim($data['no_wa'] ?? ''),
             'email'                  => trim($data['email'] ?? ''),
-            'tl_code'                => trim($data['tl_code'] ?? 'TL-01'),
+            'tl_code'                => trim($data['tl_code'] ?? 'TIN-SUHARTA'),
             'ttd_path'               => trim($data['ttd_path'] ?? ''),
             'status'                 => ($data['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active',
             'email_customer_enabled' => isset($data['email_customer_enabled']) ? (bool)$data['email_customer_enabled'] : true,
@@ -190,18 +192,20 @@ class SalesManager
                     throw new \InvalidArgumentException("Kode Sales '{$newCode}' sudah digunakan sales lain.");
                 }
 
-                $stmt = $pdo->prepare("UPDATE sales SET sales_code = ?, nama_sales = ?, no_wa = ?, email = ?, tl_code = ?, ttd_path = ?, status = ?, email_customer_enabled = ? WHERE id = ?");
-                return $stmt->execute([
+                $stmt = $pdo->prepare("UPDATE sales SET sales_code = ?, nama_sales = ?, no_wa = ?, email = ?, tl_code = ?, ttd_path = ?, status = ?, email_customer_enabled = ? WHERE id = ? OR UPPER(sales_code) = UPPER(?)");
+                $res = $stmt->execute([
                     $newCode,
                     trim($data['nama_sales'] ?? ''),
                     trim($data['no_wa'] ?? ''),
                     trim($data['email'] ?? ''),
-                    trim($data['tl_code'] ?? 'TL-01'),
+                    trim($data['tl_code'] ?? 'TIN-SUHARTA'),
                     trim($data['ttd_path'] ?? ''),
                     ($data['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active',
                     isset($data['email_customer_enabled']) ? ((bool)$data['email_customer_enabled'] ? 1 : 0) : 1,
+                    $id,
                     $id
                 ]);
+                if ($res) return true;
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
             } catch (\Exception $e) {
@@ -213,7 +217,7 @@ class SalesManager
         $found = false;
 
         foreach ($all as &$item) {
-            if (($item['id'] ?? '') === $id) {
+            if (($item['id'] ?? '') === $id || strtoupper($item['sales_code'] ?? '') === strtoupper($id)) {
                 if (strtoupper($item['sales_code']) !== $newCode && self::findByCode($newCode)) {
                     throw new \InvalidArgumentException("Kode Sales '{$newCode}' sudah digunakan sales lain.");
                 }
@@ -222,9 +226,13 @@ class SalesManager
                 $item['no_wa']                  = trim($data['no_wa'] ?? $item['no_wa']);
                 $item['email']                  = trim($data['email'] ?? $item['email']);
                 $item['tl_code']                = trim($data['tl_code'] ?? $item['tl_code']);
-                $item['ttd_path']               = trim($data['ttd_path'] ?? ($item['ttd_path'] ?? ''));
-                $item['status']                 = ($data['status'] ?? $item['status']) === 'inactive' ? 'inactive' : 'active';
-                $item['email_customer_enabled']  = isset($data['email_customer_enabled']) ? (bool)$data['email_customer_enabled'] : ($item['email_customer_enabled'] ?? true);
+                if (isset($data['ttd_path']) && $data['ttd_path'] !== '') {
+                    $item['ttd_path']           = $data['ttd_path'];
+                }
+                $item['status']                 = ($data['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active';
+                if (isset($data['email_customer_enabled'])) {
+                    $item['email_customer_enabled'] = (bool)$data['email_customer_enabled'];
+                }
                 $found = true;
                 break;
             }
@@ -238,22 +246,32 @@ class SalesManager
     }
 
     /**
-     * Hapus sales berdasarkan ID
+     * Hapus sales berdasarkan ID atau Sales Code
      */
     public static function delete(string $id): bool
     {
+        $id = trim($id);
+        if ($id === '') return false;
+
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                $stmt = $pdo->prepare("DELETE FROM sales WHERE id = ?");
-                return $stmt->execute([$id]);
+                $stmt = $pdo->prepare("DELETE FROM sales WHERE id = ? OR UPPER(sales_code) = UPPER(?)");
+                $stmt->execute([$id, $id]);
+                if ($stmt->rowCount() > 0) {
+                    // Juga sync ke json fallback
+                    $all = self::getAll();
+                    $filtered = array_values(array_filter($all, fn($item) => ($item['id'] ?? '') !== $id && strtoupper($item['sales_code'] ?? '') !== strtoupper($id)));
+                    self::saveAll($filtered);
+                    return true;
+                }
             } catch (\Exception $e) {
                 error_log("DB Sales delete Error: " . $e->getMessage());
             }
         }
 
         $all      = self::getAll();
-        $filtered = array_values(array_filter($all, fn($item) => ($item['id'] ?? '') !== $id));
+        $filtered = array_values(array_filter($all, fn($item) => ($item['id'] ?? '') !== $id && strtoupper($item['sales_code'] ?? '') !== strtoupper($id)));
 
         if (count($filtered) !== count($all)) {
             self::saveAll($filtered);
@@ -276,30 +294,18 @@ class SalesManager
         }
 
         $all     = self::getAll();
-        $changed = 0;
+        $updated = 0;
         foreach ($all as &$item) {
             if (($item['tl_code'] ?? '') === $oldCode) {
                 $item['tl_code'] = $newCode;
-                $changed++;
+                $updated++;
             }
         }
         unset($item);
-        if ($changed > 0) {
+
+        if ($updated > 0) {
             self::saveAll($all);
         }
-        return $changed;
-    }
-
-    /**
-     * Simpan array ke writable path (/tmp atau asli)
-     */
-    private static function saveAll(array $data): void
-    {
-        $path = self::getWritePath();
-        $dir  = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-        file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        return $updated;
     }
 }

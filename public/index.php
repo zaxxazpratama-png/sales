@@ -9,6 +9,7 @@ require_once dirname(__DIR__) . '/src/autoload.php';
 
 use App\SalesManager;
 use App\SettingsManager;
+use App\AuthManager;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
