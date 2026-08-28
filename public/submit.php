@@ -55,11 +55,18 @@ $data = $validator->getData();
 $salesCode = $data['sales_code'] ?? ($salesCode ?? 'SEP-001');
 $salesData = \App\SalesManager::findByCode($salesCode);
 
-// Pastikan Kode Team Leader & Nama Sales terisi akurat
+// Pastikan Data Perusahaan, Vendor, SO Date, Team Leader & Nama Sales terisi akurat
+$settings = \App\SettingsManager::get();
+$vendorName = !empty($settings['company_name']) ? $settings['company_name'] : 'PT. TALENTA INTEGRITAS NASIONAL';
 $tlCode = !empty($salesData['tl_code']) ? $salesData['tl_code'] : (!empty($data['tl_code']) ? $data['tl_code'] : 'TL-01');
+$aeName = $salesData['nama_sales'] ?? ($data['sales_name'] ?? ($salesData['sales_code'] ?? 'FIRMAN'));
+
+$data['vendor']      = $vendorName;
+$data['so_date']     = date('d/m/Y');
 $data['tl_code']     = $tlCode;
 $data['team_leader'] = $tlCode;
-$data['sales_name']  = $salesData['nama_sales'] ?? ($data['sales_name'] ?? 'FIRMAN');
+$data['ae_name']     = $aeName;
+$data['sales_name']  = $aeName;
 
 // Buat Nomor Tiket Resmi menggunakan Kode Team Leader (contoh: CBN-TIN-SUHARTA-260826-1234)
 $cleanTlCode  = strtoupper(trim(preg_replace('/[^a-zA-Z0-9\-]/', '', $tlCode)));

@@ -1,6 +1,6 @@
 /**
  * FORMULIR PENDAFTARAN LAYANAN CBN - Google Apps Script Backend (Code.gs)
- * Mitra Resmi: PT. Sinergi Emas Perdana
+ * Mitra Resmi: PT. Talenta Integritas Nasional
  */
 
 const CONFIG = {
@@ -421,17 +421,43 @@ function parseBooleanFlag() {
 
 function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
   const adminRecipient = recipientEmail || CONFIG.NOTIF_EMAIL;
-  const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})` ;
+  const vendorName = params.vendor || params.company_name || 'PT. TALENTA INTEGRITAS NASIONAL';
+  const soDateVal = params.so_date || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
+  const tlVal = params.team_leader || params.tl_name || params.tl_code || '-';
+  const aeVal = params.ae_name || params.sales_name || (params.sales_code ? params.sales_code : '-');
+  const usernameClean = (params.username_cbn || (params.nama_pelanggan ? params.nama_pelanggan.split(' ')[0].toLowerCase() : 'user')).trim();
 
   const tikorClean = String(params.tikor || '').trim();
   let tikorLink = '-';
+  let mapUrl = '';
   if (tikorClean && tikorClean !== '-') {
-    const mapUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(tikorClean);
+    mapUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(tikorClean);
     tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">📍 ${tikorClean} (Buka Google Maps)</a>`;
   }
 
   const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#005696;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;">📄 Buka Surat Formulir PDF Resmi CBN</a>` : '<em>(PDF terlampir pada email ini)</em>';
-  const ktpLink = '';
+
+  const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})` ;
+
+  const textDataFormat = `Vendor    =  ${vendorName}
+SO Date  =  ${soDateVal}
+Team Leader : ${tlVal}
+AE Name (nama sales) = ${aeVal}
+
+Nama di KTP : ${params.nama_pelanggan || '-'}
+Nomor KTP    : ${params.nomor_ktp || '-'}
+Tempat & Tanggal Lahir : ${params.ttl || '-'}
+Alamat Pemasangan : ${params.alamat || '-'}
+Kel.   : ${params.kelurahan || '-'}
+Kec.   : ${params.kecamatan || '-'}
+Home id : ${params.home_id || '-'}
+Tikor   : ${tikorClean || '-'}${mapUrl ? ' (' + mapUrl + ')' : ''}
+Telp 1: ${params.telp || '-'}
+Telp 2: ${params.telp2 || params.telp_rumah || '-'}
+--------------------------------------
+Username   : ${usernameClean}
+Email           : ${params.email_pelanggan || '-'}
+Paket : ${params.service || '-'}`;
 
   const htmlBody = `<!DOCTYPE html>
 <html>
@@ -450,6 +476,7 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
   td:first-child { color:#64748b; width:38%; font-weight:600; }
   td:last-child { color:#0f172a; }
   .badge { background:#00a0df; color:white; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:12px; }
+  .text-box { background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:16px; font-family:'Courier New', Courier, monospace; font-size:13px; line-height:1.6; color:#0f172a; white-space:pre-wrap; margin-bottom:20px; }
   .foot { background:#f8fafc; padding:15px; text-align:center; font-size:12px; color:#64748b; border-top:1px solid #e2e8f0; }
 </style>
 </head>
@@ -457,71 +484,60 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
 <div class="wrap">
   <div class="head">
     <h2>FORMULIR PENDAFTARAN LAYANAN CBN</h2>
-    <p style="margin:4px 0 0;font-size:13px;opacity:.9;">Tiket: ${params.ticket_no || '-'} &bull; ${params.vendor || '-'}</p>
+    <p style="margin:4px 0 0;font-size:13px;opacity:.9;">Tiket: ${params.ticket_no || '-'} &bull; ${vendorName}</p>
   </div>
   <div class="body">
     <div class="sec">
+      <h3>FORMAT DATA PENDAFTARAN (DATA KETIK)</h3>
+      <div class="text-box">${textDataFormat}</div>
+    </div>
+
+    <div class="sec">
       <h3>1. INFORMASI SALES ORDER</h3>
       <table>
-        <tr><td>Vendor</td><td>${params.vendor || '-'}</td></tr>
-        <tr><td>SO Date</td><td>${params.so_date || '-'}</td></tr>
-        <tr><td>Team Leader</td><td>${params.team_leader || params.tl_code || '-'}</td></tr>
-        <tr><td>AE Name (nama sales)</td><td><strong>${params.ae_name || params.sales_name || '-'}</strong></td></tr>
+        <tr><td>Vendor</td><td><strong>${vendorName}</strong></td></tr>
+        <tr><td>SO Date</td><td>${soDateVal}</td></tr>
+        <tr><td>Team Leader</td><td>${tlVal}</td></tr>
+        <tr><td>AE Name (nama sales)</td><td><strong>${aeVal}</strong></td></tr>
         <tr><td>No. Tiket</td><td><strong>${params.ticket_no || '-'}</strong></td></tr>
       </table>
     </div>
+
     <div class="sec">
       <h3>2. DATA PELANGGAN</h3>
       <table>
         <tr><td>Nama di KTP</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor KTP</td><td>${params.nomor_ktp || '-'}</td></tr>
-        <tr><td>Tempat / Tgl Lahir</td><td>${params.ttl || '-'}</td></tr>
-        <tr><td>Jenis Kelamin</td><td>${params.jenis_kelamin || '-'}</td></tr>
-        <tr><td>No. Telepon / WA</td><td><strong>${params.telp || '-'}</strong></td></tr>
-        <tr><td>No. Telepon Rumah</td><td>${params.telp_rumah || '-'}</td></tr>
-        <tr><td>Email Pelanggan</td><td>${params.email_pelanggan || '-'}</td></tr>
-      </table>
-    </div>
-
-    <div class="sec">
-      <h3>2. ALAMAT PEMASANGAN</h3>
-      <table>
+        <tr><td>Tempat &amp; Tanggal Lahir</td><td>${params.ttl || '-'}</td></tr>
         <tr><td>Alamat Pemasangan</td><td>${params.alamat || '-'}</td></tr>
         <tr><td>Kel.</td><td>${params.kelurahan || '-'}</td></tr>
         <tr><td>Kec.</td><td>${params.kecamatan || '-'}</td></tr>
-        <tr><td>RT / RW</td><td>RT ${params.rt || '-'} / RW ${params.rw || '-'}</td></tr>
-        <tr><td>Home ID</td><td>${params.home_id || '-'}</td></tr>
+        <tr><td>Home id</td><td>${params.home_id || '-'}</td></tr>
         <tr><td>Tikor</td><td>${tikorLink}</td></tr>
-        <tr><td>Telp 1</td><td>${params.telp || '-'}</td></tr>
+        <tr><td>Telp 1</td><td><strong>${params.telp || '-'}</strong></td></tr>
         <tr><td>Telp 2</td><td>${params.telp2 || params.telp_rumah || '-'}</td></tr>
-        <tr><td>Kode Pos</td><td>${params.kode_pos || '-'}</td></tr>
-        <tr><td>Status Kepemilikan</td><td><strong>${params.status_kepemilikan || 'PEMILIK'}</strong></td></tr>
       </table>
     </div>
 
     <div class="sec">
-      <h3>4. AKUN &amp; PAKET</h3>
+      <h3>3. AKUN &amp; PAKET</h3>
       <table>
-        <tr><td>Paket Layanan</td><td><span class="badge">${params.service || '-'}</span></td></tr>
-        <tr><td>Add-On TV</td><td>${params.addon_tv || 'Tidak ada'}</td></tr>
-        <tr><td>Perangkat Tambahan</td><td>${params.addon_device || 'Router Standard'}</td></tr>
-        <tr><td>Username</td><td>${params.username_cbn || '-'}</td></tr>
+        <tr><td>Username</td><td><strong>${usernameClean}</strong></td></tr>
         <tr><td>Email</td><td>${params.email_pelanggan || '-'}</td></tr>
         <tr><td>Paket</td><td><span class="badge">${params.service || '-'}</span></td></tr>
         <tr><td>Jadwal Pemasangan</td><td><strong>${params.jadwal_tanggal || '-'}</strong> (${params.jadwal_waktu || '-'})</td></tr>
-        <tr><td>Catatan Lokasi</td><td>${params.catatan || '-'}</td></tr>
         <tr><td>Estimasi Total Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
       </table>
     </div>
 
     <div class="sec">
-      <h3>4. BERKAS & LAMPIRAN DOKUMEN</h3>
+      <h3>4. BERKAS &amp; LAMPIRAN DOKUMEN</h3>
       <p style="margin:6px 0;">${pdfLink}</p>
       <p style="margin:6px 0;color:#64748b;">Tiket PDF terlampir pada email ini.</p>
     </div>
   </div>
   <div class="foot">
-    Email otomatis dari Sistem Formulir Layanan CBN &bull; PT. Sinergi Emas Perdana
+    Email otomatis dari Sistem Formulir Layanan CBN &bull; ${vendorName}
   </div>
 </div>
 </body>
@@ -536,10 +552,11 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
     emailOptions.attachments = [pdfBlob];
   }
 
-  GmailApp.sendEmail(adminRecipient, subject, '', emailOptions);
+  GmailApp.sendEmail(adminRecipient, subject, textDataFormat, emailOptions);
 }
 
 function sendCustomerEmail(params, pdfUrl, pdfBlob) {
+  const vendorName = params.vendor || params.company_name || 'PT. TALENTA INTEGRITAS NASIONAL';
   const subject = `Terima Kasih Atas Pendaftaran Anda - Layanan Internet Fiber CBN`;
 
   const htmlBody = `<!DOCTYPE html>
@@ -566,7 +583,7 @@ function sendCustomerEmail(params, pdfUrl, pdfBlob) {
 <div class="wrap">
   <div class="head">
     <h2>Terima Kasih Atas Pendaftaran Anda</h2>
-    <p>Layanan Internet Fiber CBN &bull; Mitra Resmi: PT. Sinergi Emas Perdana</p>
+    <p>Layanan Internet Fiber CBN &bull; Mitra Resmi: ${vendorName}</p>
   </div>
   <div class="body">
     <p>Halo <strong>${params.nama_pelanggan}</strong>,</p>
@@ -595,7 +612,7 @@ function sendCustomerEmail(params, pdfUrl, pdfBlob) {
     </p>
   </div>
   <div class="foot">
-    PT. Sinergi Emas Perdana &bull; Mitra Resmi CBN &bull; www.cbn.id
+    ${vendorName} &bull; Mitra Resmi CBN &bull; www.cbn.id
   </div>
 </div>
 </body>
@@ -656,7 +673,7 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
     } else if (h.includes('LEADER') || h.includes('SPV')) {
       val = params.team_leader || params.tl_code || '-';
     } else if (h.includes('VENDOR') || h.includes('PT')) {
-      val = params.vendor || params.company_name || 'PT. SINERGI EMAS PERDANA';
+      val = params.vendor || params.company_name || 'PT. TALENTA INTEGRITAS NASIONAL';
     } else if (h.includes('NAMA') || h.includes('PELANGGAN')) {
       val = params.nama_pelanggan || '';
     } else if (h.includes('KTP') && !h.includes('LINK') && !h.includes('FOTO')) {
