@@ -455,29 +455,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     error_log("GSheet Delete Order Sync Error: " . $syncErr->getMessage());
                 }
 
+                $remainingOrders = OrdersManager::getAll();
                 if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
                     header('Content-Type: application/json; charset=utf-8');
-                    $pendingCount = count(array_filter($newOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
+                    $pendingCount = count(array_filter($remainingOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
                     echo json_encode([
                         'success'       => true,
                         'ticket_no'     => $ticketNo,
                         'pending_count' => $pendingCount,
-                        'total_count'   => count($newOrders),
+                        'total_count'   => count($remainingOrders),
                         'message'       => "Order tiket {$ticketNo} berhasil dihapus & di-merahkan di Google Spreadsheet."
                     ], JSON_UNESCAPED_UNICODE);
                     exit;
                 }
 
-                $syncInfo = $gsheetSynced ? " dan baris di Google Spreadsheet telah ditandai merah (DIHAPUS)" : "";
-                $msgSuccess = "Order tiket <strong>{$ticketNo}</strong> berhasil dihapus{$syncInfo}.";
-            } else {
-                if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-                    header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['success' => false, 'message' => 'Data order tidak ditemukan.']);
-                    exit;
+                if ($deletedOrder === null) {
+                    if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                        header('Content-Type: application/json; charset=utf-8');
+                        echo json_encode(['success' => false, 'message' => 'Data order tidak ditemukan.']);
+                        exit;
+                    }
+                    $msgError = "Data order tidak ditemukan.";
+                } else {
+                    $syncInfo = $gsheetSynced ? " dan baris di Google Spreadsheet telah ditandai merah (DIHAPUS)" : "";
+                    $msgSuccess = "Order tiket <strong>{$ticketNo}</strong> berhasil dihapus{$syncInfo}.";
                 }
-                $msgError = "Data order tidak ditemukan.";
-            }
         }
     }
 
