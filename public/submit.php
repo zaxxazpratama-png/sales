@@ -96,19 +96,66 @@ try {
     // ---- Regenerate CSRF ----
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
+    // ---- Format Teks Salin untuk WhatsApp ----
+    $sQty   = (int)($data['smartbox_qty'] ?? 0);
+    $sV3Qty = (int)($data['smartbox_v3_qty'] ?? 0);
+    $stbText = '-';
+    if ($sQty > 0 && $sV3Qty > 0) {
+        $stbText = "Smartbox Android ({$sQty} Unit), Smartbox Android V3 ({$sV3Qty} Unit)";
+    } elseif ($sV3Qty > 0) {
+        $stbText = "Smartbox Android V3 ({$sV3Qty} Unit)";
+    } elseif ($sQty > 0) {
+        $stbText = "Smartbox Android ({$sQty} Unit)";
+    }
+
+    $tikorVal = !empty($data['tikor']) ? trim($data['tikor']) : '-';
+    $gmapsUrl = ($tikorVal !== '-') ? 'https://www.google.com/maps?q=' . urlencode($tikorVal) : '';
+
+    $waFormatText = "Vendor = " . ($data['vendor'] ?? $vendorName) . "\n"
+        . "SO Date = " . ($data['so_date'] ?? date('d/m/Y')) . "\n"
+        . "TL Code/Nama = " . ($data['tl_code'] ?? $tlCode) . "\n"
+        . "AE Name = " . ($data['ae_name'] ?? $aeName) . "\n"
+        . "Home ID: " . (!empty($data['home_id']) ? $data['home_id'] : '-') . "\n"
+        . "Nama: " . ($data['nama_pelanggan'] ?? '-') . "\n"
+        . "Nomor KTP: " . ($data['nomor_ktp'] ?? '-') . "\n"
+        . "TTL: " . (!empty($data['ttl']) ? $data['ttl'] : '-') . "\n"
+        . "Jenis Kelamin: " . ($data['jenis_kelamin'] ?? 'PRIA') . "\n"
+        . "Alamat Pemasangan: " . ($data['alamat'] ?? '-') . "\n"
+        . "Kel.: " . (!empty($data['kelurahan']) ? $data['kelurahan'] : '-') . "\n"
+        . "Kec.: " . (!empty($data['kecamatan']) ? $data['kecamatan'] : '-') . "\n"
+        . "Kode Pos: " . (!empty($data['kode_pos']) ? $data['kode_pos'] : '-') . "\n"
+        . "Tikor: " . $tikorVal . ($gmapsUrl ? " (" . $gmapsUrl . ")" : '') . "\n"
+        . "Telp: " . ($data['telp'] ?? '-') . "\n"
+        . "Telp2: " . (!empty($data['telp2']) ? $data['telp2'] : (!empty($data['telp_rumah']) ? $data['telp_rumah'] : '-')) . "\n"
+        . "Username: " . (!empty($data['username_cbn']) ? $data['username_cbn'] : '-') . "\n"
+        . "Paket: " . ($data['service'] ?? '-') . "\n"
+        . "STB : " . $stbText . "\n"
+        . "Email: " . ($data['email_pelanggan'] ?? '-');
+
     // ---- Pesan Sukses & Data Tiket Pendaftaran ----
     $_SESSION['success'] = [
-        'ticket_no'  => $ticketNumber,
-        'nama'       => $data['nama_pelanggan'],
-        'email'      => $data['email_pelanggan'],
-        'telp'       => $data['telp'] ?? '',
-        'alamat'     => $data['alamat'] . (!empty($data['kelurahan']) ? ', Kel. ' . $data['kelurahan'] : '') . (!empty($data['kecamatan']) ? ', Kec. ' . $data['kecamatan'] : ''),
-        'paket'      => $data['service'],
-        'jadwal'     => ($data['jadwal_tanggal'] ?? '') . (!empty($data['jadwal_waktu']) ? ' (' . $data['jadwal_waktu'] . ')' : ''),
-        'total'      => $data['biaya_total'] ?? 'Rp 193.140',
-        'sales_name' => $data['sales_name'] ?? ($salesData['nama_sales'] ?? 'FIRMAN'),
-        'sales_code' => $data['sales_code'] ?? $salesCode,
-        'timestamp'  => date('d/m/Y H:i:s'),
+        'ticket_no'    => $ticketNumber,
+        'nama'         => $data['nama_pelanggan'],
+        'nomor_ktp'    => $data['nomor_ktp'] ?? '',
+        'ttl'          => $data['ttl'] ?? '',
+        'jenis_kelamin'=> $data['jenis_kelamin'] ?? 'PRIA',
+        'email'        => $data['email_pelanggan'],
+        'telp'         => $data['telp'] ?? '',
+        'telp2'        => $data['telp2'] ?? ($data['telp_rumah'] ?? ''),
+        'alamat'       => $data['alamat'] . (!empty($data['kelurahan']) ? ', Kel. ' . $data['kelurahan'] : '') . (!empty($data['kecamatan']) ? ', Kec. ' . $data['kecamatan'] : ''),
+        'home_id'      => $data['home_id'] ?? '',
+        'tikor'        => $tikorVal,
+        'map_link'     => $gmapsUrl,
+        'paket'        => $data['service'],
+        'stb'          => $stbText,
+        'jadwal'       => ($data['jadwal_tanggal'] ?? '') . (!empty($data['jadwal_waktu']) ? ' (' . $data['jadwal_waktu'] . ')' : ''),
+        'total'        => $data['biaya_total'] ?? 'Rp 193.140',
+        'sales_name'   => $data['sales_name'] ?? ($salesData['nama_sales'] ?? 'FIRMAN'),
+        'sales_code'   => $data['sales_code'] ?? $salesCode,
+        'tl_code'      => $tlCode,
+        'vendor'       => $vendorName,
+        'timestamp'    => date('d/m/Y H:i:s'),
+        'wa_text'      => $waFormatText,
     ];
 
     // ---- Simpan Order ke JSON Lokal untuk Status Tracking ----

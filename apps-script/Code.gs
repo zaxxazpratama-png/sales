@@ -434,41 +434,44 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
   let mapUrl = '';
   if (tikorClean && tikorClean !== '-') {
     mapUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(tikorClean);
-    tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">&#128205; ${tikorClean} (Buka Google Maps)</a>`;
+    tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">📍 ${tikorClean} (Buka Google Maps)</a>`;
   }
 
-  const addonTvStr = params.addon_tv ? String(params.addon_tv).trim() : '';
-  let devList = [];
-  if (parseInt(params.router_qty, 10) > 0) devList.push(`Wireless Router (${params.router_qty} Unit)`);
-  if (parseInt(params.smartbox_qty, 10) > 0) devList.push(`Smartbox Android (${params.smartbox_qty} Unit)`);
-  if (parseInt(params.smartbox_v3_qty, 10) > 0) devList.push(`Smartbox Android V3 (${params.smartbox_v3_qty} Unit)`);
-  const addonDevRaw = params.addon_device ? String(params.addon_device).trim() : '';
-  const finalDeviceStr = addonDevRaw || devList.join(', ');
+  const sQty   = parseInt(params.smartbox_qty || '0', 10) || 0;
+  const sV3Qty = parseInt(params.smartbox_v3_qty || '0', 10) || 0;
+  let stbVal = '-';
+  if (sQty > 0 && sV3Qty > 0) {
+    stbVal = `Smartbox Android (${sQty} Unit), Smartbox Android V3 (${sV3Qty} Unit)`;
+  } else if (sV3Qty > 0) {
+    stbVal = `Smartbox Android V3 (${sV3Qty} Unit)`;
+  } else if (sQty > 0) {
+    stbVal = `Smartbox Android (${sQty} Unit)`;
+  }
 
   const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#005696;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;">📄 Buka Surat Formulir PDF Resmi CBN</a>` : '<em>(PDF terlampir pada email ini)</em>';
 
   const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})` ;
 
-  const textDataFormat = `Vendor    =  ${vendorName}
-SO Date  =  ${soDateVal}
-Team Leader : ${tlVal}
-AE Name (nama sales) = ${aeVal}
-
-Nama di KTP : ${params.nama_pelanggan || '-'}
-Nomor KTP    : ${params.nomor_ktp || '-'}
-Tempat & Tanggal Lahir : ${params.ttl || '-'}
-Alamat Pemasangan : ${params.alamat || '-'}
-Kel.   : ${params.kelurahan || '-'}
-Kec.   : ${params.kecamatan || '-'}
-Home id : ${params.home_id || '-'}
-Tikor   : ${tikorClean || '-'}${mapUrl ? ' (' + mapUrl + ')' : ''}
-Telp 1: ${params.telp || '-'}
-Telp 2: ${params.telp2 || params.telp_rumah || '-'}
---------------------------------------
-Username   : ${usernameClean}
-Email           : ${params.email_pelanggan || '-'}
-Paket : ${params.service || '-'}
-${addonTvStr ? 'Add-On TV : ' + addonTvStr + '\n' : ''}${finalDeviceStr ? 'Perangkat : ' + finalDeviceStr + '\n' : ''}Estimasi Total : ${params.biaya_total || '-'}`;
+  const textDataFormat = `Vendor = ${vendorName}
+SO Date = ${soDateVal}
+TL Code/Nama = ${tlVal}
+AE Name = ${aeVal}
+Home ID: ${params.home_id || '-'}
+Nama: ${params.nama_pelanggan || '-'}
+Nomor KTP: ${params.nomor_ktp || '-'}
+TTL: ${params.ttl || '-'}
+Jenis Kelamin: ${params.jenis_kelamin || 'PRIA'}
+Alamat Pemasangan: ${params.alamat || '-'}
+Kel.: ${params.kelurahan || '-'}
+Kec.: ${params.kecamatan || '-'}
+Kode Pos: ${params.kode_pos || '-'}
+Tikor: ${tikorClean || '-'}${mapUrl ? ' (' + mapUrl + ')' : ''}
+Telp: ${params.telp || '-'}
+Telp2: ${params.telp2 || params.telp_rumah || '-'}
+Username: ${usernameClean}
+Paket: ${params.service || '-'}
+STB : ${stbVal}
+Email: ${params.email_pelanggan || '-'}`;
 
   const htmlBody = `<!DOCTYPE html>
 <html>
@@ -487,6 +490,7 @@ ${addonTvStr ? 'Add-On TV : ' + addonTvStr + '\n' : ''}${finalDeviceStr ? 'Peran
   td:first-child { color:#64748b; width:38%; font-weight:600; }
   td:last-child { color:#0f172a; }
   .badge { background:#00a0df; color:white; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:12px; }
+  .raw-box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; font-family:monospace; font-size:12px; white-space:pre-wrap; color:#334155; line-height:1.5; }
   .foot { background:#f8fafc; padding:15px; text-align:center; font-size:12px; color:#64748b; border-top:1px solid #e2e8f0; }
 </style>
 </head>
@@ -502,27 +506,31 @@ ${addonTvStr ? 'Add-On TV : ' + addonTvStr + '\n' : ''}${finalDeviceStr ? 'Peran
       <table>
         <tr><td>Vendor</td><td><strong>${vendorName}</strong></td></tr>
         <tr><td>SO Date</td><td>${soDateVal}</td></tr>
-        <tr><td>Team Leader</td><td>${tlVal}</td></tr>
-        <tr><td>AE Name (nama sales)</td><td><strong>${aeVal}</strong></td></tr>
-        <tr><td>No. Tiket</td><td><strong>${params.ticket_no || '-'}</strong></td></tr>
-        <tr><td>Nama di KTP</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
+        <tr><td>TL Code/Nama</td><td><strong>${tlVal}</strong></td></tr>
+        <tr><td>AE Name</td><td><strong>${aeVal}</strong></td></tr>
+        <tr><td>Home ID</td><td><strong>${params.home_id || '-'}</strong></td></tr>
+        <tr><td>Nama</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor KTP</td><td>${params.nomor_ktp || '-'}</td></tr>
-        <tr><td>Tempat &amp; Tanggal Lahir</td><td>${params.ttl || '-'}</td></tr>
+        <tr><td>TTL</td><td>${params.ttl || '-'}</td></tr>
+        <tr><td>Jenis Kelamin</td><td>${params.jenis_kelamin || 'PRIA'}</td></tr>
         <tr><td>Alamat Pemasangan</td><td>${params.alamat || '-'}</td></tr>
         <tr><td>Kel.</td><td>${params.kelurahan || '-'}</td></tr>
         <tr><td>Kec.</td><td>${params.kecamatan || '-'}</td></tr>
-        <tr><td>Home id</td><td>${params.home_id || '-'}</td></tr>
+        <tr><td>Kode Pos</td><td>${params.kode_pos || '-'}</td></tr>
         <tr><td>Tikor</td><td>${tikorLink}</td></tr>
-        <tr><td>Telp 1</td><td><strong>${params.telp || '-'}</strong></td></tr>
-        <tr><td>Telp 2</td><td>${params.telp2 || params.telp_rumah || '-'}</td></tr>
+        <tr><td>Telp</td><td><strong>${params.telp || '-'}</strong></td></tr>
+        <tr><td>Telp2</td><td>${params.telp2 || params.telp_rumah || '-'}</td></tr>
         <tr><td>Username</td><td><strong>${usernameClean}</strong></td></tr>
-        <tr><td>Email</td><td>${params.email_pelanggan || '-'}</td></tr>
         <tr><td>Paket</td><td><span class="badge">${params.service || '-'}</span></td></tr>
-        ${addonTvStr ? `<tr><td>Add-On TV</td><td><strong>${addonTvStr}</strong></td></tr>` : ''}
-        ${finalDeviceStr ? `<tr><td>Perangkat Tambahan</td><td><strong>${finalDeviceStr}</strong></td></tr>` : ''}
-        <tr><td>Jadwal Pemasangan</td><td><strong>${params.jadwal_tanggal || '-'}</strong> (${params.jadwal_waktu || '-'})</td></tr>
+        <tr><td>STB</td><td><strong>${stbVal}</strong></td></tr>
+        <tr><td>Email</td><td>${params.email_pelanggan || '-'}</td></tr>
         <tr><td>Estimasi Total Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
       </table>
+    </div>
+
+    <div class="sec">
+      <h3 style="margin:0 0 8px;font-size:13px;color:#005696;">📋 FORMAT TEKS SALIN (UNTUK WA):</h3>
+      <div class="raw-box">${textDataFormat}</div>
     </div>
 
     <div class="sec">
@@ -703,8 +711,24 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
     } else if (h.includes('HOME ID') || h === 'HOME_ID') {
       val = params.home_id || '-';
     } else if (h.includes('TIKOR') || h.includes('GPS') || h.includes('KOORDINAT')) {
+      // Pure clean coordinate numbers (e.g. 3.595196, 98.672223) - NEVER use formulas which cause #ERROR!
       const t = String(params.tikor || '').trim();
-      val = (t && t !== '-') ? `=HYPERLINK("https://www.google.com/maps?q=${encodeURIComponent(t)}", "${t}")` : '';
+      val = (t && t !== '-') ? t : '';
+    } else if (h.includes('MAPS') || h.includes('GMAPS') || h.includes('LINK MAPS') || h.includes('LINK GPS')) {
+      const t = String(params.tikor || '').trim();
+      val = (t && t !== '-') ? 'https://www.google.com/maps?q=' + encodeURIComponent(t) : '';
+    } else if (h === 'STB' || h.includes('SMARTBOX') || h.includes('SET TOP BOX')) {
+      const sQty   = parseInt(params.smartbox_qty || '0', 10) || 0;
+      const sV3Qty = parseInt(params.smartbox_v3_qty || '0', 10) || 0;
+      if (sQty > 0 && sV3Qty > 0) {
+        val = `Smartbox Android (${sQty} Unit), Smartbox Android V3 (${sV3Qty} Unit)`;
+      } else if (sV3Qty > 0) {
+        val = `Smartbox Android V3 (${sV3Qty} Unit)`;
+      } else if (sQty > 0) {
+        val = `Smartbox Android (${sQty} Unit)`;
+      } else {
+        val = '-';
+      }
     } else if (h.includes('PAKET') || h.includes('SERVICE')) {
       val = params.service || 'CBN Fiber';
     } else if (h.includes('TV')) {
