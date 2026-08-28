@@ -231,88 +231,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'update_tl_profile' && $currentRole === 'tl') {
         $activeTab = 'settings-tab';
         try {
-            $newUsername = trim($_POST['tl_username'] ?? '');
-            $newPassword = $_POST['tl_password'] ?? '';
+            $newUsername   = trim($_POST['tl_username'] ?? '');
+            $newPassword   = $_POST['tl_password'] ?? '';
+            $newAdminEmail = trim($_POST['tl_admin_email'] ?? '');
             if ($newUsername === '') {
                 throw new \InvalidArgumentException('Username Team Leader tidak boleh kosong.');
             }
-            $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword);
+            $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword, $newAdminEmail);
             $_SESSION['admin_user'] = $updated['username'];
             $currentUser = $updated['username'];
-            $msgSuccess = "Profil dan password Team Leader <strong>{$currentUser}</strong> berhasil diperbarui!";
+            $msgSuccess = "Profil dan Email Admin Team Leader <strong>{$currentUser}</strong> berhasil diperbarui!";
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
     }
 
     // 5. UPDATE PENGATURAN GOOGLE & PROFIL SUPERADMIN
-    elseif ($action === 'update_general_settings') {
-        $activeTab = ($currentRole === 'superadmin' && isset($_POST['apps_script_url'])) ? 'google-tab' : 'settings-tab';
+    elseif ($action === 'update_general_settings' && $currentRole === 'superadmin') {
+        $activeTab = isset($_POST['apps_script_url']) ? 'google-tab' : 'settings-tab';
         try {
             $settings = SettingsManager::get();
 
-            if ($currentRole === 'superadmin') {
-                if (isset($_POST['company_name'])) {
-                    $settings['company_name'] = trim($_POST['company_name'] ?? $settings['company_name']);
-                }
-                if (isset($_POST['call_center'])) {
-                    $settings['call_center'] = trim($_POST['call_center'] ?? $settings['call_center']);
-                }
-                if (isset($_POST['wa_helpdesk'])) {
-                    $settings['wa_helpdesk'] = trim($_POST['wa_helpdesk'] ?? $settings['wa_helpdesk']);
-                }
-                if (isset($_POST['apps_script_url'])) {
-                    $appsScriptUrl = trim($_POST['apps_script_url'] ?? '');
-                    if ($appsScriptUrl !== '' && !filter_var($appsScriptUrl, FILTER_VALIDATE_URL)) {
-                        throw new \InvalidArgumentException('URL Web App Google Apps Script tidak valid.');
-                    }
-                    $settings['apps_script_url'] = $appsScriptUrl;
-                }
-                if (isset($_POST['spreadsheet_id'])) {
-                    $settings['spreadsheet_id'] = trim($_POST['spreadsheet_id'] ?? '');
-                }
-                if (isset($_POST['drive_folder_id'])) {
-                    $settings['drive_folder_id'] = trim($_POST['drive_folder_id'] ?? '');
-                }
-                if (isset($_POST['master_email'])) {
-                    $settings['master_email'] = trim($_POST['master_email'] ?? '');
-                }
-                if (isset($_POST['admin_email'])) {
-                    $settings['admin_email'] = trim($_POST['admin_email'] ?? '');
-                }
-                if (isset($_POST['default_notes'])) {
-                    $settings['default_notes'] = trim($_POST['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB');
-                }
-
-                // Update superadmin credentials
-                $newAdminUsername = trim($_POST['admin_username'] ?? '');
-                $newAdminPassword = $_POST['admin_password'] ?? '';
-                if ($newAdminUsername !== '') {
-                    $updated = AuthManager::updateProfile($currentUser, $newAdminUsername, $newAdminPassword);
-                    $_SESSION['admin_user'] = $updated['username'];
-                    $currentUser = $updated['username'];
-                    $settings['admin_username'] = $newAdminUsername;
-                }
-
-                if (!empty($_FILES['ttd_spv']['name']) && $_FILES['ttd_spv']['error'] === UPLOAD_ERR_OK) {
-                    $target = dirname(__DIR__) . '/assets/img/ttd_spv_master.png';
-                    \App\ImageHelper::makeTransparentSignature($_FILES['ttd_spv']['tmp_name'], $target);
-                    $settings['ttd_spv_path'] = 'assets/img/ttd_spv_master.png';
-                }
-
-                SettingsManager::update($settings);
-                $msgSuccess = "Pengaturan profil & sistem berhasil disimpan!";
-            } else {
-                $newUsername   = trim($_POST['tl_username'] ?? '');
-                $newPassword   = $_POST['tl_password'] ?? '';
-                $newAdminEmail = trim($_POST['tl_admin_email'] ?? '');
-                if ($newUsername !== '') {
-                    $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword, $newAdminEmail);
-                    $_SESSION['admin_user'] = $updated['username'];
-                    $currentUser = $updated['username'];
-                    $msgSuccess = 'Profil Team Leader & Email Admin berhasil diperbarui!';
-                }
+            if (isset($_POST['company_name'])) {
+                $settings['company_name'] = trim($_POST['company_name'] ?? $settings['company_name']);
             }
+            if (isset($_POST['call_center'])) {
+                $settings['call_center'] = trim($_POST['call_center'] ?? $settings['call_center']);
+            }
+            if (isset($_POST['wa_helpdesk'])) {
+                $settings['wa_helpdesk'] = trim($_POST['wa_helpdesk'] ?? $settings['wa_helpdesk']);
+            }
+            if (isset($_POST['apps_script_url'])) {
+                $appsScriptUrl = trim($_POST['apps_script_url'] ?? '');
+                if ($appsScriptUrl !== '' && !filter_var($appsScriptUrl, FILTER_VALIDATE_URL)) {
+                    throw new \InvalidArgumentException('URL Web App Google Apps Script tidak valid.');
+                }
+                $settings['apps_script_url'] = $appsScriptUrl;
+            }
+            if (isset($_POST['spreadsheet_id'])) {
+                $settings['spreadsheet_id'] = trim($_POST['spreadsheet_id'] ?? '');
+            }
+            if (isset($_POST['drive_folder_id'])) {
+                $settings['drive_folder_id'] = trim($_POST['drive_folder_id'] ?? '');
+            }
+            if (isset($_POST['master_email'])) {
+                $settings['master_email'] = trim($_POST['master_email'] ?? '');
+            }
+            if (isset($_POST['default_notes'])) {
+                $settings['default_notes'] = trim($_POST['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB');
+            }
+
+            // Update superadmin credentials
+            $newAdminUsername = trim($_POST['admin_username'] ?? '');
+            $newAdminPassword = $_POST['admin_password'] ?? '';
+            if ($newAdminUsername !== '') {
+                $updated = AuthManager::updateProfile($currentUser, $newAdminUsername, $newAdminPassword);
+                $_SESSION['admin_user'] = $updated['username'];
+                $currentUser = $updated['username'];
+                $settings['admin_username'] = $newAdminUsername;
+            }
+
+            if (!empty($_FILES['ttd_spv']['name']) && $_FILES['ttd_spv']['error'] === UPLOAD_ERR_OK) {
+                $target = dirname(__DIR__) . '/assets/img/ttd_spv_master.png';
+                \App\ImageHelper::makeTransparentSignature($_FILES['ttd_spv']['tmp_name'], $target);
+                $settings['ttd_spv_path'] = 'assets/img/ttd_spv_master.png';
+            }
+
+            SettingsManager::update($settings);
+            $msgSuccess = "Pengaturan profil & sistem berhasil disimpan!";
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
