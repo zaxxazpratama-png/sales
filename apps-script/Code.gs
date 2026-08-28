@@ -437,6 +437,14 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
     tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">&#128205; ${tikorClean} (Buka Google Maps)</a>`;
   }
 
+  const addonTvStr = params.addon_tv ? String(params.addon_tv).trim() : '';
+  let devList = [];
+  if (parseInt(params.router_qty, 10) > 0) devList.push(`Wireless Router (${params.router_qty} Unit)`);
+  if (parseInt(params.smartbox_qty, 10) > 0) devList.push(`Smartbox Android (${params.smartbox_qty} Unit)`);
+  if (parseInt(params.smartbox_v3_qty, 10) > 0) devList.push(`Smartbox Android V3 (${params.smartbox_v3_qty} Unit)`);
+  const addonDevRaw = params.addon_device ? String(params.addon_device).trim() : '';
+  const finalDeviceStr = addonDevRaw || devList.join(', ');
+
   const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#005696;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;">📄 Buka Surat Formulir PDF Resmi CBN</a>` : '<em>(PDF terlampir pada email ini)</em>';
 
   const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})` ;
@@ -459,7 +467,8 @@ Telp 2: ${params.telp2 || params.telp_rumah || '-'}
 --------------------------------------
 Username   : ${usernameClean}
 Email           : ${params.email_pelanggan || '-'}
-Paket : ${params.service || '-'}`;
+Paket : ${params.service || '-'}
+${addonTvStr ? 'Add-On TV : ' + addonTvStr + '\n' : ''}${finalDeviceStr ? 'Perangkat : ' + finalDeviceStr + '\n' : ''}Estimasi Total : ${params.biaya_total || '-'}`;
 
   const htmlBody = `<!DOCTYPE html>
 <html>
@@ -490,19 +499,12 @@ Paket : ${params.service || '-'}`;
   <div class="body">
 
     <div class="sec">
-      <h3>1. INFORMASI SALES ORDER</h3>
       <table>
         <tr><td>Vendor</td><td><strong>${vendorName}</strong></td></tr>
         <tr><td>SO Date</td><td>${soDateVal}</td></tr>
         <tr><td>Team Leader</td><td>${tlVal}</td></tr>
         <tr><td>AE Name (nama sales)</td><td><strong>${aeVal}</strong></td></tr>
         <tr><td>No. Tiket</td><td><strong>${params.ticket_no || '-'}</strong></td></tr>
-      </table>
-    </div>
-
-    <div class="sec">
-      <h3>2. DATA PELANGGAN</h3>
-      <table>
         <tr><td>Nama di KTP</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor KTP</td><td>${params.nomor_ktp || '-'}</td></tr>
         <tr><td>Tempat &amp; Tanggal Lahir</td><td>${params.ttl || '-'}</td></tr>
@@ -513,22 +515,17 @@ Paket : ${params.service || '-'}`;
         <tr><td>Tikor</td><td>${tikorLink}</td></tr>
         <tr><td>Telp 1</td><td><strong>${params.telp || '-'}</strong></td></tr>
         <tr><td>Telp 2</td><td>${params.telp2 || params.telp_rumah || '-'}</td></tr>
-      </table>
-    </div>
-
-    <div class="sec">
-      <h3>3. AKUN &amp; PAKET</h3>
-      <table>
         <tr><td>Username</td><td><strong>${usernameClean}</strong></td></tr>
         <tr><td>Email</td><td>${params.email_pelanggan || '-'}</td></tr>
         <tr><td>Paket</td><td><span class="badge">${params.service || '-'}</span></td></tr>
+        ${addonTvStr ? `<tr><td>Add-On TV</td><td><strong>${addonTvStr}</strong></td></tr>` : ''}
+        ${finalDeviceStr ? `<tr><td>Perangkat Tambahan</td><td><strong>${finalDeviceStr}</strong></td></tr>` : ''}
         <tr><td>Jadwal Pemasangan</td><td><strong>${params.jadwal_tanggal || '-'}</strong> (${params.jadwal_waktu || '-'})</td></tr>
         <tr><td>Estimasi Total Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
       </table>
     </div>
 
     <div class="sec">
-      <h3>4. BERKAS &amp; LAMPIRAN DOKUMEN</h3>
       <p style="margin:6px 0;">${pdfLink}</p>
       <p style="margin:6px 0;color:#64748b;">Tiket PDF terlampir pada email ini.</p>
     </div>
@@ -555,6 +552,14 @@ Paket : ${params.service || '-'}`;
 function sendCustomerEmail(params, pdfUrl, pdfBlob) {
   const vendorName = params.vendor || params.company_name || 'PT. TALENTA INTEGRITAS NASIONAL';
   const subject = `Terima Kasih Atas Pendaftaran Anda - Layanan Internet Fiber CBN`;
+
+  const addonTvStr = params.addon_tv ? String(params.addon_tv).trim() : '';
+  let devList = [];
+  if (parseInt(params.router_qty, 10) > 0) devList.push(`Wireless Router (${params.router_qty} Unit)`);
+  if (parseInt(params.smartbox_qty, 10) > 0) devList.push(`Smartbox Android (${params.smartbox_qty} Unit)`);
+  if (parseInt(params.smartbox_v3_qty, 10) > 0) devList.push(`Smartbox Android V3 (${params.smartbox_v3_qty} Unit)`);
+  const addonDevRaw = params.addon_device ? String(params.addon_device).trim() : '';
+  const finalDeviceStr = addonDevRaw || devList.join(', ');
 
   const htmlBody = `<!DOCTYPE html>
 <html>
@@ -594,6 +599,8 @@ function sendCustomerEmail(params, pdfUrl, pdfBlob) {
         <tr><td>Nama Lengkap</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor Identitas (KTP)</td><td>${params.nomor_ktp || '-'}</td></tr>
         <tr><td>Paket Layanan</td><td><span class="badge">${params.service || 'CBN Fiber'}</span></td></tr>
+        ${addonTvStr ? `<tr><td>Add-On TV</td><td><strong>${addonTvStr}</strong></td></tr>` : ''}
+        ${finalDeviceStr ? `<tr><td>Perangkat Tambahan</td><td><strong>${finalDeviceStr}</strong></td></tr>` : ''}
         <tr><td>Alamat Pemasangan</td><td>${params.alamat || '-'} (RT ${params.rt || '-'}/RW ${params.rw || '-'}, Kode Pos: ${params.kode_pos || '-'})</td></tr>
         <tr><td>Rencana Jadwal Pemasangan</td><td><strong>${params.jadwal_tanggal || '-'}</strong> (Slot: ${params.jadwal_waktu || '-'})</td></tr>
         <tr><td>Estimasi Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
@@ -703,7 +710,11 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
     } else if (h.includes('TV')) {
       val = params.addon_tv || '';
     } else if (h.includes('PERANGKAT')) {
-      val = params.addon_device || '';
+      let dList = [];
+      if (parseInt(params.router_qty, 10) > 0) dList.push(`Wireless Router (${params.router_qty} Unit)`);
+      if (parseInt(params.smartbox_qty, 10) > 0) dList.push(`Smartbox Android (${params.smartbox_qty} Unit)`);
+      if (parseInt(params.smartbox_v3_qty, 10) > 0) dList.push(`Smartbox Android V3 (${params.smartbox_v3_qty} Unit)`);
+      val = params.addon_device || dList.join(', ');
     } else if (h.includes('EMAIL CBN') || h.includes('AKUN')) {
       val = params.username_cbn ? params.username_cbn + '@cbn.net.id' : '';
     } else if (h.includes('JADWAL') && !h.includes('WAKTU')) {
