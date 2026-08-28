@@ -20,17 +20,12 @@ if (!empty($_SESSION['admin_logged_in'])) {
 
 $error = '';
 $settings = SettingsManager::get();
-$defaultUser = $settings['admin_username'] ?? 'admin';
-$defaultPass = $settings['admin_password'] ?? 'admin';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = trim($_POST['username'] ?? '');
     $pass = $_POST['password'] ?? '';
 
     $account = AuthManager::authenticate($user, $pass);
-    if (!$account && $user === $defaultUser && $pass === $defaultPass) {
-        $account = ['username' => $user, 'role' => 'admin', 'tl_code' => ''];
-    }
 
     if ($account) {
         $_SESSION['admin_logged_in'] = true;
