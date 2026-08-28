@@ -119,7 +119,7 @@ class AppsScriptService
 
         $jsonPayload = json_encode($payload);
 
-        // Eksekusi HTTP Request via cURL (Standar cPanel) dengan fallback stream
+        // Eksekusi HTTP Request via cURL 2-Step Handler
         $response = $this->postJson($this->scriptUrl, $jsonPayload, 60);
 
         $decoded = json_decode($response, true);
@@ -189,49 +189,92 @@ class AppsScriptService
     }
 
     /**
-     * Kirim HTTP POST JSON payload ke Google Apps Script menggunakan cURL (dengan fallback stream)
+     * Kirim HTTP POST JSON payload ke Google Apps Script secara aman
+     * Menangani 302 Redirect Google Apps Script tanpa header leaking yang memicu Error 400
      */
     private function postJson(string $url, string $jsonPayload, int $timeout = 60): string
     {
-        // 1. Prioritaskan cURL (Kompatibel dengan semua server cPanel / Linux)
+        $url = trim($url);
+
         if (function_exists('curl_init')) {
+            // STEP 1: Kirim POST ke script.google.com tanpa auto-follow location
             $ch = curl_init();
             curl_setopt_array($ch, [
                 CURLOPT_URL            => $url,
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $jsonPayload,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS      => 5,
+                CURLOPT_HEADER         => true,
+                CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_TIMEOUT        => $timeout,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 CURLOPT_HTTPHEADER     => [
-                    'Content-Type: text/plain;charset=UTF-8',
-                    'Content-Length: ' . strlen($jsonPayload)
+                    'Content-Type: text/plain;charset=UTF-8'
                 ]
             ]);
 
-            $response  = curl_exec($ch);
-            $curlError = curl_error($ch);
-            $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $rawResponse = curl_exec($ch);
+            $httpCode    = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $headerSize  = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            $curlError   = curl_error($ch);
             curl_close($ch);
 
-            if ($response !== false && !empty($response)) {
-                return $response;
+            $headers = substr($rawResponse, 0, $headerSize);
+            $body    = substr($rawResponse, $headerSize);
+
+            // Jika Google Apps Script mengembalikan 302 / 301 / 303 Redirect
+            if (in_array($httpCode, [301, 302, 303, 307, 308])) {
+                if (preg_match('/Location:\s*([^\r\n]+)/i', $headers, $matches)) {
+                    $redirectUrl = trim($matches[1]);
+
+                    // STEP 2: Lakukan clean GET request ke script.googleusercontent.com
+                    $chGet = curl_init();
+                    curl_setopt_array($chGet, [
+                        CURLOPT_URL            => $redirectUrl,
+                        CURLOPT_HTTPGET        => true,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_FOLLOWLOCATION => true,
+                        CURLOPT_MAXREDIRS      => 5,
+                        CURLOPT_TIMEOUT        => $timeout,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => 0,
+                        CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        CURLOPT_HTTPHEADER     => [
+                            'Accept: application/json, text/plain, */*'
+                        ]
+                    ]);
+
+                    $getResponse  = curl_exec($chGet);
+                    $getCurlError = curl_error($chGet);
+                    curl_close($chGet);
+
+                    if ($getResponse !== false && !empty($getResponse)) {
+                        return $getResponse;
+                    }
+
+                    if (!empty($getCurlError)) {
+                        throw new \RuntimeException("Gagal mengambil respon Google Apps Script: " . $getCurlError);
+                    }
+                }
+            }
+
+            // Jika langsung 200 OK
+            if ($httpCode === 200 && !empty($body)) {
+                return $body;
             }
 
             if (!empty($curlError)) {
-                error_log("[AppsScriptService] cURL error: " . $curlError . " (HTTP " . $httpCode . ")");
+                throw new \RuntimeException("cURL error ke Google Apps Script: " . $curlError);
             }
         }
 
-        // 2. Fallback via file_get_contents (Stream Context)
+        // Fallback Stream Context
         $opts = [
             'http' => [
                 'method'          => 'POST',
-                'header'          => "Content-Type: text/plain;charset=UTF-8\r\n" .
-                                     "Content-Length: " . strlen($jsonPayload) . "\r\n",
+                'header'          => "Content-Type: text/plain;charset=UTF-8\r\n",
                 'content'         => $jsonPayload,
                 'follow_location' => 1,
                 'max_redirects'   => 5,
@@ -249,7 +292,7 @@ class AppsScriptService
 
         if ($response === false) {
             $error = error_get_last();
-            throw new \RuntimeException("Gagal terhubung ke Google Apps Script: " . ($error['message'] ?? 'Periksa koneksi internet server / cURL'));
+            throw new \RuntimeException("Gagal terhubung ke Google Apps Script: " . ($error['message'] ?? 'Network error'));
         }
 
         return $response;
