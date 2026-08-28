@@ -757,6 +757,6 @@ window.CBN_PACKAGES = <?php
 ?>;
 window.PPN_PERCENT = <?= json_encode((float)($settings['ppn_percent'] ?? 11)) ?>;
 </script>
-<script src="<?= $baseUrl ?>/assets/js/main.js"></script>
+<script src="<?= $baseUrl ?>/assets/js/main.js?v=<?= time() ?>"></script>
 </body>
 </html>
