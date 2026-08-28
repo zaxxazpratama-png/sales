@@ -81,7 +81,7 @@
     "addons": {
         "tv_dens": {
             "name": "Dens TV+ Apps",
-            "price": 30000,
+            "price": 0,
             "active": true
         },
         "tv_vision": {
@@ -90,8 +90,13 @@
             "active": true
         },
         "device_smartbox": {
-            "name": "Smartbox Android TV",
-            "price": 35000,
+            "name": "Smartbox Android",
+            "price": 45000,
+            "active": true
+        },
+        "device_smartbox_v3": {
+            "name": "Smartbox Android V3",
+            "price": 55000,
             "active": true
         }
     }

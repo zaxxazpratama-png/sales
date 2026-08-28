@@ -205,8 +205,10 @@ function generateCbnDocumentHtml(data) {
   const hasDensTv   = tvCombinedStr.includes('dens');
   const hasVisionTv = tvCombinedStr.includes('vision');
 
-  const routerQty   = data.router_qty || '0';
-  const smartboxQty = data.smartbox_qty || '0';
+  const routerQty     = data.router_qty || '0';
+  const smartboxQty   = parseInt(data.smartbox_qty || '0', 10) || 0;
+  const smartboxV3Qty = parseInt(data.smartbox_v3_qty || '0', 10) || 0;
+  const totalSmartbox = smartboxQty + smartboxV3Qty;
 
   const usernameCbn = (data.username_cbn || (nama.split(' ')[0] || 'user')).toLowerCase().trim();
   
@@ -358,9 +360,9 @@ function generateCbnDocumentHtml(data) {
       <div class='fld' style='top:43.85%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
       <div class='fld' style='top:43.85%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;'>${routerQty}</div>
     ` : ''}
-    ${parseInt(smartboxQty) >= 1 ? `
+    ${totalSmartbox >= 1 ? `
       <div class='fld' style='top:46.00%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
-      <div class='fld' style='top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;'>${smartboxQty}</div>
+      <div class='fld' style='top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;'>${totalSmartbox}</div>
     ` : ''}
 
     <!-- ADD-ON TV (KOLOM KANAN - SUBKOLOM KIRI) -->

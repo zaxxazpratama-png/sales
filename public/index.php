@@ -558,7 +558,7 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                         <div style="display:flex;flex-direction:column;gap:8px;">
                             <label class="checkbox-label-card" style="justify-content:flex-start;">
                                 <input type="checkbox" name="addon_tv[]" value="Dens TV+ Apps" class="addon-tv-check">
-                                Dens TV+ Apps (+Rp 30.000/bln)
+                                Dens TV+ Apps <span style="color:#10b981;font-weight:700;margin-left:4px;">(FREE)</span>
                             </label>
                             <label class="checkbox-label-card" style="justify-content:flex-start;">
                                 <input type="checkbox" name="addon_tv[]" value="Vision - Premium Sports" class="addon-tv-check">
@@ -581,14 +581,18 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                     <!-- Perangkat Tambahan -->
                     <div class="form-group">
                         <label class="form-label">Perangkat Tambahan (Additional Devices)</label>
-                        <div style="display:flex;gap:12px;">
-                            <div style="flex:1;">
-                                <label style="font-size:11.5px;color:#94a3b8;">Wireless Router (Unit)</label>
-                                <input type="number" name="router_qty" class="form-input" value="0" min="0" max="5">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;">
+                            <div>
+                                <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Wireless Router (Unit)</label>
+                                <input type="number" name="router_qty" class="form-input" value="<?= htmlspecialchars($old['router_qty'] ?? '0') ?>" min="0" max="5">
                             </div>
-                            <div style="flex:1;">
-                                <label style="font-size:11.5px;color:#94a3b8;">Smartbox Android TV (+Rp 35rb)</label>
-                                <input type="number" id="smartbox_qty" name="smartbox_qty" class="form-input" value="0" min="0" max="5">
+                            <div>
+                                <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Smartbox Android (+45rb)</label>
+                                <input type="number" id="smartbox_qty" name="smartbox_qty" class="form-input" value="<?= htmlspecialchars($old['smartbox_qty'] ?? '0') ?>" min="0" max="5">
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;">Smartbox Android V3 (+55rb)</label>
+                                <input type="number" id="smartbox_v3_qty" name="smartbox_v3_qty" class="form-input" value="<?= htmlspecialchars($old['smartbox_v3_qty'] ?? '0') ?>" min="0" max="5">
                             </div>
                         </div>
                     </div>

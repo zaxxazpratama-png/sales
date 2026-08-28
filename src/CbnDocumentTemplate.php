@@ -90,9 +90,11 @@ class CbnDocumentTemplate
             if (strpos($tvLower, 'vision') !== false) $hasVisionTv = true;
         }
 
-        $addonDevice  = $data['addon_device'] ?? [];
-        $routerQty    = trim($data['router_qty'] ?? '0');
-        $smartboxQty  = trim($data['smartbox_qty'] ?? '0');
+        $addonDevice   = $data['addon_device'] ?? [];
+        $routerQty     = trim($data['router_qty'] ?? '0');
+        $smartboxQty   = (int)trim($data['smartbox_qty'] ?? '0');
+        $smartboxV3Qty = (int)trim($data['smartbox_v3_qty'] ?? '0');
+        $totalSmartbox = $smartboxQty + $smartboxV3Qty;
 
         $addonCbnPackage = $data['addon_cbn_package'] ?? [];
         if (is_string($addonCbnPackage)) {
@@ -272,9 +274,9 @@ class CbnDocumentTemplate
       <div class="cbn-fld" style="top:43.85%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars($routerQty) ?></div>
     <?php endif; ?>
 
-    <?php if ((int)$smartboxQty >= 1): ?>
+    <?php if ($totalSmartbox >= 1): ?>
       <div class="cbn-fld" style="top:46.00%;left:49.85%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
-      <div class="cbn-fld" style="top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars($smartboxQty) ?></div>
+      <div class="cbn-fld" style="top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars((string)$totalSmartbox) ?></div>
     <?php endif; ?>
 
     <!-- CHECKMARK DENS TV+ APPS (KOLOM KANAN - SUBKOLOM KIRI) -->

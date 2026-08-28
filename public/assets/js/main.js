@@ -119,7 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const packageCards = document.querySelectorAll('.package-card');
     const serviceInput = document.getElementById('service');
     const addonTvCheckboxes = document.querySelectorAll('.addon-tv-check');
-    const smartboxQtyInput = document.getElementById('smartbox_qty');
+    const smartboxQtyInput   = document.getElementById('smartbox_qty');
+    const smartboxV3QtyInput = document.getElementById('smartbox_v3_qty');
     
     const displayPaket    = document.getElementById('summary-biaya-paket');
     const displayTambahan = document.getElementById('summary-biaya-tambahan');
@@ -171,14 +172,19 @@ document.addEventListener('DOMContentLoaded', () => {
         let addonPrice = 0;
         addonTvCheckboxes.forEach(cb => {
             if (cb.checked) {
-                if (cb.value.includes('Dens'))   addonPrice += 30000;
+                if (cb.value.includes('Dens'))   addonPrice += 0; // Dens TV is Free
                 if (cb.value.includes('Vision')) addonPrice += 40000;
             }
         });
 
         if (smartboxQtyInput) {
             const qty = parseInt(smartboxQtyInput.value, 10) || 0;
-            if (qty > 0) addonPrice += (qty * 35000);
+            if (qty > 0) addonPrice += (qty * 45000);
+        }
+
+        if (smartboxV3QtyInput) {
+            const qtyV3 = parseInt(smartboxV3QtyInput.value, 10) || 0;
+            if (qtyV3 > 0) addonPrice += (qtyV3 * 55000);
         }
 
         const ppnRate  = (typeof window.PPN_PERCENT !== 'undefined' ? parseFloat(window.PPN_PERCENT) : 11) / 100;
@@ -225,6 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addonTvCheckboxes.forEach(cb => cb.addEventListener('change', calculatePricing));
     if (smartboxQtyInput) smartboxQtyInput.addEventListener('input', calculatePricing);
+    if (smartboxV3QtyInput) smartboxV3QtyInput.addEventListener('input', calculatePricing);
 
     // Initial pricing run
     calculatePricing();
