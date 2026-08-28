@@ -36,6 +36,24 @@ class CbnDocumentTemplate
         $kodePos     = trim($data['kode_pos'] ?? '');
         $rawAlamat   = trim($data['alamat'] ?? '');
 
+        // Auto-extract Kelurahan from raw alamat if kelurahan is empty
+        if (empty($kelurahan) && preg_match('/\bKel(?:urahan)?[\s.:]+([^,]+)/i', $rawAlamat, $kelM)) {
+            $kelurahan = trim($kelM[1]);
+            $rawAlamat = preg_replace('/\bKel(?:urahan)?[\s.:]+[^,]+/i', '', $rawAlamat);
+        }
+        // Auto-extract Kecamatan from raw alamat if kecamatan is empty
+        if (empty($kecamatan) && preg_match('/\bKec(?:amatan)?[\s.:]+([^,]+)/i', $rawAlamat, $kecM)) {
+            $kecamatan = trim($kecM[1]);
+            $rawAlamat = preg_replace('/\bKec(?:amatan)?[\s.:]+[^,]+/i', '', $rawAlamat);
+        }
+        // Clean redundant Kelurahan / Kecamatan keywords from rawAlamat line 1
+        if (!empty($kelurahan)) {
+            $rawAlamat = preg_replace('/\bKel(?:urahan)?[\s.:]+[^,]+/i', '', $rawAlamat);
+        }
+        if (!empty($kecamatan)) {
+            $rawAlamat = preg_replace('/\bKec(?:amatan)?[\s.:]+[^,]+/i', '', $rawAlamat);
+        }
+
         // Auto-extract RT/RW from raw alamat if present
         if (preg_match('/\bRT[\s.:]*([0-9]{1,3})\b/i', $rawAlamat, $rtM)) {
             if (empty($rt)) $rt = $rtM[1];
@@ -46,69 +64,16 @@ class CbnDocumentTemplate
             $rawAlamat = preg_replace('/\bRW[\s.:]*[0-9]{1,3}\b/i', '', $rawAlamat);
         }
         $rawAlamat = trim(preg_replace('/[\/,\s]+$/', '', preg_replace('/\s+/', ' ', $rawAlamat)));
-        if (!empty($rt) && ctype_digit($rt)) $rt = str_pad($rt, 3, '0', STR_PAD_LEFT);
-        if (!empty($rw) && ctype_digit($rw)) $rw = str_pad($rw, 3, '0', STR_PAD_LEFT);
+        // Format 3 Baris Alamat Resmi CBN:
+        // Baris 1: Alamat Lengkap Rumah / Gedung (37 kotak penuh sampai ujung)
+        // Baris 2: Kelurahan (37 kotak penuh sampai ujung) - e.g. "Kel. Kota Medan"
+        // Baris 3: Kecamatan (16 kotak) - e.g. "Kec. Medan Barat"
+        $kelDisplay = !empty($kelurahan) ? (preg_match('/^kel/i', $kelurahan) ? $kelurahan : 'Kel. ' . $kelurahan) : '';
+        $kecDisplay = !empty($kecamatan) ? (preg_match('/^kec/i', $kecamatan) ? $kecamatan : 'Kec. ' . $kecamatan) : '';
 
-        // Smart distribution across 3 address lines (29 boxes, 29 boxes, 16 boxes)
-        $addrParts = [];
-        if (!empty($rawAlamat)) $addrParts[] = $rawAlamat;
-        if (!empty($kelurahan)) $addrParts[] = (stripos($kelurahan, 'kel') === false ? "Kel. $kelurahan" : $kelurahan);
-        if (!empty($kecamatan)) $addrParts[] = (stripos($kecamatan, 'kec') === false ? "Kec. $kecamatan" : $kecamatan);
-        if (!empty($kabupaten)) $addrParts[] = $kabupaten;
-
-        $fullAddrStr = implode(', ', $addrParts);
-        $words = preg_split('/\s+/', trim($fullAddrStr));
-        
-        $alamat1 = '';
-        $alamat2 = '';
-        $alamat3 = '';
-
-        // Line 1: max 29 chars
-        while (!empty($words)) {
-            $w = $words[0];
-            $test = $alamat1 === '' ? $w : "$alamat1 $w";
-            if (mb_strlen($test) <= 29) {
-                $alamat1 = $test;
-                array_shift($words);
-            } else {
-                if ($alamat1 === '') {
-                    $alamat1 = mb_substr($w, 0, 29);
-                    $words[0] = mb_substr($w, 29);
-                }
-                break;
-            }
-        }
-
-        // Line 2: max 29 chars
-        while (!empty($words)) {
-            $w = $words[0];
-            $test = $alamat2 === '' ? $w : "$alamat2 $w";
-            if (mb_strlen($test) <= 29) {
-                $alamat2 = $test;
-                array_shift($words);
-            } else {
-                if ($alamat2 === '') {
-                    $alamat2 = mb_substr($w, 0, 29);
-                    $words[0] = mb_substr($w, 29);
-                }
-                break;
-            }
-        }
-
-        // Line 3: max 16 chars (16 empty boxes on the 3rd row)
-        while (!empty($words)) {
-            $w = $words[0];
-            $test = $alamat3 === '' ? $w : "$alamat3 $w";
-            if (mb_strlen($test) <= 16) {
-                $alamat3 = $test;
-                array_shift($words);
-            } else {
-                if ($alamat3 === '') {
-                    $alamat3 = mb_substr($w, 0, 16);
-                }
-                break;
-            }
-        }
+        $alamat1 = mb_substr($rawAlamat, 0, 37);
+        $alamat2 = mb_substr($kelDisplay, 0, 37);
+        $alamat3 = mb_substr($kecDisplay, 0, 16);
 
         $kepemilikan = strtoupper(trim($data['status_kepemilikan'] ?? 'PEMILIK'));
         $service     = trim($data['service'] ?? 'Fiber 50');
@@ -151,7 +116,9 @@ class CbnDocumentTemplate
         $defaultNotes= $data['default_notes'] ?? ($settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB');
         $catatan     = !empty($data['catatan']) ? trim($data['catatan']) : $defaultNotes;
         $tglTtd      = trim($data['so_date'] ?? date('d/m/Y'));
-        $signatureImg= $data['signature_data'] ?? $data['signature'] ?? '';
+        $signatureImg= '';
+        $spvName = strtoupper(trim((string)($data['team_leader'] ?? $data['tl_name'] ?? $data['tl_code'] ?? '')));
+        $spvName = preg_replace('/^TIN006[-_]/i', '', $spvName);
 
         $fmtRp = function($val, $def = '') {
             if (empty($val) && $val !== '0' && $val !== 0) return $def;
@@ -270,10 +237,10 @@ class CbnDocumentTemplate
     <?php endif; ?>
     <?= $box($telpSelular, 66.8, 19.19, 1.905, '9pt', 12) ?>
 
-    <!-- 2. ALAMAT PEMASANGAN (BARIS 1: 29 KOTAK, BARIS 2: 29 KOTAK, BARIS 3: 16 KOTAK) -->
-    <?= $box($alamat1, 20.88, 26.51, 1.905, '8.5pt', 29) ?>
+    <!-- 2. ALAMAT PEMASANGAN (BARIS 1: 37 KOTAK, BARIS 2: 37 KOTAK, BARIS 3: 16 KOTAK) -->
+    <?= $box($alamat1, 20.88, 26.51, 1.905, '8.5pt', 37) ?>
     <?php if (!empty($alamat2)): ?>
-      <?= $box($alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) ?>
+      <?= $box($alamat2, 20.88, 28.49, 1.905, '8.5pt', 37) ?>
     <?php endif; ?>
     <?php if (!empty($alamat3)): ?>
       <?= $box($alamat3, 20.88, 30.50, 1.905, '8.5pt', 16) ?>
@@ -292,7 +259,7 @@ class CbnDocumentTemplate
     <?php endif; ?>
 
     <!-- ALAMAT EMAIL -->
-    <?= $box(strtolower($email), 20.88, 34.96, 1.905, '8.5pt', 29) ?>
+    <?= $box(strtolower($email), 20.88, 34.96, 1.905, '8.5pt', 37) ?>
 
     <!-- 3. PILIHAN PAKET LAYANAN (KOLOM KIRI SAJA) -->
     <div class="cbn-fld" style="top:42.25%;left:2.9%;font-size:13pt;font-weight:bold;">&#10004;</div>
@@ -353,13 +320,6 @@ class CbnDocumentTemplate
     <!-- TANGGAL SURAT -->
     <?= $f($tglTtd, 92.85, 9.50, '10.5pt') ?>
 
-    <!-- TANDA TANGAN PELANGGAN -->
-    <?php if (!empty($signatureImg)): 
-      $sigSrc = (strpos($signatureImg, 'data:') === 0) ? $signatureImg : ('data:image/png;base64,' . $signatureImg);
-    ?>
-      <img src="<?= $sigSrc ?>" style="position:absolute;top:89.2%;left:6.0%;max-height:52px;max-width:135px;z-index:10;" alt="TTD Pelanggan">
-    <?php endif; ?>
-
     <!-- TANDA TANGAN SALES -->
     <?php if (!empty($salesSigBase64)): ?>
       <img src="<?= $salesSigBase64 ?>" style="position:absolute;top:89.5%;left:43.0%;max-height:55px;max-width:130px;z-index:5;" alt="TTD Sales">
@@ -368,9 +328,9 @@ class CbnDocumentTemplate
 
     <!-- TANDA TANGAN SPV -->
     <?php if (!empty($spvSigBase64)): ?>
-      <img src="<?= $spvSigBase64 ?>" style="position:absolute;top:88.8%;left:78.0%;max-height:60px;max-width:130px;z-index:5;" alt="TTD SPV">
+      <img src="<?= $spvSigBase64 ?>" style="position:absolute;top:88.8%;left:84.0%;max-height:60px;max-width:130px;z-index:5;" alt="TTD SPV">
     <?php endif; ?>
-    <?= $f("TIN006-SUHARTA", 94.20, 73.5, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;') ?>
+    <?= $f($spvName, 94.20, 78.5, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;') ?>
   </div>
 </div>
 </body>

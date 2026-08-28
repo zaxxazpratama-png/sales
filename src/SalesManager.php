@@ -70,15 +70,16 @@ class SalesManager
         }
 
         $newSales = [
-            'id'         => (string) (time() . rand(100, 999)),
-            'sales_code' => $code,
-            'nama_sales' => trim($data['nama_sales'] ?? ''),
-            'no_wa'      => trim($data['no_wa'] ?? ''),
-            'email'      => trim($data['email'] ?? ''),
-            'tl_code'    => trim($data['tl_code'] ?? 'TL-01'),
-            'ttd_path'   => trim($data['ttd_path'] ?? ''),
-            'status'     => ($data['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active',
-            'created_at' => date('Y-m-d H:i:s'),
+            'id'                     => (string) (time() . rand(100, 999)),
+            'sales_code'             => $code,
+            'nama_sales'             => trim($data['nama_sales'] ?? ''),
+            'no_wa'                  => trim($data['no_wa'] ?? ''),
+            'email'                  => trim($data['email'] ?? ''),
+            'tl_code'                => trim($data['tl_code'] ?? 'TL-01'),
+            'ttd_path'               => trim($data['ttd_path'] ?? ''),
+            'status'                 => ($data['status'] ?? 'active') === 'inactive' ? 'inactive' : 'active',
+            'email_customer_enabled' => isset($data['email_customer_enabled']) ? (bool)$data['email_customer_enabled'] : true,
+            'created_at'             => date('Y-m-d H:i:s'),
         ];
 
         $all[] = $newSales;
@@ -102,13 +103,14 @@ class SalesManager
                     throw new \InvalidArgumentException("Kode Sales '{$newCode}' sudah digunakan sales lain.");
                 }
 
-                $item['sales_code'] = $newCode;
-                $item['nama_sales'] = trim($data['nama_sales'] ?? $item['nama_sales']);
-                $item['no_wa']      = trim($data['no_wa'] ?? $item['no_wa']);
-                $item['email']      = trim($data['email'] ?? $item['email']);
-                $item['tl_code']    = trim($data['tl_code'] ?? $item['tl_code']);
-                $item['ttd_path']   = trim($data['ttd_path'] ?? ($item['ttd_path'] ?? ''));
-                $item['status']     = ($data['status'] ?? $item['status']) === 'inactive' ? 'inactive' : 'active';
+                $item['sales_code']             = $newCode;
+                $item['nama_sales']             = trim($data['nama_sales'] ?? $item['nama_sales']);
+                $item['no_wa']                  = trim($data['no_wa'] ?? $item['no_wa']);
+                $item['email']                  = trim($data['email'] ?? $item['email']);
+                $item['tl_code']                = trim($data['tl_code'] ?? $item['tl_code']);
+                $item['ttd_path']               = trim($data['ttd_path'] ?? ($item['ttd_path'] ?? ''));
+                $item['status']                 = ($data['status'] ?? $item['status']) === 'inactive' ? 'inactive' : 'active';
+                $item['email_customer_enabled'] = isset($data['email_customer_enabled']) ? (bool)$data['email_customer_enabled'] : ($item['email_customer_enabled'] ?? true);
                 $found = true;
                 break;
             }
@@ -135,6 +137,23 @@ class SalesManager
             return true;
         }
         return false;
+    }
+
+    public static function reassignTeamLeader(string $oldCode, string $newCode): int
+    {
+        $all = self::getAll();
+        $changed = 0;
+        foreach ($all as &$item) {
+            if (($item['tl_code'] ?? '') === $oldCode) {
+                $item['tl_code'] = $newCode;
+                $changed++;
+            }
+        }
+        unset($item);
+        if ($changed > 0) {
+            self::saveAll($all);
+        }
+        return $changed;
     }
 
     /**

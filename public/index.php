@@ -54,10 +54,21 @@ $tlCode      = $foundSales['tl_code'] ?: 'TL-MEDAN-01';
 $settings = SettingsManager::get();
 $packages = $settings['packages'] ?? [];
 $selectedService = $old['service'] ?? ($packages[0]['name'] ?? 'Fiber 50');
+$allSales = array_values(array_filter(SalesManager::getAll(), static function (array $sales): bool {
+    return ($sales['status'] ?? 'active') === 'active';
+}));
+$salesByLeader = [];
+foreach ($allSales as $sales) {
+    $leaderCode = $sales['tl_code'] ?: 'TANPA-TL';
+    $salesByLeader[$leaderCode][] = [
+        'code' => $sales['sales_code'],
+        'name' => $sales['nama_sales'],
+    ];
+}
 
-$baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== false) 
-    ? '/ALATTEMPUR/FORMGOOGLE' 
-    : '';
+$scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+$cleanBase = preg_replace('#/public$#i', '', $scriptDir);
+$baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== false) ? '/ALATTEMPUR/FORMGOOGLE' : '');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -94,6 +105,28 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
 
 <!-- ============ MAIN WRAPPER ============ -->
 <main class="main-wrapper">
+
+    <!-- Pemilihan Team Leader dan Sales -->
+    <div style="background:rgba(17,28,56,0.9);border:1px solid rgba(0,160,223,0.35);border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <strong style="color:#fff;font-size:14px;">Pilih Team Leader &amp; Sales</strong>
+            <span style="color:#94a3b8;font-size:12px;">Link formulir mengikuti sales yang dipilih.</span>
+        </div>
+        <div class="sales-picker-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="team-leader-picker">Team Leader</label>
+                <select id="team-leader-picker" class="form-input form-select">
+                    <?php foreach ($salesByLeader as $leaderCode => $leaderSales): ?>
+                        <option value="<?= htmlspecialchars($leaderCode) ?>" <?= $leaderCode === $tlCode ? 'selected' : '' ?>><?= htmlspecialchars($leaderCode) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="sales-picker">Nama Sales</label>
+                <select id="sales-picker" class="form-input form-select"></select>
+            </div>
+        </div>
+    </div>
 
     <!-- Banner Verifikasi Sales Khusus (Persistent & Terkunci) -->
     <?php if ($activeSales): ?>
@@ -223,17 +256,15 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
             </div>
         </div>
 
-        <form id="cbn-form" method="POST" action="submit.php" enctype="multipart/form-data" novalidate>
+        <form id="cbn-form" method="POST" action="submit.php" novalidate>
             <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
 
             <!-- Field SO & Hidden Values -->
-            <input type="hidden" name="vendor"          value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA') ?>">
+            <input type="hidden" name="vendor"          value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. TIN') ?>">
             <input type="hidden" name="so_date"         value="<?= date('d/m/Y') ?>">
             <input type="hidden" name="tl_code"         value="<?= htmlspecialchars($tlCode) ?>">
             <input type="hidden" name="ae_name"         value="<?= htmlspecialchars($salesName ?: $salesCode) ?>">
-            <input type="hidden" name="home_id"         value="PENDING">
             <input type="hidden" id="service"           name="service" value="<?= htmlspecialchars($selectedService) ?>">
-            <input type="hidden" id="signature_data"    name="signature_data" value="">
             <input type="hidden" id="biaya_pasang"      name="biaya_pasang" value="Rp 0">
             <input type="hidden" id="biaya_paket"       name="biaya_paket" value="Rp 169.000">
             <input type="hidden" id="biaya_tambahan"    name="biaya_tambahan" value="Rp 5.000">
@@ -355,6 +386,15 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['email_pelanggan']) ?></div>
                         <?php endif; ?>
                     </div>
+
+                    <!-- Home ID -->
+                    <div class="form-group">
+                        <label class="form-label" for="home_id">Home ID <em style="color:#94a3b8;font-weight:normal;">(opsional, jika sudah punya)</em></label>
+                        <input type="text" id="home_id" name="home_id" class="form-input"
+                            placeholder="Contoh: CBN-JKT-00123"
+                            value="<?= htmlspecialchars($old['home_id'] ?? '') ?>">
+                    </div>
+
                 </div>
             </div>
 
@@ -565,7 +605,7 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                         <span id="summary-biaya-addon">Rp 0</span>
                     </div>
                     <div class="pricing-summary-row">
-                        <span>PPN 11%</span>
+                        <span id="summary-ppn-label">PPN <?= (float)($settings['ppn_percent'] ?? 11) ?>%</span>
                         <span id="summary-biaya-ppn">Rp 19.140</span>
                     </div>
                     <div class="pricing-summary-row total-row">
@@ -575,35 +615,7 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                 </div>
             </div>
 
-            <!-- ================= SEKSI 4: JADWAL, UPLOAD & TTD ================= -->
-            <div class="form-section">
-                <div class="section-header">
-                    <div class="section-icon">4</div>
-                    <div>
-                        <div class="section-title">4. JADWAL PEMASANGAN & TANDA TANGAN DIGITAL</div>
-                        <div class="section-subtitle">Tentukan waktu instalasi dan bubuhkan tanda tangan pemohon</div>
-                    </div>
-                </div>
-
-                <div class="grid-2">
-                    <!-- Jadwal Tanggal -->
-                    <div class="form-group">
-                        <label class="form-label" for="jadwal_tanggal">Rencana Tanggal Pemasangan <span class="req">*</span></label>
-                        <input type="date" id="jadwal_tanggal" name="jadwal_tanggal" class="form-input"
-                            value="<?= htmlspecialchars($old['jadwal_tanggal'] ?? date('Y-m-d', strtotime('+2 days'))) ?>"
-                            required>
-                    </div>
-
-                    <!-- Slot Waktu -->
-                    <div class="form-group">
-                        <label class="form-label" for="jadwal_waktu">Pilihan Slot Waktu Teknisi <span class="req">*</span></label>
-                        <select id="jadwal_waktu" name="jadwal_waktu" class="form-select" required>
-                            <option value="09.00-11.00">09.00 - 11.00 WIB (Pagi)</option>
-                            <option value="11.00-13.00">11.00 - 13.00 WIB (Siang)</option>
-                            <option value="13.00-15.00">13.00 - 15.00 WIB (Siang/Sore)</option>
-                            <option value="15.00-17.00">15.00 - 17.00 WIB (Sore)</option>
-                        </select>
-                    </div>
+            <!-- ================= SEKSI 4: JADWAL PEMASANGAN ================= -->
 
                     <!-- Catatan Tambahan -->
                     <div class="form-group col-full">
@@ -613,38 +625,6 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
                             maxlength="400"><?= htmlspecialchars($old['catatan'] ?? '') ?></textarea>
                     </div>
 
-                    <!-- Upload Foto KTP -->
-                    <div class="form-group col-full">
-                        <label class="form-label">Upload Foto KTP / Dokumen Identitas <em style="color:#94a3b8;font-weight:normal;">(opsional)</em></label>
-                        <div class="file-drop">
-                            <input type="file" id="sales_order_file" name="sales_order_file" accept=".jpg,.jpeg,.png,.pdf">
-                            <div class="file-drop-icon">[FILE]</div>
-                            <div class="file-drop-text"><strong>Klik untuk pilih foto KTP</strong> atau seret file ke sini</div>
-                            <div class="file-drop-hint">Format: JPG, PNG, PDF &bull; Maks. 8MB</div>
-                        </div>
-                        <div id="file-preview" class="file-preview">
-                            <span id="file-name" class="file-preview-name">foto_ktp.jpg</span>
-                            <button type="button" id="file-remove" class="file-preview-remove">[X]</button>
-                        </div>
-                    </div>
-
-                    <!-- Tanda Tangan Digital Canvas Pad -->
-                    <div class="form-group col-full">
-                        <label class="form-label">Tanda Tangan Digital Pelanggan (Goreskan di dalam kotak) <span class="req">*</span></label>
-                        <div class="signature-box <?= isset($errors['signature_data']) ? 'error' : '' ?>">
-                            <canvas id="signature-canvas"></canvas>
-                            <div id="sign-placeholder" class="signature-placeholder">
-                                <span>Sentuh / gambar tanda tangan di sini</span>
-                            </div>
-                        </div>
-                        <?php if (!empty($errors['signature_data'])): ?>
-                            <div class="field-error-msg" style="color:#f87171;font-size:12px;font-weight:700;margin-top:5px;">⚠️ <?= htmlspecialchars($errors['signature_data']) ?></div>
-                        <?php endif; ?>
-                        <div class="signature-controls">
-                            <span style="font-size:11px;color:#94a3b8;">Tanda tangan wajib diisi dan akan langsung dicetak pada Surat Formulir CBN PDF.</span>
-                            <button type="button" id="btn-clear-sign" class="btn-sign-clear">Hapus / Ulangi TTD</button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -689,6 +669,43 @@ $baseUrl = (strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/FORMGOOGLE') !== 
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+const salesByLeader = <?= json_encode($salesByLeader, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+const activeSalesCode = <?= json_encode($salesCode) ?>;
+const formBaseUrl = <?= json_encode(rtrim($baseUrl, '/')) ?>;
+const leaderPicker = document.getElementById('team-leader-picker');
+const salesPicker = document.getElementById('sales-picker');
+
+function populateSalesPicker(leaderCode, selectedCode) {
+    salesPicker.replaceChildren();
+    const list = salesByLeader[leaderCode] || [];
+    list.forEach((sales) => {
+        const option = new Option(`${sales.name} (${sales.code})`, sales.code);
+        option.selected = sales.code === selectedCode;
+        salesPicker.add(option);
+    });
+}
+
+function redirectToSales(code) {
+    if (!code || code === activeSalesCode) return;
+    const base = formBaseUrl ? formBaseUrl : '';
+    window.location.href = `${base}/${encodeURIComponent(code)}`;
+}
+
+leaderPicker.addEventListener('change', () => {
+    populateSalesPicker(leaderPicker.value, '');
+    if (salesPicker.value) {
+        redirectToSales(salesPicker.value);
+    }
+});
+
+salesPicker.addEventListener('change', () => {
+    if (salesPicker.value) {
+        redirectToSales(salesPicker.value);
+    }
+});
+
+populateSalesPicker(leaderPicker.value, activeSalesCode);
+
 // Package config injected from admin settings (settings.json)
 // Allows main.js to use dynamic pricing and CBN package descriptions
 window.CBN_PACKAGES = <?php
@@ -710,6 +727,7 @@ window.CBN_PACKAGES = <?php
     }
     echo json_encode($pkgMap, JSON_UNESCAPED_UNICODE);
 ?>;
+window.PPN_PERCENT = <?= json_encode((float)($settings['ppn_percent'] ?? 11)) ?>;
 </script>
 <script src="<?= $baseUrl ?>/assets/js/main.js"></script>
 </body>

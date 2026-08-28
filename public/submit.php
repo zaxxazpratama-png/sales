@@ -53,7 +53,17 @@ if (!$valid) {
 $data = $validator->getData();
 $salesCode = $data['sales_code'] ?? ($salesCode ?? 'SEP-001');
 $salesData = \App\SalesManager::findByCode($salesCode);
-$data['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
+
+// Pastikan Kode Team Leader & Nama Sales terisi akurat
+$tlCode = !empty($salesData['tl_code']) ? $salesData['tl_code'] : (!empty($data['tl_code']) ? $data['tl_code'] : 'TL-01');
+$data['tl_code']     = $tlCode;
+$data['team_leader'] = $tlCode;
+$data['sales_name']  = $salesData['nama_sales'] ?? ($data['sales_name'] ?? 'FIRMAN');
+
+// Buat Nomor Tiket Resmi menggunakan Kode Team Leader (contoh: CBN-TIN-SUHARTA-260826-1234)
+$cleanTlCode  = strtoupper(trim(preg_replace('/[^a-zA-Z0-9\-]/', '', $tlCode)));
+$ticketNumber = 'CBN-' . $cleanTlCode . '-' . date('ymd') . '-' . rand(1000, 9999);
+$data['ticket_no'] = $ticketNumber;
 
 // Simpan data terakhir di session untuk preview/download PDF
 $_SESSION['cbn_last_submission'] = $data;
@@ -63,37 +73,8 @@ $uploadPath = '';
 
 try {
 
-    // ---- Siapkan info file KTP (jika ada) ----
+    // Tidak ada upload KTP atau tanda tangan customer pada form.
     $fileInfo = [];
-    if (!empty($data['upload_file'])) {
-        $file    = $data['upload_file'];
-        $ext     = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $mimeMap = [
-            'jpg'  => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png'  => 'image/png',
-            'pdf'  => 'application/pdf',
-        ];
-
-        // Nama file unik
-        $safeKtp  = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $data['nomor_ktp']);
-        $safeName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $data['nama_pelanggan']);
-        $fileName = "KTP_" . date('Ymd_His') . "_{$safeKtp}_{$safeName}.{$ext}";
-
-        // Simpan sementara
-        $uploadDir = dirname(__DIR__) . '/uploads/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        $uploadPath = $uploadDir . $fileName;
-        move_uploaded_file($file['tmp_name'], $uploadPath);
-
-        $fileInfo = [
-            'tmp_path' => $uploadPath,
-            'name'     => $fileName,
-            'mime'     => $mimeMap[$ext] ?? 'application/octet-stream',
-        ];
-    }
 
     // ---- 1. Kirim ke Google Apps Script (Spreadsheet, Drive PDF, & Email) ----
     $service  = new AppsScriptService();
@@ -111,9 +92,6 @@ try {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
     // ---- Pesan Sukses & Data Tiket Pendaftaran ----
-    $cleanSalesCode = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $data['sales_code'] ?? 'SEP001'));
-    $ticketNumber = 'CBN-' . $cleanSalesCode . '-' . date('ymd') . '-' . rand(1000, 9999);
-
     $_SESSION['success'] = [
         'ticket_no'  => $ticketNumber,
         'nama'       => $data['nama_pelanggan'],
@@ -127,6 +105,28 @@ try {
         'sales_code' => $data['sales_code'] ?? $salesCode,
         'timestamp'  => date('d/m/Y H:i:s'),
     ];
+
+    // ---- Simpan Order ke JSON Lokal untuk Status Tracking ----
+    $ordersFile = dirname(__DIR__) . '/data/orders.json';
+    $orders = file_exists($ordersFile) ? (json_decode(file_get_contents($ordersFile), true) ?: []) : [];
+    $orders[] = [
+        'ticket_no'   => $ticketNumber,
+        'nama'        => $data['nama_pelanggan'],
+        'nomor_ktp'   => $data['nomor_ktp'] ?? '',
+        'telp'        => $data['telp'] ?? '',
+        'email'       => $data['email_pelanggan'] ?? '',
+        'alamat'      => $data['alamat'] . (!empty($data['kelurahan']) ? ', Kel. ' . $data['kelurahan'] : '') . (!empty($data['kecamatan']) ? ', Kec. ' . $data['kecamatan'] : ''),
+        'home_id'     => $data['home_id'] ?? '',
+        'tikor'       => $data['tikor'] ?? '',
+        'paket'       => $data['service'] ?? '',
+        'total'       => $data['biaya_total'] ?? '',
+        'sales_code'  => $data['sales_code'] ?? $salesCode,
+        'tl_code'     => $data['tl_code'] ?? '',
+        'jadwal'      => ($data['jadwal_tanggal'] ?? '') . (!empty($data['jadwal_waktu']) ? ' (' . $data['jadwal_waktu'] . ')' : ''),
+        'status'      => 'PENDING',
+        'submitted_at'=> date('Y-m-d H:i:s'),
+    ];
+    file_put_contents($ordersFile, json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
     $redirectTarget = !empty($data['sales_code']) ? $data['sales_code'] : ($salesCode ?? 'SEP-001');
     $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');

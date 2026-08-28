@@ -181,9 +181,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (qty > 0) addonPrice += (qty * 35000);
         }
 
+        const ppnRate  = (typeof window.PPN_PERCENT !== 'undefined' ? parseFloat(window.PPN_PERCENT) : 11) / 100;
         const subtotal = basePrice + biayaTambahan + addonPrice;
-        const ppn      = Math.round(subtotal * 0.11);
+        const ppn      = Math.round(subtotal * ppnRate);
         const total    = subtotal + ppn;
+
+        // Update PPN label in summary if present
+        const ppnLabel = document.getElementById('summary-ppn-label');
+        if (ppnLabel && typeof window.PPN_PERCENT !== 'undefined') {
+            ppnLabel.textContent = `PPN ${window.PPN_PERCENT}%`;
+        }
 
         // Update displays
         if (displayPaket)    displayPaket.textContent    = formatRupiah(basePrice);
@@ -533,25 +540,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const kodePosEl = document.getElementById('kode_pos');
             if (!kodePosEl || !kodePosEl.value.trim()) {
                 addError(kodePosEl, 'Kode Pos belum diisi');
-            }
-
-            // 8. Tanda Tangan Digital
-            const signBox = document.querySelector('.signature-box');
-            if (canvas && hasDrawn && (!signatureInput.value || signatureInput.value.length < 50)) {
-                signatureInput.value = canvas.toDataURL('image/png');
-            }
-            const hasValidSign = (signatureInput && signatureInput.value && signatureInput.value.startsWith('data:image/') && signatureInput.value.length > 200) || hasDrawn;
-            if (!hasValidSign) {
-                if (signBox) {
-                    signBox.classList.add('error');
-                    const errDiv = document.createElement('div');
-                    errDiv.className = 'field-error-msg client-err';
-                    errDiv.style.cssText = 'color:#f87171;font-size:12px;font-weight:700;margin-top:5px;';
-                    errDiv.innerHTML = '⚠️ Tanda Tangan Digital Pelanggan wajib digoreskan pada kotak di atas';
-                    signBox.parentElement.appendChild(errDiv);
-                    if (!firstInvalidEl) firstInvalidEl = signBox;
-                    clientErrors.push('Tanda Tangan Digital Pelanggan belum digoreskan');
-                }
             }
 
             // JIKA ADA FIELD YANG BELUM DIISI -> GAGALKAN SUBMIT & ARAHKAN KE FIELD TERSEBUT

@@ -30,27 +30,26 @@ function doPost(e) {
 
     const targetFolderId = params.drive_folder_id || CONFIG.DRIVE_FOLDER_ID;
     const targetSheetId  = params.spreadsheet_id  || CONFIG.SPREADSHEET_ID;
-    const targetEmail    = params.notif_email     || CONFIG.NOTIF_EMAIL;
+    const masterEmail    = params.master_email   || 'pujapangestu02@gmail.com';
+    const adminEmail     = params.admin_email    || '1seopageone@gmail.com';
+
+    // Handle Update Status Action from Dashboard Admin / Team Leader
+    if (params.action === 'update_status' || params.action === 'update_order_status') {
+      const updateResult = updateOrderStatusInSheet(params, targetSheetId);
+      return ContentService.createTextOutput(JSON.stringify(updateResult)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Handle Delete Order Action from Dashboard Super Admin (Merahkan baris di spreadsheet)
+    if (params.action === 'delete_order' || params.action === 'delete_order_row') {
+      const deleteResult = deleteOrderInSheet(params, targetSheetId);
+      return ContentService.createTextOutput(JSON.stringify(deleteResult)).setMimeType(ContentService.MimeType.JSON);
+    }
 
     let ktpDriveUrl = '';
     let pdfDriveUrl = '';
     let pdfBlob     = null;
 
-    // 1. Simpan Foto KTP ke Google Drive
-    if (params.file_data && params.file_name) {
-      try {
-        ktpDriveUrl = saveBase64ToDrive(
-          params.file_data,
-          params.file_name,
-          params.file_mime || 'image/jpeg',
-          targetFolderId
-        );
-      } catch (ktpErr) {
-        logError('Error upload KTP: ' + ktpErr.message, targetSheetId);
-      }
-    }
-
-    // 2. Generate PDF Formulir CBN
+    // 1. Generate PDF Formulir CBN
     try {
       const htmlBody = generateCbnDocumentHtml(params);
       const htmlBlob = Utilities.newBlob(htmlBody, 'text/html', 'temp_cbn_form.html');
@@ -76,15 +75,17 @@ function doPost(e) {
       logError('Error append Spreadsheet: ' + sheetErr.message, targetSheetId);
     }
 
-    // 4. Kirim Email Notifikasi ke Admin
+    // 3. Kirim Email Notifikasi ke Master dan Admin
     try {
-      sendAdminEmail(params, pdfDriveUrl, ktpDriveUrl, pdfBlob, targetEmail);
+      dedupeRecipients([masterEmail, adminEmail]).forEach(function (recipient) {
+        sendAdminEmail(params, pdfDriveUrl, ktpDriveUrl, pdfBlob, recipient);
+      });
     } catch (mailErr) {
       logError('Error kirim email admin: ' + mailErr.message, targetSheetId);
     }
 
-    // 5. Kirim Email Notifikasi ke Pelanggan
-    if (params.email_pelanggan) {
+    // 4. Kirim Email Notifikasi ke Pelanggan (opsional per sales)
+    if (params.email_pelanggan && parseBooleanFlag(params.customer_email_enabled, params.email_customer_enabled)) {
       try {
         sendCustomerEmail(params, pdfDriveUrl, pdfBlob);
       } catch (custMailErr) {
@@ -144,6 +145,26 @@ function generateCbnDocumentHtml(data) {
   const kodePos   = (data.kode_pos || '').trim();
   let rawAlamat   = (data.alamat || '').trim();
 
+  // Auto-extract Kelurahan from raw alamat if kelurahan is empty
+  const kelMatch = rawAlamat.match(/\bKel(?:urahan)?[\s.:]+([^,]+)/i);
+  if (!kelurahan && kelMatch) {
+    kelurahan = kelMatch[1].trim();
+    rawAlamat = rawAlamat.replace(/\bKel(?:urahan)?[\s.:]+[^,]+/gi, '');
+  }
+  // Auto-extract Kecamatan from raw alamat if kecamatan is empty
+  const kecMatch = rawAlamat.match(/\bKec(?:amatan)?[\s.:]+([^,]+)/i);
+  if (!kecamatan && kecMatch) {
+    kecamatan = kecMatch[1].trim();
+    rawAlamat = rawAlamat.replace(/\bKec(?:amatan)?[\s.:]+[^,]+/gi, '');
+  }
+  // Clean redundant Kelurahan / Kecamatan from rawAlamat line 1
+  if (kelurahan) {
+    rawAlamat = rawAlamat.replace(/\bKel(?:urahan)?[\s.:]+[^,]+/gi, '');
+  }
+  if (kecamatan) {
+    rawAlamat = rawAlamat.replace(/\bKec(?:amatan)?[\s.:]+[^,]+/gi, '');
+  }
+
   // Auto-extract RT/RW from raw alamat if present
   const rtMatch = rawAlamat.match(/\bRT[\s.:]*([0-9]{1,3})\b/i);
   if (rtMatch) {
@@ -159,63 +180,16 @@ function generateCbnDocumentHtml(data) {
   if (rt && /^\d+$/.test(rt)) rt = ('000' + rt).slice(-3);
   if (rw && /^\d+$/.test(rw)) rw = ('000' + rw).slice(-3);
 
-  // Smart wrap across 3 address lines (29 boxes, 29 boxes, 16 boxes)
-  const addrParts = [];
-  if (rawAlamat) addrParts.push(rawAlamat);
-  if (kelurahan) addrParts.push(kelurahan.toLowerCase().includes('kel') ? kelurahan : ('Kel. ' + kelurahan));
-  if (kecamatan) addrParts.push(kecamatan.toLowerCase().includes('kec') ? kecamatan : ('Kec. ' + kecamatan));
-  if (kabupaten) addrParts.push(kabupaten);
+  // Format 3 Baris Alamat Resmi CBN:
+  // Baris 1: Alamat Lengkap Rumah / Gedung (37 kotak penuh sampai ujung)
+  // Baris 2: Kelurahan (37 kotak penuh sampai ujung) - e.g. "Kel. Kota Medan"
+  // Baris 3: Kecamatan (16 kotak) - e.g. "Kec. Medan Barat"
+  const kelDisplay = kelurahan ? (/^kel/i.test(kelurahan) ? kelurahan : 'Kel. ' + kelurahan) : '';
+  const kecDisplay = kecamatan ? (/^kec/i.test(kecamatan) ? kecamatan : 'Kec. ' + kecamatan) : '';
 
-  const fullAddrStr = addrParts.join(', ');
-  const words = fullAddrStr.trim().split(/\s+/);
-
-  let alamat1 = '';
-  let alamat2 = '';
-  let alamat3 = '';
-
-  while (words.length > 0) {
-    const w = words[0];
-    const test = !alamat1 ? w : (alamat1 + ' ' + w);
-    if (test.length <= 29) {
-      alamat1 = test;
-      words.shift();
-    } else {
-      if (!alamat1) {
-        alamat1 = w.substring(0, 29);
-        words[0] = w.substring(29);
-      }
-      break;
-    }
-  }
-
-  while (words.length > 0) {
-    const w = words[0];
-    const test = !alamat2 ? w : (alamat2 + ' ' + w);
-    if (test.length <= 29) {
-      alamat2 = test;
-      words.shift();
-    } else {
-      if (!alamat2) {
-        alamat2 = w.substring(0, 29);
-        words[0] = w.substring(29);
-      }
-      break;
-    }
-  }
-
-  while (words.length > 0) {
-    const w = words[0];
-    const test = !alamat3 ? w : (alamat3 + ' ' + w);
-    if (test.length <= 16) {
-      alamat3 = test;
-      words.shift();
-    } else {
-      if (!alamat3) {
-        alamat3 = w.substring(0, 16);
-      }
-      break;
-    }
-  }
+  const alamat1 = rawAlamat.substring(0, 37);
+  const alamat2 = kelDisplay.substring(0, 37);
+  const alamat3 = kecDisplay.substring(0, 16);
 
   const kepemilikan = (data.status_kepemilikan || 'PEMILIK').toUpperCase().trim();
   const service     = (data.service || 'Fiber 50').trim();
@@ -259,6 +233,10 @@ function generateCbnDocumentHtml(data) {
   const salesSigImg   = data.ttd_sales_base64 || DEFAULT_TTD_SALES_B64;
   const spvSigImg     = data.ttd_spv_base64   || DEFAULT_TTD_SPV_B64;
   const salesName     = (data.sales_name || 'FIRMAN').toUpperCase();
+  const spvName       = String(data.team_leader || data.tl_name || data.tl_code || '')
+    .replace(/^TIN006[-_]/i, '')
+    .trim()
+    .toUpperCase();
   const defaultNotes  = data.default_notes || 'REGULER PROMO JULY 2026 - NAB';
   const notesText     = data.catatan || defaultNotes;
 
@@ -358,9 +336,9 @@ function generateCbnDocumentHtml(data) {
     ${telpRumah && telpRumah !== telpSelular ? box(telpRumah, 20.88, 19.19, 1.905, '9pt', 12) : ''}
     ${box(telpSelular, 66.8, 19.19, 1.905, '9pt', 12)}
 
-    <!-- 2. ALAMAT PEMASANGAN (BARIS 1: 29 KOTAK, BARIS 2: 29 KOTAK, BARIS 3: 16 KOTAK) -->
-    ${box(alamat1, 20.88, 26.51, 1.905, '8.5pt', 29)}
-    ${alamat2 ? box(alamat2, 20.88, 28.49, 1.905, '8.5pt', 29) : ''}
+    <!-- 2. ALAMAT PEMASANGAN (BARIS 1: 37 KOTAK, BARIS 2: 37 KOTAK, BARIS 3: 16 KOTAK) -->
+    ${box(alamat1, 20.88, 26.51, 1.905, '8.5pt', 37)}
+    ${alamat2 ? box(alamat2, 20.88, 28.49, 1.905, '8.5pt', 37) : ''}
     ${alamat3 ? box(alamat3, 20.88, 30.50, 1.905, '8.5pt', 16) : ''}
     
     ${box(rt, 55.21, 30.50, 1.905, '8.5pt', 3)}
@@ -369,7 +347,7 @@ function generateCbnDocumentHtml(data) {
     
     ${isPemilik ? "<div class='fld' style='top:33.0%;left:20.9%;font-size:12pt;font-weight:bold;'>&#10004;</div>" : ''}
     ${isPenyewa ? "<div class='fld' style='top:33.0%;left:34.4%;font-size:12pt;font-weight:bold;'>&#10004;</div>" : ''}
-    ${box(email, 20.88, 34.96, 1.905, '8.5pt', 29)}
+    ${box(email, 20.88, 34.96, 1.905, '8.5pt', 37)}
 
     <!-- 3. PILIHAN PAKET & ADD-ON -->
     <div class='fld' style='top:42.25%;left:2.9%;font-size:13pt;font-weight:bold;'>&#10004;</div>
@@ -414,28 +392,46 @@ function generateCbnDocumentHtml(data) {
     <!-- 5. TANGGAL & TANDA TANGAN -->
     ${fld(tglTtd, 92.85, 9.50, '10.5pt')}
 
-    <!-- TANDA TANGAN PELANGGAN -->
-    ${sigSrc ? `<img src='${sigSrc}' style='position:absolute;top:89.2%;left:6.0%;max-height:52px;max-width:135px;z-index:10;'>` : ''}
-
     <!-- TANDA TANGAN SALES -->
     <img src='${salesSigImg}' style='position:absolute;top:89.5%;left:43.0%;max-height:55px;max-width:130px;z-index:5;' alt='TTD Sales'>
     ${fld(salesName, 94.20, 38.0, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;')}
 
     <!-- TANDA TANGAN SPV -->
-    <img src='${spvSigImg}' style='position:absolute;top:88.8%;left:78.0%;max-height:60px;max-width:130px;z-index:5;' alt='TTD SPV'>
-    ${fld("TIN006-SUHARTA", 94.20, 73.5, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;')}
+    <img src='${spvSigImg}' style='position:absolute;top:88.8%;left:84.0%;max-height:60px;max-width:130px;z-index:5;' alt='TTD SPV'>
+    ${fld(spvName, 94.20, 78.5, '10.5pt', 'width:22.5%;text-align:center;font-weight:bold;')}
   </div>
 </div>
 </body>
 </html>`;
 }
 
+function dedupeRecipients(list) {
+  return list.filter(function (email, index, values) {
+    return email && values.indexOf(email) === index;
+  });
+}
+
+function parseBooleanFlag() {
+  const value = Array.prototype.slice.call(arguments).find(function (item) {
+    return item !== undefined && item !== null && item !== '';
+  });
+  if (value === undefined) return true;
+  return ['1', 'true', 'yes', 'on'].indexOf(String(value).toLowerCase()) !== -1;
+}
+
 function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
   const adminRecipient = recipientEmail || CONFIG.NOTIF_EMAIL;
   const subject = `[SALES ORDER CBN] ${params.sales_code || 'SEP-001'} - ${params.nama_pelanggan || 'Pelanggan'} (${params.service || 'Fiber 100'})` ;
 
+  const tikorClean = String(params.tikor || '').trim();
+  let tikorLink = '-';
+  if (tikorClean && tikorClean !== '-') {
+    const mapUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(tikorClean);
+    tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">📍 ${tikorClean} (Buka Google Maps)</a>`;
+  }
+
   const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#005696;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;">📄 Buka Surat Formulir PDF Resmi CBN</a>` : '<em>(PDF terlampir pada email ini)</em>';
-  const ktpLink = ktpUrl ? `<a href="${ktpUrl}" target="_blank" style="display:inline-block;background:#0284c7;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;margin-left:8px;">💳 Lihat Foto KTP Pelanggan</a>` : '';
+  const ktpLink = '';
 
   const htmlBody = `<!DOCTYPE html>
 <html>
@@ -461,13 +457,23 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
 <div class="wrap">
   <div class="head">
     <h2>FORMULIR PENDAFTARAN LAYANAN CBN</h2>
-    <p style="margin:4px 0 0;font-size:13px;opacity:.9;"><span class="badge">Sales Code: ${params.sales_code || 'SEP-001'}</span> &bull; Mitra Resmi: PT. Sinergi Emas Perdana</p>
+    <p style="margin:4px 0 0;font-size:13px;opacity:.9;">Tiket: ${params.ticket_no || '-'} &bull; ${params.vendor || '-'}</p>
   </div>
   <div class="body">
     <div class="sec">
-      <h3>1. DATA PELANGGAN</h3>
+      <h3>1. INFORMASI SALES ORDER</h3>
       <table>
-        <tr><td>Nama Lengkap</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
+        <tr><td>Vendor</td><td>${params.vendor || '-'}</td></tr>
+        <tr><td>SO Date</td><td>${params.so_date || '-'}</td></tr>
+        <tr><td>Team Leader</td><td>${params.team_leader || params.tl_code || '-'}</td></tr>
+        <tr><td>AE Name (nama sales)</td><td><strong>${params.ae_name || params.sales_name || '-'}</strong></td></tr>
+        <tr><td>No. Tiket</td><td><strong>${params.ticket_no || '-'}</strong></td></tr>
+      </table>
+    </div>
+    <div class="sec">
+      <h3>2. DATA PELANGGAN</h3>
+      <table>
+        <tr><td>Nama di KTP</td><td><strong>${params.nama_pelanggan || '-'}</strong></td></tr>
         <tr><td>Nomor KTP</td><td>${params.nomor_ktp || '-'}</td></tr>
         <tr><td>Tempat / Tgl Lahir</td><td>${params.ttl || '-'}</td></tr>
         <tr><td>Jenis Kelamin</td><td>${params.jenis_kelamin || '-'}</td></tr>
@@ -480,21 +486,28 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
     <div class="sec">
       <h3>2. ALAMAT PEMASANGAN</h3>
       <table>
-        <tr><td>Alamat Lengkap</td><td>${params.alamat || '-'}</td></tr>
+        <tr><td>Alamat Pemasangan</td><td>${params.alamat || '-'}</td></tr>
+        <tr><td>Kel.</td><td>${params.kelurahan || '-'}</td></tr>
+        <tr><td>Kec.</td><td>${params.kecamatan || '-'}</td></tr>
         <tr><td>RT / RW</td><td>RT ${params.rt || '-'} / RW ${params.rw || '-'}</td></tr>
-        <tr><td>Kelurahan / Kecamatan</td><td>${params.kelurahan || '-'} / ${params.kecamatan || '-'}</td></tr>
+        <tr><td>Home ID</td><td>${params.home_id || '-'}</td></tr>
+        <tr><td>Tikor</td><td>${tikorLink}</td></tr>
+        <tr><td>Telp 1</td><td>${params.telp || '-'}</td></tr>
+        <tr><td>Telp 2</td><td>${params.telp2 || params.telp_rumah || '-'}</td></tr>
         <tr><td>Kode Pos</td><td>${params.kode_pos || '-'}</td></tr>
         <tr><td>Status Kepemilikan</td><td><strong>${params.status_kepemilikan || 'PEMILIK'}</strong></td></tr>
       </table>
     </div>
 
     <div class="sec">
-      <h3>3. PAKET LAYANAN & JADWAL</h3>
+      <h3>4. AKUN &amp; PAKET</h3>
       <table>
         <tr><td>Paket Layanan</td><td><span class="badge">${params.service || '-'}</span></td></tr>
         <tr><td>Add-On TV</td><td>${params.addon_tv || 'Tidak ada'}</td></tr>
         <tr><td>Perangkat Tambahan</td><td>${params.addon_device || 'Router Standard'}</td></tr>
-        <tr><td>Username Email CBN</td><td>${params.username_cbn ? params.username_cbn + '@cbn.net.id' : '-'}</td></tr>
+        <tr><td>Username</td><td>${params.username_cbn || '-'}</td></tr>
+        <tr><td>Email</td><td>${params.email_pelanggan || '-'}</td></tr>
+        <tr><td>Paket</td><td><span class="badge">${params.service || '-'}</span></td></tr>
         <tr><td>Jadwal Pemasangan</td><td><strong>${params.jadwal_tanggal || '-'}</strong> (${params.jadwal_waktu || '-'})</td></tr>
         <tr><td>Catatan Lokasi</td><td>${params.catatan || '-'}</td></tr>
         <tr><td>Estimasi Total Biaya</td><td><strong>${params.biaya_total || '-'}</strong></td></tr>
@@ -504,7 +517,7 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
     <div class="sec">
       <h3>4. BERKAS & LAMPIRAN DOKUMEN</h3>
       <p style="margin:6px 0;">${pdfLink}</p>
-      <p style="margin:6px 0;">${ktpLink}</p>
+      <p style="margin:6px 0;color:#64748b;">Tiket PDF terlampir pada email ini.</p>
     </div>
   </div>
   <div class="foot">
@@ -605,49 +618,330 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
   const ss    = SpreadsheetApp.openById(ssId);
   let sheet = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
 
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow([
-      'Timestamp', 'Sales Code', 'Vendor', 'Nama Pelanggan', 'Nomor KTP',
-      'TTL', 'Jenis Kelamin', 'Telepon Rumah', 'No. WhatsApp / HP', 'Alamat Pemasangan',
-      'RT', 'RW', 'Kode Pos', 'Status Rumah', 'Titik GPS', 'Paket CBN (Service)',
-      'Add-On TV', 'Perangkat Tambahan', 'Akun Email CBN', 'Jadwal Pasang',
-      'Waktu Pasang', 'Catatan', 'Estimasi Total Biaya', 'Link PDF Surat CBN', 'Link Foto KTP'
-    ]);
-  }
-
   let alamatDisplay = params.alamat || '';
   if (params.kelurahan) alamatDisplay += ', Kel. ' + params.kelurahan;
   if (params.kecamatan) alamatDisplay += ', Kec. ' + params.kecamatan;
 
-  const rowData = [
-    Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss'),
-    params.sales_code || 'SEP-001',
-    params.vendor || 'PT. SINERGI EMAS PERDANA',
-    params.nama_pelanggan || '',
-    params.nomor_ktp || '',
-    params.ttl || '',
-    params.jenis_kelamin || 'PRIA',
-    params.telp_rumah || '',
-    params.telp || '',
-    alamatDisplay,
-    params.rt || '',
-    params.rw || '',
-    params.kode_pos || '',
-    params.status_kepemilikan || 'PEMILIK',
-    params.tikor || '',
-    params.service || 'CBN Fiber',
-    params.addon_tv || '',
-    params.addon_device || '',
-    params.username_cbn ? params.username_cbn + '@cbn.net.id' : '',
-    params.jadwal_tanggal || '',
-    params.jadwal_waktu || '',
-    params.catatan || '',
-    params.biaya_total || '',
-    pdfUrl || '',
-    ktpUrl || ''
-  ];
+  // Jika sheet masih baru / kosong, buat default header
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      'Timestamp', 'Sales Code', 'Vendor', 'Nama Pelanggan', 'STATUS',
+      'Nomor KTP', 'TTL', 'Jenis Kelamin', 'Telepon Rumah', 'No. WhatsApp / HP',
+      'Alamat Pemasangan', 'RT', 'RW', 'Kode Pos', 'Status Rumah', 'Home ID',
+      'Titik GPS', 'Paket CBN (Service)', 'Add-On TV', 'Perangkat Tambahan',
+      'Akun Email CBN', 'Jadwal Pasang', 'Waktu Pasang', 'Catatan',
+      'Estimasi Total Biaya', 'Link PDF Surat CBN', 'Link Foto KTP', 'No. Tiket', 'Team Leader'
+    ]);
+  }
+
+  // Baca baris header yang ada di baris 1 spreadsheet
+  const headerRow = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  
+  let rowData = [];
+  let statusColIdx = -1;
+
+  for (let i = 0; i < headerRow.length; i++) {
+    const h = String(headerRow[i]).trim().toUpperCase();
+    let val = '';
+    
+    if (h === 'STATUS' || h === 'STATUS ORDER') {
+      val = 'PENDING';
+      statusColIdx = i + 1;
+    } else if (h.includes('TIMESTAMP')) {
+      val = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    } else if (h.includes('TIKET') || h === 'NO. TIKET' || h === 'TICKET_NO') {
+      val = params.ticket_no || '';
+    } else if (h.includes('SALES')) {
+      val = params.sales_code || 'SEP-001';
+    } else if (h.includes('LEADER') || h.includes('SPV')) {
+      val = params.team_leader || params.tl_code || '-';
+    } else if (h.includes('VENDOR') || h.includes('PT')) {
+      val = params.vendor || params.company_name || 'PT. SINERGI EMAS PERDANA';
+    } else if (h.includes('NAMA') || h.includes('PELANGGAN')) {
+      val = params.nama_pelanggan || '';
+    } else if (h.includes('KTP') && !h.includes('LINK') && !h.includes('FOTO')) {
+      val = params.nomor_ktp || '';
+    } else if (h.includes('TTL') || h.includes('LAHIR')) {
+      val = params.ttl || '';
+    } else if (h.includes('KELAMIN')) {
+      val = params.jenis_kelamin || 'PRIA';
+    } else if (h.includes('RUMAH') && h.includes('TELP')) {
+      val = params.telp_rumah || '';
+    } else if (h.includes('WHATSAPP') || h.includes('HP') || h.includes('TELP')) {
+      val = params.telp || '';
+    } else if (h.includes('ALAMAT')) {
+      val = alamatDisplay;
+    } else if (h === 'RT') {
+      val = params.rt || '';
+    } else if (h === 'RW') {
+      val = params.rw || '';
+    } else if (h.includes('POS')) {
+      val = params.kode_pos || '';
+    } else if (h.includes('STATUS RUMAH') || h.includes('KEPEMILIKAN')) {
+      val = params.status_kepemilikan || 'PEMILIK';
+    } else if (h.includes('HOME ID') || h === 'HOME_ID') {
+      val = params.home_id || '-';
+    } else if (h.includes('TIKOR') || h.includes('GPS') || h.includes('KOORDINAT')) {
+      const t = String(params.tikor || '').trim();
+      val = (t && t !== '-') ? `=HYPERLINK("https://www.google.com/maps?q=${encodeURIComponent(t)}", "${t}")` : '';
+    } else if (h.includes('PAKET') || h.includes('SERVICE')) {
+      val = params.service || 'CBN Fiber';
+    } else if (h.includes('TV')) {
+      val = params.addon_tv || '';
+    } else if (h.includes('PERANGKAT')) {
+      val = params.addon_device || '';
+    } else if (h.includes('EMAIL CBN') || h.includes('AKUN')) {
+      val = params.username_cbn ? params.username_cbn + '@cbn.net.id' : '';
+    } else if (h.includes('JADWAL') && !h.includes('WAKTU')) {
+      val = params.jadwal_tanggal || '';
+    } else if (h.includes('WAKTU')) {
+      val = params.jadwal_waktu || '';
+    } else if (h.includes('CATATAN') || h.includes('NOTES')) {
+      val = params.catatan || '';
+    } else if (h.includes('BIAYA') || h.includes('TOTAL')) {
+      val = params.biaya_total || '';
+    } else if (h.includes('PDF')) {
+      val = pdfUrl || '';
+    } else if (h.includes('FOTO') || (h.includes('KTP') && h.includes('LINK'))) {
+      val = ktpUrl || '';
+    }
+    
+    rowData.push(val);
+  }
 
   sheet.appendRow(rowData);
+
+  // Set warna status PENDING (Orange) pada cell status di baris baru
+  const newRowIdx = sheet.getLastRow();
+  if (statusColIdx > 0) {
+    const statusCell = sheet.getRange(newRowIdx, statusColIdx);
+    statusCell.setValue('PENDING');
+    statusCell.setBackground('#ff9900');
+    statusCell.setFontColor('#000000');
+    statusCell.setFontWeight('bold');
+  }
+}
+
+function updateOrderStatusInSheet(params, sheetId) {
+  try {
+    const ssId  = sheetId || CONFIG.SPREADSHEET_ID;
+    const ss    = SpreadsheetApp.openById(ssId);
+    let sheet = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
+    const lastRow = sheet.getLastRow();
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+
+    if (lastRow < 2) {
+      return { status: 'error', message: 'Sheet kosong atau belum ada data pendaftaran.' };
+    }
+
+    const headerValues = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    let statusColIdx = -1;
+    let ticketColIdx = -1;
+    let nameColIdx   = -1;
+    let ktpColIdx    = -1;
+
+    for (let c = 0; c < headerValues.length; c++) {
+      const h = String(headerValues[c]).trim().toUpperCase();
+      if (h === 'STATUS' || h === 'STATUS ORDER') {
+        statusColIdx = c + 1;
+      }
+      if (h.includes('TIKET') || h === 'NO. TIKET' || h === 'TICKET_NO') {
+        ticketColIdx = c + 1;
+      }
+      if (h.includes('PELANGGAN') || h.includes('NAMA')) {
+        nameColIdx = c + 1;
+      }
+      if (h.includes('KTP')) {
+        ktpColIdx = c + 1;
+      }
+    }
+
+    // Jika kolom STATUS belum ada di header, tambahkan otomatis di kolom terakhir
+    if (statusColIdx === -1) {
+      statusColIdx = lastCol + 1;
+      const headerCell = sheet.getRange(1, statusColIdx);
+      headerCell.setValue('STATUS');
+      headerCell.setFontWeight('bold');
+      headerCell.setBackground('#005696');
+      headerCell.setFontColor('#ffffff');
+    }
+
+    const allData = sheet.getRange(2, 1, lastRow - 1, Math.max(lastCol, statusColIdx)).getValues();
+    const ticketTarget = String(params.ticket_no || '').trim().toUpperCase();
+    const nameTarget   = String(params.nama_pelanggan || '').trim().toUpperCase();
+    const ktpTarget    = String(params.nomor_ktp || '').trim().toUpperCase();
+    const newStatus    = String(params.status || 'PENDING').trim().toUpperCase();
+
+    let targetRowIdx = -1;
+
+    // 1. Cari berdasarkan No. Tiket
+    if (ticketTarget) {
+      for (let r = allData.length - 1; r >= 0; r--) {
+        if (ticketColIdx > 0 && String(allData[r][ticketColIdx - 1]).trim().toUpperCase().includes(ticketTarget)) {
+          targetRowIdx = r + 2;
+          break;
+        }
+        for (let c = 0; c < allData[r].length; c++) {
+          if (String(allData[r][c]).trim().toUpperCase().includes(ticketTarget)) {
+            targetRowIdx = r + 2;
+            break;
+          }
+        }
+        if (targetRowIdx !== -1) break;
+      }
+    }
+
+    // 2. Fallback: cari berdasarkan Nama Pelanggan / Nomor KTP
+    if (targetRowIdx === -1 && (nameTarget || ktpTarget)) {
+      for (let r = allData.length - 1; r >= 0; r--) {
+        const rowName = nameColIdx > 0 ? String(allData[r][nameColIdx - 1]).trim().toUpperCase() : '';
+        const rowKtp  = ktpColIdx > 0 ? String(allData[r][ktpColIdx - 1]).trim().toUpperCase() : '';
+        if ((nameTarget && rowName === nameTarget) || (ktpTarget && rowKtp === ktpTarget)) {
+          targetRowIdx = r + 2;
+          break;
+        }
+      }
+    }
+
+    if (targetRowIdx === -1) {
+      return { status: 'error', message: 'Data baris order tidak ditemukan di Google Spreadsheet.' };
+    }
+
+    const statusCell = sheet.getRange(targetRowIdx, statusColIdx);
+    statusCell.setValue(newStatus);
+    statusCell.setFontWeight('bold');
+
+    // Warna status:
+    // PENDING  -> Orange (#ff9900)
+    // DIPROSES -> Kuning (#ffff00)
+    // SELESAI  -> Hijau  (#00ff00)
+    // BATAL    -> Merah  (#ff0000)
+    if (newStatus === 'PENDING') {
+      statusCell.setBackground('#ff9900');
+      statusCell.setFontColor('#000000');
+    } else if (newStatus === 'DIPROSES') {
+      statusCell.setBackground('#ffff00');
+      statusCell.setFontColor('#000000');
+    } else if (newStatus === 'SELESAI') {
+      statusCell.setBackground('#00ff00');
+      statusCell.setFontColor('#000000');
+    } else if (newStatus === 'BATAL') {
+      statusCell.setBackground('#ff0000');
+      statusCell.setFontColor('#ffffff');
+    }
+
+    return {
+      status: 'success',
+      message: 'Status order berhasil diperbarui di Spreadsheet',
+      row: targetRowIdx,
+      ticket_no: ticketTarget,
+      new_status: newStatus
+    };
+  } catch (err) {
+    logError('Error updateOrderStatusInSheet: ' + err.message, sheetId);
+    return { status: 'error', message: err.message };
+  }
+}
+
+function deleteOrderInSheet(params, sheetId) {
+  try {
+    const ssId  = sheetId || CONFIG.SPREADSHEET_ID;
+    const ss    = SpreadsheetApp.openById(ssId);
+    let sheet   = ss.getSheetByName(CONFIG.SHEET_NAME) || ss.getSheets()[0];
+    const lastRow = sheet.getLastRow();
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+
+    if (lastRow < 2) {
+      return { status: 'error', message: 'Sheet kosong atau belum ada data pendaftaran.' };
+    }
+
+    const headerValues = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    let statusColIdx = -1;
+    let ticketColIdx = -1;
+    let nameColIdx   = -1;
+    let ktpColIdx    = -1;
+
+    for (let c = 0; c < headerValues.length; c++) {
+      const h = String(headerValues[c]).trim().toUpperCase();
+      if (h === 'STATUS' || h === 'STATUS ORDER') {
+        statusColIdx = c + 1;
+      }
+      if (h.includes('TIKET') || h === 'NO. TIKET' || h === 'TICKET_NO') {
+        ticketColIdx = c + 1;
+      }
+      if (h.includes('PELANGGAN') || h.includes('NAMA')) {
+        nameColIdx = c + 1;
+      }
+      if (h.includes('KTP')) {
+        ktpColIdx = c + 1;
+      }
+    }
+
+    const allData = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    const ticketTarget = String(params.ticket_no || '').trim().toUpperCase();
+    const nameTarget   = String(params.nama_pelanggan || params.nama || '').trim().toUpperCase();
+    const ktpTarget    = String(params.nomor_ktp || '').trim().toUpperCase();
+
+    let targetRowIdx = -1;
+
+    // 1. Cari berdasarkan No. Tiket
+    if (ticketTarget) {
+      for (let r = allData.length - 1; r >= 0; r--) {
+        if (ticketColIdx > 0 && String(allData[r][ticketColIdx - 1]).trim().toUpperCase().includes(ticketTarget)) {
+          targetRowIdx = r + 2;
+          break;
+        }
+        for (let c = 0; c < allData[r].length; c++) {
+          if (String(allData[r][c]).trim().toUpperCase().includes(ticketTarget)) {
+            targetRowIdx = r + 2;
+            break;
+          }
+        }
+        if (targetRowIdx !== -1) break;
+      }
+    }
+
+    // 2. Fallback: cari berdasarkan Nama Pelanggan / KTP
+    if (targetRowIdx === -1 && (nameTarget || ktpTarget)) {
+      for (let r = allData.length - 1; r >= 0; r--) {
+        const rowName = nameColIdx > 0 ? String(allData[r][nameColIdx - 1]).trim().toUpperCase() : '';
+        const rowKtp  = ktpColIdx > 0 ? String(allData[r][ktpColIdx - 1]).trim().toUpperCase() : '';
+        if ((nameTarget && rowName === nameTarget) || (ktpTarget && rowKtp === ktpTarget)) {
+          targetRowIdx = r + 2;
+          break;
+        }
+      }
+    }
+
+    if (targetRowIdx === -1) {
+      return { status: 'error', message: 'Data baris order tidak ditemukan di Google Spreadsheet.' };
+    }
+
+    // 1. Merahkan seluruh baris yang dihapus
+    const entireRowRange = sheet.getRange(targetRowIdx, 1, 1, lastCol);
+    entireRowRange.setBackground('#ffcccc'); // Background merah muda
+    entireRowRange.setFontColor('#990000');   // Teks merah tua
+    entireRowRange.setFontLine('line-through'); // Coret teks sebagai tanda terhapus
+
+    // 2. Tandai kolom STATUS sebagai DIHAPUS dengan warna merah solid
+    if (statusColIdx > 0) {
+      const statusCell = sheet.getRange(targetRowIdx, statusColIdx);
+      statusCell.setValue('DIHAPUS');
+      statusCell.setBackground('#ff0000');
+      statusCell.setFontColor('#ffffff');
+      statusCell.setFontWeight('bold');
+      statusCell.setFontLine('none');
+    }
+
+    return {
+      status: 'success',
+      message: 'Baris order ' + ticketTarget + ' berhasil di-merahkan di Google Spreadsheet.',
+      row: targetRowIdx
+    };
+  } catch (err) {
+    logError('Error deleteOrderInSheet: ' + err.message, sheetId);
+    return { status: 'error', message: err.message };
+  }
 }
 
 function logError(msg, sheetId) {

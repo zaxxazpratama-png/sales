@@ -36,21 +36,13 @@ class Validator
             }
         }
 
-        // --- 2. Validasi Tanda Tangan Digital Pelanggan ---
-        $signatureData = trim($input['signature_data'] ?? '');
-        if (empty($signatureData)) {
-            $this->errors['signature_data'] = 'Tanda Tangan Digital Pelanggan wajib digoreskan pada kotak tanda tangan.';
-        } else {
-            $this->data['signature_data'] = $signatureData;
-        }
-
-        // --- 3. Optional & Additional CBN Fields ---
+        // --- 2. Optional & Additional CBN Fields ---
         $this->data['sales_code']        = htmlspecialchars(trim($input['sales_code'] ?? 'SEP-001'), ENT_QUOTES, 'UTF-8');
-        $this->data['vendor']            = htmlspecialchars(trim($input['vendor'] ?? 'PT. SINERGI EMAS PERDANA'), ENT_QUOTES, 'UTF-8');
+        $this->data['vendor']            = htmlspecialchars(trim($input['vendor'] ?? 'PT. TIN'), ENT_QUOTES, 'UTF-8');
         $this->data['so_date']           = htmlspecialchars(trim($input['so_date'] ?? date('d/m/Y')), ENT_QUOTES, 'UTF-8');
         $this->data['tl_code']           = htmlspecialchars(trim($input['tl_code'] ?? '-'), ENT_QUOTES, 'UTF-8');
         $this->data['ae_name']           = htmlspecialchars(trim($input['ae_name'] ?? '-'), ENT_QUOTES, 'UTF-8');
-        $this->data['home_id']           = htmlspecialchars(trim($input['home_id'] ?? 'PENDING'), ENT_QUOTES, 'UTF-8');
+        $this->data['home_id']           = htmlspecialchars(trim($input['home_id'] ?? ''), ENT_QUOTES, 'UTF-8');
         
         $this->data['telp_rumah']        = htmlspecialchars(trim($input['telp_rumah'] ?? ''), ENT_QUOTES, 'UTF-8');
         $this->data['telp2']             = htmlspecialchars(trim($input['telp2'] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -97,24 +89,6 @@ class Validator
             $cleanTelp = preg_replace('/[^\d+]/', '', $input['telp']);
             if (strlen($cleanTelp) < 9 || strlen($cleanTelp) > 16) {
                 $this->errors['telp'] = 'Nomor telepon seluler tidak valid (minimal 10-15 digit angka).';
-            }
-        }
-
-        // --- Validasi File Upload KTP (Opsional) ---
-        if (!empty($files['sales_order_file']['name'])) {
-            $file       = $files['sales_order_file'];
-            $allowedExt = ['jpg', 'jpeg', 'png', 'pdf'];
-            $maxSize    = 8 * 1024 * 1024; // 8MB
-            $ext        = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-            if ($file['error'] !== UPLOAD_ERR_OK) {
-                $this->errors['sales_order_file'] = 'Terjadi kesalahan saat upload foto KTP.';
-            } elseif (!in_array($ext, $allowedExt)) {
-                $this->errors['sales_order_file'] = 'File KTP harus berformat JPG, JPEG, PNG, atau PDF.';
-            } elseif ($file['size'] > $maxSize) {
-                $this->errors['sales_order_file'] = 'Ukuran file foto KTP maksimal 8MB.';
-            } else {
-                $this->data['upload_file'] = $file;
             }
         }
 

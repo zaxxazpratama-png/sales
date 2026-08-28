@@ -6,6 +6,7 @@
 require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 
 use App\SettingsManager;
+use App\AuthManager;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -26,9 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = trim($_POST['username'] ?? '');
     $pass = $_POST['password'] ?? '';
 
-    if ($user === $defaultUser && $pass === $defaultPass) {
+    $account = AuthManager::authenticate($user, $pass);
+    if (!$account && $user === $defaultUser && $pass === $defaultPass) {
+        $account = ['username' => $user, 'role' => 'admin', 'tl_code' => ''];
+    }
+
+    if ($account) {
         $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_user']      = $user;
+        $_SESSION['admin_user']      = $account['username'];
+        $_SESSION['admin_role']      = $account['role'];
+        $_SESSION['admin_tl_code']   = $account['tl_code'];
         header('Location: dashboard.php');
         exit;
     } else {

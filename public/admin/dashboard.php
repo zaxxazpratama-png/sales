@@ -9,6 +9,7 @@ require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 use App\Config;
 use App\SalesManager;
 use App\SettingsManager;
+use App\AuthManager;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -23,21 +24,94 @@ if (empty($_SESSION['admin_logged_in'])) {
 // Handle Logout
 if (isset($_GET['logout'])) {
     $_SESSION['admin_logged_in'] = false;
-    unset($_SESSION['admin_logged_in'], $_SESSION['admin_user']);
+    unset($_SESSION['admin_logged_in'], $_SESSION['admin_user'], $_SESSION['admin_role'], $_SESSION['admin_tl_code']);
     header('Location: admin');
     exit;
 }
 
 Config::load();
 
+$currentRole   = $_SESSION['admin_role'] ?? 'admin';
+$currentTlCode = $_SESSION['admin_tl_code'] ?? '';
+$currentUser   = $_SESSION['admin_user'] ?? 'admin';
+$activeTab     = $_SESSION['active_admin_tab'] ?? 'sales-tab';
+
 $msgSuccess = '';
 $msgError   = '';
+
+// ========================================================
+// REALTIME API: FETCH ORDERS (AUTO-SYNC & POLLING)
+// ========================================================
+if (isset($_GET['action']) && $_GET['action'] === 'fetch_orders_realtime') {
+    header('Content-Type: application/json; charset=utf-8');
+    $ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
+    $allOrders = file_exists($ordersFile) ? (json_decode(file_get_contents($ordersFile), true) ?: []) : [];
+    if ($currentRole === 'tl') {
+        $allOrders = array_values(array_filter($allOrders, fn($ord) => ($ord['tl_code'] ?? '') === $currentTlCode));
+    }
+    // Sort newest first
+    usort($allOrders, function($a, $b) {
+        return strcmp($b['submitted_at'] ?? '', $a['submitted_at'] ?? '');
+    });
+
+    $pendingCount = count(array_filter($allOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
+
+    echo json_encode([
+        'success'       => true,
+        'orders'        => $allOrders,
+        'pending_count' => $pendingCount,
+        'total_count'   => count($allOrders),
+        'role'          => $currentRole,
+        'timestamp'     => date('Y-m-d H:i:s')
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 // ========================================================
 // POST ACTION HANDLERS
 // ========================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if ($action === 'add_team_leader' && $currentRole === 'superadmin') {
+        try {
+            AuthManager::addTeamLeader(
+                $_POST['tl_username'] ?? '',
+                $_POST['tl_password'] ?? '',
+                $_POST['tl_code'] ?? ''
+            );
+            $msgSuccess = 'Akun team leader berhasil dibuat.';
+        } catch (\Exception $e) {
+            $msgError = $e->getMessage();
+        }
+    }
+
+    if ($action === 'edit_team_leader' && $currentRole === 'superadmin') {
+        try {
+            $tlId = $_POST['tl_id'] ?? '';
+            $oldTlCode = '';
+            foreach (AuthManager::getUsers() as $user) {
+                if (($user['id'] ?? $user['username'] ?? '') === $tlId) {
+                    $oldTlCode = $user['tl_code'] ?? '';
+                    break;
+                }
+            }
+            $newTlCode = strtoupper(trim($_POST['tl_code'] ?? ''));
+            AuthManager::updateTeamLeader(
+                $tlId,
+                $_POST['tl_username'] ?? '',
+                $_POST['tl_password'] ?? '',
+                $newTlCode,
+                $_POST['tl_status'] ?? 'active'
+            );
+            if ($oldTlCode !== '' && $oldTlCode !== $newTlCode) {
+                SalesManager::reassignTeamLeader($oldTlCode, $newTlCode);
+            }
+            $msgSuccess = 'Data team leader berhasil diperbarui.';
+        } catch (\Exception $e) {
+            $msgError = $e->getMessage();
+        }
+    }
 
     // 1. TAMBAH SALES BARU
     if ($action === 'add_sales') {
@@ -46,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $namaSales = trim($_POST['nama_sales'] ?? '');
             $noWa      = trim($_POST['no_wa'] ?? '');
             $email     = trim($_POST['email'] ?? '');
-            $tlCode    = trim($_POST['tl_code'] ?? 'TL-01');
+            $tlCode    = $currentRole === 'tl' ? $currentTlCode : trim($_POST['tl_code'] ?? 'TL-01');
 
             if (empty($salesCode) || empty($namaSales)) {
                 throw new \Exception('Kode Sales dan Nama Sales wajib diisi.');
@@ -75,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $namaSales = trim($_POST['nama_sales'] ?? '');
             $noWa      = trim($_POST['no_wa'] ?? '');
             $email     = trim($_POST['email'] ?? '');
-            $tlCode    = trim($_POST['tl_code'] ?? 'TL-01');
+            $tlCode    = $currentRole === 'tl' ? $currentTlCode : trim($_POST['tl_code'] ?? 'TL-01');
             $status    = $_POST['status'] ?? 'active';
 
             $existingSales = SalesManager::findById($id);
@@ -114,25 +188,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // 4. UPDATE PENGATURAN GOOGLE & SISTEM
+    // 6. TOGGLE EMAIL CUSTOMER PER SALES
+    elseif ($action === 'toggle_email_customer') {
+        $id      = trim($_POST['sales_id'] ?? '');
+        $enabled = ($_POST['enabled'] ?? '1') === '1';
+        $sales   = SalesManager::findById($id);
+        if ($sales) {
+            SalesManager::update($id, array_merge($sales, ['email_customer_enabled' => $enabled]));
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => true,
+                    'enabled' => $enabled,
+                    'message' => 'Status kirim email customer untuk sales ' . ($sales['nama_sales'] ?? '') . ' diubah ke ' . ($enabled ? 'ON (Aktif)' : 'OFF (Nonaktif)')
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $msgSuccess = "Pengaturan email customer berhasil diubah.";
+        } else {
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Sales tidak ditemukan.']);
+                exit;
+            }
+            $msgError = "Sales tidak ditemukan.";
+        }
+    }
+
+    // 4. UPDATE PROFIL TEAM LEADER
+    elseif ($action === 'update_tl_profile' && $currentRole === 'tl') {
+        $activeTab = 'settings-tab';
+        try {
+            $newUsername = trim($_POST['tl_username'] ?? '');
+            $newPassword = $_POST['tl_password'] ?? '';
+            if ($newUsername === '') {
+                throw new \InvalidArgumentException('Username Team Leader tidak boleh kosong.');
+            }
+            $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword);
+            $_SESSION['admin_user'] = $updated['username'];
+            $currentUser = $updated['username'];
+            $msgSuccess = "Profil dan password Team Leader <strong>{$currentUser}</strong> berhasil diperbarui!";
+        } catch (\Exception $e) {
+            $msgError = $e->getMessage();
+        }
+    }
+
+    // 5. UPDATE PENGATURAN GOOGLE & PROFIL SUPERADMIN
     elseif ($action === 'update_general_settings') {
+        $activeTab = ($currentRole === 'superadmin' && isset($_POST['apps_script_url'])) ? 'google-tab' : 'settings-tab';
         try {
             $settings = SettingsManager::get();
-            $settings['company_name']    = trim($_POST['company_name'] ?? $settings['company_name']);
-            $settings['call_center']     = trim($_POST['call_center'] ?? $settings['call_center']);
-            $settings['wa_helpdesk']     = trim($_POST['wa_helpdesk'] ?? $settings['wa_helpdesk']);
-            $settings['admin_email']     = trim($_POST['admin_email'] ?? $settings['admin_email']);
-            $settings['default_notes']   = trim($_POST['default_notes'] ?? ($settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB'));
-            
-            if (!empty($_FILES['ttd_spv']['name']) && $_FILES['ttd_spv']['error'] === UPLOAD_ERR_OK) {
-                $target = dirname(__DIR__) . '/assets/img/ttd_spv_master.png';
-                \App\ImageHelper::makeTransparentSignature($_FILES['ttd_spv']['tmp_name'], $target);
-                $settings['ttd_spv_path'] = 'assets/img/ttd_spv_master.png';
+
+            if ($currentRole === 'superadmin') {
+                if (isset($_POST['company_name'])) {
+                    $settings['company_name'] = trim($_POST['company_name'] ?? $settings['company_name']);
+                }
+                if (isset($_POST['call_center'])) {
+                    $settings['call_center'] = trim($_POST['call_center'] ?? $settings['call_center']);
+                }
+                if (isset($_POST['wa_helpdesk'])) {
+                    $settings['wa_helpdesk'] = trim($_POST['wa_helpdesk'] ?? $settings['wa_helpdesk']);
+                }
+                if (isset($_POST['apps_script_url'])) {
+                    $appsScriptUrl = trim($_POST['apps_script_url'] ?? '');
+                    if ($appsScriptUrl !== '' && !filter_var($appsScriptUrl, FILTER_VALIDATE_URL)) {
+                        throw new \InvalidArgumentException('URL Web App Google Apps Script tidak valid.');
+                    }
+                    $settings['apps_script_url'] = $appsScriptUrl;
+                }
+                if (isset($_POST['spreadsheet_id'])) {
+                    $settings['spreadsheet_id'] = trim($_POST['spreadsheet_id'] ?? '');
+                }
+                if (isset($_POST['drive_folder_id'])) {
+                    $settings['drive_folder_id'] = trim($_POST['drive_folder_id'] ?? '');
+                }
+                if (isset($_POST['master_email'])) {
+                    $settings['master_email'] = trim($_POST['master_email'] ?? '');
+                }
+                if (isset($_POST['admin_email'])) {
+                    $settings['admin_email'] = trim($_POST['admin_email'] ?? '');
+                }
+                if (isset($_POST['default_notes'])) {
+                    $settings['default_notes'] = trim($_POST['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB');
+                }
+
+                // Update superadmin credentials
+                $newAdminUsername = trim($_POST['admin_username'] ?? '');
+                $newAdminPassword = $_POST['admin_password'] ?? '';
+                if ($newAdminUsername !== '') {
+                    $updated = AuthManager::updateProfile($currentUser, $newAdminUsername, $newAdminPassword);
+                    $_SESSION['admin_user'] = $updated['username'];
+                    $currentUser = $updated['username'];
+                    $settings['admin_username'] = $newAdminUsername;
+                }
+
+                if (!empty($_FILES['ttd_spv']['name']) && $_FILES['ttd_spv']['error'] === UPLOAD_ERR_OK) {
+                    $target = dirname(__DIR__) . '/assets/img/ttd_spv_master.png';
+                    \App\ImageHelper::makeTransparentSignature($_FILES['ttd_spv']['tmp_name'], $target);
+                    $settings['ttd_spv_path'] = 'assets/img/ttd_spv_master.png';
+                }
+
+                SettingsManager::update($settings);
+                $msgSuccess = "Pengaturan profil & sistem berhasil disimpan!";
+            } else {
+                $newUsername = trim($_POST['tl_username'] ?? '');
+                $newPassword = $_POST['tl_password'] ?? '';
+                if ($newUsername !== '') {
+                    $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword);
+                    $_SESSION['admin_user'] = $updated['username'];
+                    $currentUser = $updated['username'];
+                    $msgSuccess = 'Profil Team Leader berhasil diperbarui!';
+                }
             }
-
-            SettingsManager::update($settings);
-
-            $msgSuccess = "Pengaturan Google & Profil Admin berhasil disimpan!";
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
@@ -206,14 +373,189 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgError = $e->getMessage();
         }
     }
+
+    // 7. UPDATE STATUS ORDER
+    elseif ($action === 'update_order_status') {
+        $activeTab = 'orders-tab';
+        $ticketNo  = trim($_POST['ticket_no'] ?? '');
+        $newStatus = strtoupper(trim($_POST['order_status'] ?? 'PENDING'));
+        $allowedStatuses = ['PENDING', 'DIPROSES', 'SELESAI', 'BATAL'];
+        if (!in_array($newStatus, $allowedStatuses)) $newStatus = 'PENDING';
+
+        $ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
+        if (file_exists($ordersFile)) {
+            $orders = json_decode(file_get_contents($ordersFile), true) ?: [];
+            $targetOrder = null;
+            foreach ($orders as &$ord) {
+                if (($ord['ticket_no'] ?? '') === $ticketNo
+                    && ($currentRole !== 'tl' || ($ord['tl_code'] ?? '') === $currentTlCode)) {
+                    $ord['status']     = $newStatus;
+                    $ord['updated_at'] = date('Y-m-d H:i:s');
+                    $targetOrder       = $ord;
+                    break;
+                }
+            }
+            unset($ord);
+            file_put_contents($ordersFile, json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+            // Sinkronkan status langsung ke Google Spreadsheet via Apps Script
+            $gsheetSynced = false;
+            $settings = SettingsManager::get();
+            try {
+                if (!empty($settings['apps_script_url'])) {
+                    $service = new \App\AppsScriptService();
+                    $service->updateStatus($ticketNo, $newStatus, $targetOrder ?: []);
+                    $gsheetSynced = true;
+                }
+            } catch (\Exception $syncErr) {
+                error_log("GSheet Status Sync Error: " . $syncErr->getMessage());
+            }
+
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                $allOrders = json_decode(file_get_contents($ordersFile), true) ?: [];
+                if ($currentRole === 'tl') {
+                    $allOrders = array_values(array_filter($allOrders, fn($o) => ($o['tl_code'] ?? '') === $currentTlCode));
+                }
+                $pendingCount = count(array_filter($allOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
+                echo json_encode([
+                    'success'       => true,
+                    'ticket_no'     => $ticketNo,
+                    'status'        => $newStatus,
+                    'status_class'  => 'status-' . strtolower($newStatus),
+                    'pending_count' => $pendingCount,
+                    'total_count'   => count($allOrders),
+                    'message'       => "Status order {$ticketNo} diubah ke {$newStatus}" . ($gsheetSynced ? " (Tersinkron ke Spreadsheet)" : "")
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $syncInfo = $gsheetSynced ? " (Otomatis Tersinkron ke Google Spreadsheet)" : "";
+            $msgSuccess = "Status order <strong>{$ticketNo}</strong> berhasil diubah ke <strong>{$newStatus}</strong>{$syncInfo}.";
+        } else {
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'File orders tidak ditemukan.']);
+                exit;
+            }
+            $msgError = "File orders tidak ditemukan.";
+        }
+    }
+
+    // 8. HAPUS ORDER (KHUSUS SUPER ADMIN)
+    elseif ($action === 'delete_order') {
+        $activeTab = 'orders-tab';
+        if ($currentRole !== 'superadmin') {
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Hanya Super Admin yang berhak menghapus data order.']);
+                exit;
+            }
+            $msgError = 'Hanya Super Admin yang berhak menghapus data order.';
+        } else {
+            $ticketNo = trim($_POST['ticket_no'] ?? '');
+            $ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
+            if (file_exists($ordersFile) && $ticketNo) {
+                $orders = json_decode(file_get_contents($ordersFile), true) ?: [];
+                $deletedOrder = null;
+                $newOrders = [];
+                foreach ($orders as $ord) {
+                    if (($ord['ticket_no'] ?? '') === $ticketNo) {
+                        $deletedOrder = $ord;
+                    } else {
+                        $newOrders[] = $ord;
+                    }
+                }
+                file_put_contents($ordersFile, json_encode($newOrders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+                // Sinkronkan ke Google Spreadsheet untuk merahkan baris yang terhapus
+                $settings = SettingsManager::get();
+                $gsheetSynced = false;
+                try {
+                    if (!empty($settings['apps_script_url'])) {
+                        $service = new \App\AppsScriptService();
+                        $service->deleteOrder($ticketNo, $deletedOrder ?: []);
+                        $gsheetSynced = true;
+                    }
+                } catch (\Exception $syncErr) {
+                    error_log("GSheet Delete Order Sync Error: " . $syncErr->getMessage());
+                }
+
+                if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    $pendingCount = count(array_filter($newOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
+                    echo json_encode([
+                        'success'       => true,
+                        'ticket_no'     => $ticketNo,
+                        'pending_count' => $pendingCount,
+                        'total_count'   => count($newOrders),
+                        'message'       => "Order tiket {$ticketNo} berhasil dihapus & di-merahkan di Google Spreadsheet."
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+
+                $syncInfo = $gsheetSynced ? " dan baris di Google Spreadsheet telah ditandai merah (DIHAPUS)" : "";
+                $msgSuccess = "Order tiket <strong>{$ticketNo}</strong> berhasil dihapus{$syncInfo}.";
+            } else {
+                if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['success' => false, 'message' => 'Data order tidak ditemukan.']);
+                    exit;
+                }
+                $msgError = "Data order tidak ditemukan.";
+            }
+        }
+    }
+
+    // 9. UPDATE TARIF PPN (KHUSUS SUPER ADMIN)
+    elseif ($action === 'update_ppn_rate') {
+        $activeTab = 'packages-tab';
+        if ($currentRole !== 'superadmin') {
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Hanya Super Admin yang berhak mengubah tarif PPN.']);
+                exit;
+            }
+            $msgError = 'Hanya Super Admin yang berhak mengubah tarif PPN sistem.';
+        } else {
+            $ppnRate = (float)($_POST['ppn_percent'] ?? 11);
+            if ($ppnRate < 0) $ppnRate = 11;
+            $settings['ppn_percent'] = $ppnRate;
+            SettingsManager::update($settings);
+
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success'     => true,
+                    'ppn_percent' => $ppnRate,
+                    'message'     => "Tarif PPN berhasil diperbarui menjadi {$ppnRate}% dan otomatis berlaku untuk seluruh sistem!"
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $msgSuccess = "Tarif PPN berhasil diperbarui menjadi <strong>{$ppnRate}%</strong> dan otomatis berlaku untuk seluruh formulir & tim!";
+        }
+    }
 }
 
 // Data Fetching
 $salesList     = SalesManager::getAll();
+if ($currentRole === 'tl') {
+    $salesList = array_values(array_filter($salesList, fn($sales) => ($sales['tl_code'] ?? '') === $currentTlCode));
+}
 $settings      = SettingsManager::get();
+$teamLeaders   = array_values(array_filter(AuthManager::getUsers(), fn($user) => ($user['role'] ?? '') === 'tl'));
 $packages      = $settings['packages'] ?? [];
 $codeGsPath    = dirname(__DIR__, 2) . '/apps-script/Code.gs';
 $codeGsContent = file_exists($codeGsPath) ? file_get_contents($codeGsPath) : '';
+
+// Load Orders untuk Status Tracking
+$ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
+$ordersList = file_exists($ordersFile) ? (json_decode(file_get_contents($ordersFile), true) ?: []) : [];
+if ($currentRole === 'tl') {
+    $ordersList = array_values(array_filter($ordersList, fn($order) => ($order['tl_code'] ?? '') === $currentTlCode));
+}
+$ordersList = array_reverse($ordersList); // Terbaru di atas
 
 // Hitung Base URL untuk link sales tanpa /public/
 $protocol   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
@@ -226,6 +568,8 @@ $baseUrl    = rtrim($protocol . $host . $rootAppDir, '/') . '/';
 
 $totalSales  = count($salesList);
 $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active') === 'active'));
+$totalOrders = count($ordersList);
+$pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PENDING') === 'PENDING'));
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -437,12 +781,31 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
         }
 
         .status-badge {
-            font-size: 11px; font-weight: 700;
-            padding: 3px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 800;
+            padding: 4px 12px; border-radius: 12px;
             display: inline-block;
         }
-        .status-active { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
-        .status-inactive { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+        .status-active, .status-selesai { background: #00ff00; color: #000; font-weight: 800; border: 1px solid #00cc00; }
+        .status-inactive, .status-batal { background: #ff0000; color: #fff; font-weight: 800; border: 1px solid #cc0000; }
+        .status-pending { background: #ff9900; color: #000; font-weight: 800; border: 1px solid #cc7a00; }
+        .status-processing, .status-diproses { background: #ffff00; color: #000; font-weight: 800; border: 1px solid #cccc00; }
+
+        .order-status-select {
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 12.5px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        .order-status-select.status-pending { background: #ff9900; color: #000; border: 1px solid #cc7a00; }
+        .order-status-select.status-diproses { background: #ffff00; color: #000; border: 1px solid #cccc00; }
+        .order-status-select.status-selesai { background: #00ff00; color: #000; border: 1px solid #00cc00; }
+        .order-status-select.status-batal { background: #ff0000; color: #fff; border: 1px solid #cc0000; }
+        .order-status-select option { background: #111c38; color: #fff; font-weight: normal; }
+        .empty-state { padding: 32px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border); border-radius: var(--radius-md); }
 
         /* Action Buttons */
         .btn-action {
@@ -670,6 +1033,84 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes rowNewAnim {
+            0% { background: rgba(16, 185, 129, 0.35); transform: translateY(-8px); opacity: 0; }
+            50% { background: rgba(16, 185, 129, 0.2); }
+            100% { background: transparent; transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes savingPulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 160, 223, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(0, 160, 223, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 160, 223, 0); }
+        }
+
+        .row-new {
+            animation: rowNewAnim 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .select-saving {
+            animation: savingPulse 1s infinite;
+            pointer-events: none;
+            opacity: 0.85;
+        }
+
+        /* LIVE PULSE DOT */
+        .live-pulse-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            margin-left: 6px;
+            box-shadow: 0 0 8px #10b981;
+            animation: pulseDot 2s infinite;
+        }
+        @keyframes pulseDot {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* FLOATING TOAST SYSTEM */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            max-width: 380px;
+            width: calc(100% - 48px);
+        }
+        .toast-item {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.96);
+            border: 1px solid rgba(0, 160, 223, 0.4);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            animation: toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transition: all 0.3s ease;
+        }
+        .toast-item.toast-success { border-color: rgba(16, 185, 129, 0.5); border-left: 4px solid #10b981; }
+        .toast-item.toast-error { border-color: rgba(239, 68, 68, 0.5); border-left: 4px solid #ef4444; }
+        .toast-item.toast-info { border-color: rgba(0, 160, 223, 0.5); border-left: 4px solid #00a0df; }
+        .toast-item.toast-out { opacity: 0; transform: translateY(12px) scale(0.95); }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(16px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         /* ================= RESPONSIVE BREAKPOINTS ================= */
@@ -910,6 +1351,10 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
         </div>
     </div>
     <div class="topbar-right">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;font-size:12.5px;">
+            <span style="color:#67e8f9;font-weight:800;">👤 <?= htmlspecialchars($currentUser) ?></span>
+            <span style="color:var(--text-muted);font-size:11px;">(<?= $currentRole === 'superadmin' ? 'Super Admin' : 'TL: ' . htmlspecialchars($currentTlCode) ?>)</span>
+        </div>
         <?php if (!empty($salesList[0])): ?>
             <a href="<?= htmlspecialchars($baseUrl . $salesList[0]['sales_code']) ?>" target="_blank" class="btn-view-form">Lihat Form Sales (<?= htmlspecialchars($salesList[0]['sales_code']) ?>)</a>
         <?php endif; ?>
@@ -954,14 +1399,126 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
 
     <!-- TABS NAV -->
     <div class="tabs-nav">
-        <button type="button" class="tab-btn active" onclick="switchTab('sales-tab')">Manajemen Tim Sales & Shortlink</button>
-        <button type="button" class="tab-btn" onclick="switchTab('google-tab')">Integrasi Google & Apps Script</button>
-        <button type="button" class="tab-btn" onclick="switchTab('packages-tab')">Pengaturan Paket & Form</button>
-        <button type="button" class="tab-btn" onclick="switchTab('settings-tab')">Profil Perusahaan & Admin</button>
+        <button type="button" class="tab-btn <?= $activeTab === 'sales-tab' ? 'active' : '' ?>" onclick="switchTab('sales-tab', this)">Manajemen Tim Sales & Shortlink</button>
+        <button type="button" class="tab-btn <?= $activeTab === 'orders-tab' ? 'active' : '' ?>" onclick="switchTab('orders-tab', this)" id="tab-btn-orders">
+            Status Order <span id="orders-tab-count">(<?= $totalOrders ?>)</span> <span class="live-pulse-dot" title="Realtime Live Sync Aktif"></span>
+        </button>
+        <?php if ($currentRole === 'superadmin'): ?>
+            <button type="button" class="tab-btn <?= $activeTab === 'google-tab' ? 'active' : '' ?>" onclick="switchTab('google-tab', this)">Integrasi Google & Apps Script</button>
+        <?php endif; ?>
+        <button type="button" class="tab-btn <?= $activeTab === 'packages-tab' ? 'active' : '' ?>" onclick="switchTab('packages-tab', this)">Pengaturan Paket & Form</button>
+        <button type="button" class="tab-btn <?= $activeTab === 'settings-tab' ? 'active' : '' ?>" onclick="switchTab('settings-tab', this)"><?= $currentRole === 'superadmin' ? 'Profil Perusahaan & Super Admin' : 'Profil & Keamanan Team Leader' ?></button>
+    </div>
+
+    <!-- ================= TAB: STATUS ORDER ================= -->
+    <div id="orders-tab" class="tab-content <?= $activeTab === 'orders-tab' ? 'active' : '' ?>">
+        <div class="panel-card">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title" style="display:flex;align-items:center;gap:8px;">
+                        <span>Status Pendaftaran Pelanggan</span>
+                        <span style="font-size:11px;background:rgba(16,185,129,0.15);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);padding:2px 8px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+                            <span class="live-pulse-dot" style="margin-left:0;"></span> REALTIME LIVE SYNC
+                        </span>
+                    </div>
+                    <div class="panel-desc">Perubahan status dan data pendaftaran diperbarui secara otomatis dan instan secara realtime tanpa perlu me-refresh halaman.</div>
+                </div>
+                <span class="status-badge status-pending" id="header-pending-badge"><?= $pendingOrders ?> Pending</span>
+            </div>
+
+            <!-- SEARCH & STATUS FILTER BAR -->
+            <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;align-items:center;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:12px 16px;">
+                <div style="flex:1;min-width:260px;position:relative;">
+                    <input type="text" id="search-orders" class="form-control" 
+                           placeholder="🔍 Cari kata kunci (No. Tiket, Nama Pelanggan, Email, Sales, Home ID, Tikor)..." 
+                           oninput="filterOrders()" 
+                           style="padding-left:14px;padding-right:38px;font-size:13px;border-radius:8px;background:#090d1a;">
+                    <button type="button" id="btn-clear-search-orders" onclick="clearSearchOrders()" 
+                            style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.1);border:none;color:#cbd5e1;font-size:13px;width:22px;height:22px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;" 
+                            title="Hapus kata kunci pencarian">&times;</button>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    <span style="font-size:12px;color:var(--text-muted);font-weight:700;">Filter:</span>
+                    <button type="button" class="btn-filter-status active" data-status="ALL" onclick="filterStatusOrders('ALL', this)" style="padding:6px 12px;font-size:11.5px;font-weight:700;border-radius:8px;cursor:pointer;background:#00a0df;color:#fff;border:1px solid #00a0df;transition:all 0.2s;">Semua</button>
+                    <button type="button" class="btn-filter-status" data-status="PENDING" onclick="filterStatusOrders('PENDING', this)" style="padding:6px 12px;font-size:11.5px;font-weight:700;border-radius:8px;cursor:pointer;background:rgba(245,158,11,0.12);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);transition:all 0.2s;">Pending</button>
+                    <button type="button" class="btn-filter-status" data-status="DIPROSES" onclick="filterStatusOrders('DIPROSES', this)" style="padding:6px 12px;font-size:11.5px;font-weight:700;border-radius:8px;cursor:pointer;background:rgba(14,165,233,0.12);color:#38bdf8;border:1px solid rgba(14,165,233,0.3);transition:all 0.2s;">Diproses</button>
+                    <button type="button" class="btn-filter-status" data-status="SELESAI" onclick="filterStatusOrders('SELESAI', this)" style="padding:6px 12px;font-size:11.5px;font-weight:700;border-radius:8px;cursor:pointer;background:rgba(16,185,129,0.12);color:#6ee7b7;border:1px solid rgba(16,185,129,0.3);transition:all 0.2s;">Selesai</button>
+                    <button type="button" class="btn-filter-status" data-status="BATAL" onclick="filterStatusOrders('BATAL', this)" style="padding:6px 12px;font-size:11.5px;font-weight:700;border-radius:8px;cursor:pointer;background:rgba(239,68,68,0.12);color:#fca5a5;border:1px solid rgba(239,68,68,0.3);transition:all 0.2s;">Batal</button>
+                </div>
+            </div>
+
+            <div id="orders-not-found" class="empty-state" style="display:none;padding:24px;background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.15);border-radius:10px;margin-bottom:14px;color:#94a3b8;">
+                🔍 Tidak ditemukan pendaftaran yang cocok dengan kata kunci pencarian Anda.
+            </div>
+
+            <div id="orders-empty-state" class="empty-state" style="<?= empty($ordersList) ? '' : 'display:none;' ?>">
+                Belum ada pendaftaran yang tercatat.
+            </div>
+
+            <div class="table-responsive" id="orders-table-wrapper" style="<?= empty($ordersList) ? 'display:none;' : '' ?>">
+                <table class="admin-table" id="orders-table">
+                    <thead>
+                        <tr>
+                            <th>Pelanggan</th>
+                            <th>No. Tiket</th>
+                            <th>Sales / Team Leader</th>
+                            <th>Home ID</th>
+                            <th>Waktu Daftar</th>
+                            <th>Status Order</th>
+                            <?php if ($currentRole === 'superadmin'): ?>
+                                <th style="text-align:center;">Aksi</th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody">
+                        <?php foreach ($ordersList as $order):
+                            $orderStatus = strtoupper($order['status'] ?? 'PENDING');
+                            $statusClass = match ($orderStatus) {
+                                'SELESAI' => 'status-selesai',
+                                'BATAL' => 'status-batal',
+                                'DIPROSES' => 'status-diproses',
+                                default => 'status-pending',
+                            };
+                            $ticketId = htmlspecialchars($order['ticket_no'] ?? '');
+                        ?>
+                        <tr id="order-row-<?= $ticketId ?>">
+                            <td><strong><?= htmlspecialchars($order['nama'] ?? '-') ?></strong><br><small><?= htmlspecialchars($order['email'] ?? '-') ?></small></td>
+                            <td><code style="font-size:11.5px;color:#38bdf8;"><?= $ticketId ?: '-' ?></code></td>
+                            <td><?= htmlspecialchars($order['sales_code'] ?? '-') ?><br><small><?= htmlspecialchars($order['tl_code'] ?? '-') ?></small></td>
+                            <td>
+                                <?= htmlspecialchars($order['home_id'] ?? '-') ?>
+                                <?php if (!empty($order['tikor'])): ?>
+                                    <br><a href="https://www.google.com/maps?q=<?= urlencode($order['tikor']) ?>" target="_blank" style="font-size:11px;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Buka Lokasi di Google Maps">📍 <?= htmlspecialchars($order['tikor']) ?></a>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($order['submitted_at'] ?? '-') ?></td>
+                            <td>
+                                <div style="display:flex;align-items:center;gap:6px;min-width:140px;">
+                                    <select id="select-status-<?= $ticketId ?>" class="order-status-select <?= $statusClass ?>" onchange="updateOrderStatusRealtime('<?= $ticketId ?>', this.value, this)" aria-label="Status order <?= $ticketId ?>">
+                                        <option value="PENDING" <?= $orderStatus === 'PENDING' ? 'selected' : '' ?>>PENDING</option>
+                                        <option value="DIPROSES" <?= $orderStatus === 'DIPROSES' ? 'selected' : '' ?>>DIPROSES</option>
+                                        <option value="SELESAI" <?= $orderStatus === 'SELESAI' ? 'selected' : '' ?>>SELESAI</option>
+                                        <option value="BATAL" <?= $orderStatus === 'BATAL' ? 'selected' : '' ?>>BATAL</option>
+                                    </select>
+                                </div>
+                            </td>
+                            <?php if ($currentRole === 'superadmin'): ?>
+                            <td style="text-align:center;white-space:nowrap;">
+                                <button type="button" class="btn-action" onclick="deleteOrderRealtime('<?= $ticketId ?>', this)" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(239,68,68,0.35);" title="Hapus order & tandai merah di Spreadsheet">
+                                    🗑️ Hapus
+                                </button>
+                            </td>
+                            <?php endif; ?>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- ================= TAB 1: MANAJEMEN SALES ================= -->
-    <div id="sales-tab" class="tab-content active">
+    <div id="sales-tab" class="tab-content <?= $activeTab === 'sales-tab' ? 'active' : '' ?>">
 
         <div class="panel-card">
             <div class="panel-header">
@@ -985,6 +1542,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                             <th>WhatsApp / Telp</th>
                             <th>Team Leader</th>
                             <th>Status</th>
+                            <th style="text-align:center;">Email Customer</th>
                             <th>Link Form Khusus Sales</th>
                             <th>Aksi</th>
                         </tr>
@@ -1006,6 +1564,14 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                                 <span class="status-badge <?= $sales['status'] === 'active' ? 'status-active' : 'status-inactive' ?>">
                                     <?= $sales['status'] === 'active' ? 'Aktif' : 'Non-aktif' ?>
                                 </span>
+                            </td>
+                            <td style="text-align:center;">
+                                <?php $emailOn = $sales['email_customer_enabled'] ?? true; ?>
+                                <button type="button" onclick="toggleEmailCustomerAjax('<?= htmlspecialchars($sales['id']) ?>', <?= $emailOn ? '0' : '1' ?>, this)"
+                                    title="<?= $emailOn ? 'Klik untuk MATIKAN email ke customer' : 'Klik untuk AKTIFKAN email ke customer' ?>"
+                                    style="background:<?= $emailOn ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.15)' ?>;border:1px solid <?= $emailOn ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.4)' ?>;color:<?= $emailOn ? '#6ee7b7' : '#fca5a5' ?>;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;">
+                                    <?= $emailOn ? '✓ ON' : '✗ OFF' ?>
+                                </button>
                             </td>
                             <td>
                                 <div style="display:flex;align-items:center;gap:6px;">
@@ -1034,8 +1600,9 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
 
     </div>
 
+    <?php if ($currentRole === 'superadmin'): ?>
     <!-- ================= TAB 2: INTEGRASI GOOGLE & APPS SCRIPT ================= -->
-    <div id="google-tab" class="tab-content">
+    <div id="google-tab" class="tab-content <?= $activeTab === 'google-tab' ? 'active' : '' ?>">
         <div class="panel-card">
             <div class="panel-header">
                 <div>
@@ -1077,9 +1644,15 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     </div>
 
                     <div class="form-group">
-                        <label>Email Master Penerima Notifikasi & SO</label>
+                        <label>Email Master Penerima Notifikasi SO</label>
+                        <input type="email" name="master_email" class="form-control"
+                            value="<?= htmlspecialchars($settings['master_email'] ?? ($settings['admin_email'] ?? 'pujapangestu02@gmail.com')) ?>" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email Admin / Penerima Notifikasi Tambahan</label>
                         <input type="email" name="admin_email" class="form-control" 
-                            value="<?= htmlspecialchars($settings['admin_email'] ?? 'pujapangestu02@gmail.com') ?>" required>
+                            value="<?= htmlspecialchars($settings['admin_email'] ?? ($settings['master_email'] ?? 'pujapangestu02@gmail.com')) ?>" required>
                     </div>
 
                     <div class="form-group">
@@ -1113,9 +1686,45 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- ================= TAB 3: PENGATURAN PAKET & FORM ================= -->
-    <div id="packages-tab" class="tab-content">
+    <div id="packages-tab" class="tab-content <?= $activeTab === 'packages-tab' ? 'active' : '' ?>">
+
+        <?php $ppnPercent = (float)($settings['ppn_percent'] ?? 11); ?>
+
+        <!-- CARD PENGATURAN TARIF PPN SISTEM -->
+        <div class="panel-card" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(0,160,223,0.1),rgba(15,23,42,0.6));border:1px solid rgba(0,160,223,0.3);">
+            <div class="panel-header" style="margin-bottom:12px;">
+                <div>
+                    <div class="panel-title" style="color:#67e8f9;font-size:16px;">⚙️ Pengaturan Tarif PPN Sistem</div>
+                    <div class="panel-desc">Atur persentase tarif PPN untuk seluruh kalkulasi paket internet &amp; add-on. Perubahan oleh Super Admin otomatis berlaku secara instan ke formulir pelanggan dan seluruh akun Team Leader.</div>
+                </div>
+            </div>
+            <form id="form-ppn" onsubmit="updatePpnRateRealtime(event)" method="POST" style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+                <input type="hidden" name="action" value="update_ppn_rate">
+                <input type="hidden" name="ajax" value="1">
+                <div class="form-group" style="margin-bottom:0;min-width:220px;">
+                    <label style="color:#e2e8f0;font-weight:700;">Tarif PPN Saat Ini (%) *</label>
+                    <div style="position:relative;display:flex;align-items:center;">
+                        <input type="number" step="0.1" min="0" max="100" name="ppn_percent" id="input-ppn-percent" class="form-control" 
+                               value="<?= htmlspecialchars($ppnPercent) ?>" 
+                               <?= $currentRole !== 'superadmin' ? 'readonly style="background:rgba(0,0,0,0.4);color:#94a3b8;"' : 'required' ?>
+                               style="padding-right:38px;font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;">
+                        <span style="position:absolute;right:14px;color:#67e8f9;font-weight:800;font-size:14px;">%</span>
+                    </div>
+                </div>
+                <?php if ($currentRole === 'superadmin'): ?>
+                <button type="submit" id="btn-save-ppn" class="btn-primary" style="padding:10px 22px;">
+                    Simpan Tarif PPN
+                </button>
+                <?php else: ?>
+                <div style="font-size:12px;color:#fbbf24;display:flex;align-items:center;gap:6px;padding-bottom:10px;">
+                    ℹ️ Tarif PPN dikonfigurasi secara terpusat oleh Super Admin (Otomatis Tersinkron)
+                </div>
+                <?php endif; ?>
+            </form>
+        </div>
 
         <!-- INFO BULAN OTOMATIS -->
         <div style="background:linear-gradient(135deg, rgba(16,185,129,0.12), rgba(0,160,223,0.12));border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;">
@@ -1169,7 +1778,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     $pkgId = $pkg['id'];
 
                     $estimasiSubtotal = $price + $biayaTambahan;
-                    $estimasiPpn = round($estimasiSubtotal * 0.11);
+                    $estimasiPpn = round($estimasiSubtotal * ($ppnPercent / 100));
                     $estimasiTotal = $estimasiSubtotal + $estimasiPpn;
                 ?>
                 <div class="pkg-main-card" id="pkg-card-<?= $pkgId ?>">
@@ -1304,7 +1913,7 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                                         <strong style="color:#fff;" id="live-calc-tambahan-<?= $pkgId ?>">Rp <?= number_format($biayaTambahan, 0, ',', '.') ?></strong>
                                     </div>
                                     <div style="display:flex;justify-content:space-between;">
-                                        <span>PPN 11%:</span>
+                                        <span>PPN <?= $ppnPercent ?>%:</span>
                                         <strong style="color:#fff;" id="live-calc-ppn-<?= $pkgId ?>">Rp <?= number_format($estimasiPpn, 0, ',', '.') ?></strong>
                                     </div>
                                     <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.12);padding-top:5px;margin-top:2px;">
@@ -1388,13 +1997,58 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
         </div>
     </div>
 
-    <!-- ================= TAB 4: PROFIL PERUSAHAAN & ADMIN ================= -->
-    <div id="settings-tab" class="tab-content">
+    <!-- ================= TAB 4: PROFIL PERUSAHAAN & ADMIN / TEAM LEADER ================= -->
+    <div id="settings-tab" class="tab-content <?= $activeTab === 'settings-tab' ? 'active' : '' ?>">
+        <?php if ($currentRole === 'superadmin'): ?>
+        <!-- SUPERADMIN: KELOLA AKUN TEAM LEADER -->
         <div class="panel-card">
             <div class="panel-header">
                 <div>
-                    <div class="panel-title">Pengaturan Kontak & Keamanan Admin</div>
-                    <div class="panel-desc">Sesuaikan nomor call center, kontak helpdesk, dan kredensial login admin</div>
+                    <div class="panel-title">Akun Team Leader</div>
+                    <div class="panel-desc">Buat akun TL untuk mengelola sales yang memakai kode team leader tersebut.</div>
+                </div>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="add_team_leader">
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label>Username TL *</label>
+                        <input type="text" name="tl_username" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password TL *</label>
+                        <input type="password" name="tl_password" class="form-control" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label>Kode Team Leader *</label>
+                        <input type="text" name="tl_code" class="form-control" placeholder="TL-MEDAN-04" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">Buat Akun Team Leader</button>
+            </form>
+            <?php if ($teamLeaders): ?>
+                <div class="table-responsive" style="margin-top:20px;">
+                    <table class="admin-table">
+                        <thead><tr><th>Username</th><th>Kode TL</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <tbody><?php foreach ($teamLeaders as $leader): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($leader['username']) ?></td>
+                                <td><?= htmlspecialchars($leader['tl_code'] ?? '-') ?></td>
+                                <td><span class="status-badge <?= ($leader['status'] ?? 'active') === 'active' ? 'status-active' : 'status-inactive' ?>"><?= ($leader['status'] ?? 'active') === 'active' ? 'Aktif' : 'Non-aktif' ?></span></td>
+                                <td><button type="button" class="btn-action" onclick="openEditTeamLeader(<?= htmlspecialchars(json_encode($leader)) ?>)">Edit Data</button></td>
+                            </tr>
+                        <?php endforeach; ?></tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- SUPERADMIN: PROFIL PERUSAHAAN & KEAMANAN -->
+        <div class="panel-card">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Pengaturan Profil Perusahaan & Keamanan Super Admin</div>
+                    <div class="panel-desc">Sesuaikan profil perusahaan, kontak helpdesk, dan kredensial login akun Super Admin</div>
                 </div>
             </div>
 
@@ -1402,6 +2056,11 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                 <input type="hidden" name="action" value="update_general_settings">
 
                 <div class="form-grid-2">
+                    <div class="form-group">
+                        <label>Nama Perusahaan / Vendor</label>
+                        <input type="text" name="company_name" class="form-control" value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA') ?>" required>
+                    </div>
+
                     <div class="form-group">
                         <label>Nomor Call Center</label>
                         <input type="text" name="call_center" class="form-control" value="<?= htmlspecialchars($settings['call_center'] ?? '1500 780') ?>" required>
@@ -1413,12 +2072,12 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                     </div>
 
                     <div class="form-group">
-                        <label>Username Login Admin</label>
-                        <input type="text" name="admin_username" class="form-control" value="<?= htmlspecialchars($settings['admin_username'] ?? 'admin') ?>" required>
+                        <label>Username Login Super Admin</label>
+                        <input type="text" name="admin_username" class="form-control" value="<?= htmlspecialchars($currentUser) ?>" required>
                     </div>
 
                     <div class="form-group">
-                        <label>Ganti Password Login Admin</label>
+                        <label>Ganti Password Login Super Admin</label>
                         <input type="password" name="admin_password" class="form-control" placeholder="Biarkan kosong jika tidak ingin mengubah">
                     </div>
 
@@ -1455,9 +2114,96 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
                 <button type="submit" class="btn-primary" style="margin-top:14px;">Simpan Pengaturan Profil & TTD SPV</button>
             </form>
         </div>
+
+        <?php else: ?>
+        <!-- TEAM LEADER: PROFIL & KEAMANAN MANDIRI (BALANCE) -->
+        <div class="panel-card">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Profil & Keamanan Akun Team Leader</div>
+                    <div class="panel-desc">Kelola username dan password login akun Team Leader Anda secara mandiri.</div>
+                </div>
+                <span class="status-badge status-active">Kode TL: <?= htmlspecialchars($currentTlCode) ?></span>
+            </div>
+
+            <div style="background:rgba(0,160,223,0.1);border:1px solid rgba(0,160,223,0.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;">
+                <div style="font-size:13px;color:#cbd5e1;line-height:1.6;">
+                    👤 Anda sedang login sebagai <strong>Team Leader</strong> dengan kode <strong><?= htmlspecialchars($currentTlCode) ?></strong>. Anda dapat mengganti username dan password akun Anda di bawah ini kapan saja.
+                </div>
+            </div>
+
+            <form method="POST">
+                <input type="hidden" name="action" value="update_tl_profile">
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label>Username Login Team Leader *</label>
+                        <input type="text" name="tl_username" class="form-control" value="<?= htmlspecialchars($currentUser) ?>" required>
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Username yang Anda gunakan untuk login ke panel ini.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ganti Password Login Team Leader</label>
+                        <input type="password" name="tl_password" class="form-control" minlength="6" placeholder="Biarkan kosong jika tidak ingin mengubah">
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Minimal 6 karakter jika ingin mengganti password baru.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Kode Team Leader (TL Code)</label>
+                        <input type="text" readonly class="form-control" value="<?= htmlspecialchars($currentTlCode) ?>" style="background:rgba(0,0,0,0.3);color:#67e8f9;font-weight:800;font-family:'JetBrains Mono',monospace;">
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Kode penugasan tim sales Anda (diatur oleh Super Admin).</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Role Akun</label>
+                        <input type="text" readonly class="form-control" value="Team Leader / SPV" style="background:rgba(0,0,0,0.3);color:#86efac;font-weight:700;">
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Hak akses khusus pimpinan tim sales.</small>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary" style="margin-top:14px;padding:12px 28px;">
+                    💾 Simpan Perubahan Profil Team Leader
+                </button>
+            </form>
+        </div>
+        <?php endif; ?>
     </div>
 
 </main>
+
+<!-- MODAL EDIT TEAM LEADER -->
+<div id="modal-edit-team-leader" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">Edit Data Team Leader</div>
+            <button type="button" class="modal-close" onclick="closeModal('modal-edit-team-leader')">&times;</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="edit_team_leader">
+            <input type="hidden" id="edit-tl-id" name="tl_id">
+            <div class="form-group">
+                <label>Username TL *</label>
+                <input type="text" id="edit-tl-username" name="tl_username" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Password Baru</label>
+                <input type="password" name="tl_password" class="form-control" minlength="6" placeholder="Kosongkan jika tidak diubah">
+            </div>
+            <div class="form-group">
+                <label>Kode Team Leader *</label>
+                <input type="text" id="edit-tl-code" name="tl_code" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select id="edit-tl-status" name="tl_status" class="form-control form-select">
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Non-aktif</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary" style="width:100%;margin-top:8px;">Simpan Perubahan TL</button>
+        </form>
+    </div>
+</div>
 
 <!-- MODAL TAMBAH SALES -->
 <div id="modal-add-sales" class="modal">
@@ -1573,6 +2319,8 @@ $activeSales = count(array_filter($salesList, fn($s) => ($s['status'] ?? 'active
 <div id="toast" class="toast">Link berhasil disalin ke clipboard!</div>
 
 <script>
+const PPN_PERCENT = <?= (float)($settings['ppn_percent'] ?? 11) ?>;
+
 function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -1591,6 +2339,14 @@ function switchTab(tabId, btn) {
 
 function openAddModal() {
     document.getElementById('modal-add-sales').classList.add('active');
+}
+
+function openEditTeamLeader(leader) {
+    document.getElementById('edit-tl-id').value = leader.id || leader.username;
+    document.getElementById('edit-tl-username').value = leader.username || '';
+    document.getElementById('edit-tl-code').value = leader.tl_code || '';
+    document.getElementById('edit-tl-status').value = leader.status || 'active';
+    document.getElementById('modal-edit-team-leader').classList.add('active');
 }
 
 function openEditModal(sales) {
@@ -1720,7 +2476,7 @@ function syncPkgLive(pkgId) {
     const tambahan = parseInt(rawTambahan, 10) || 0;
 
     const subtotal = price + tambahan;
-    const ppn = Math.round(subtotal * 0.11);
+    const ppn = Math.round(subtotal * (PPN_PERCENT / 100));
     const total = subtotal + ppn;
 
     // Update Header Price Summary
@@ -1799,6 +2555,433 @@ function escapeHtml(text) {
     };
     return text.replace(/[&<>"']/g, m => map[m]);
 }
+
+// ========================================================
+// REALTIME LIVE SYSTEM (ZERO PAGE RELOAD)
+// ========================================================
+function showLiveToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    const icon = type === 'success' ? '✓' : (type === 'error' ? '⚠️' : 'ℹ️');
+    toast.innerHTML = `<span style="font-size:16px;">${icon}</span><span style="flex:1;">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 320);
+    }, 3800);
+}
+
+// Toggle Email Customer Realtime
+async function toggleEmailCustomerAjax(salesId, nextState, btnEl) {
+    const formData = new FormData();
+    formData.append('action', 'toggle_email_customer');
+    formData.append('sales_id', salesId);
+    formData.append('enabled', String(nextState));
+    formData.append('ajax', '1');
+    
+    btnEl.style.opacity = '0.5';
+    try {
+        const res = await fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const result = await res.json();
+        btnEl.style.opacity = '1';
+        if (result.success) {
+            const isNowOn = !!result.enabled;
+            btnEl.textContent = isNowOn ? '✓ ON' : '✗ OFF';
+            btnEl.style.background = isNowOn ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.15)';
+            btnEl.style.borderColor = isNowOn ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.4)';
+            btnEl.style.color = isNowOn ? '#6ee7b7' : '#fca5a5';
+            btnEl.setAttribute('onclick', `toggleEmailCustomerAjax('${salesId}', ${isNowOn ? 0 : 1}, this)`);
+            showLiveToast(result.message, 'success');
+        } else {
+            showLiveToast(result.message || 'Gagal mengubah status email', 'error');
+        }
+    } catch (e) {
+        btnEl.style.opacity = '1';
+        showLiveToast('Terjadi kesalahan: ' + e.message, 'error');
+    }
+}
+
+// 1. Update Status Order Realtime (Zero Reload)
+async function updateOrderStatusRealtime(ticketNo, newStatus, selectEl) {
+    if (!ticketNo) return;
+    
+    // Ubah visual status & badge seketika
+    const statusLower = newStatus.toLowerCase();
+    selectEl.className = `order-status-select status-${statusLower} select-saving`;
+    
+    const formData = new FormData();
+    formData.append('action', 'update_order_status');
+    formData.append('ticket_no', ticketNo);
+    formData.append('order_status', newStatus);
+    formData.append('ajax', '1');
+    
+    try {
+        const res = await fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const result = await res.json();
+        selectEl.classList.remove('select-saving');
+        
+        if (result.success) {
+            showLiveToast(result.message || `Status order ${ticketNo} diubah ke ${newStatus}`, 'success');
+            if (typeof result.pending_count !== 'undefined') {
+                const headerBadge = document.getElementById('header-pending-badge');
+                if (headerBadge) headerBadge.textContent = `${result.pending_count} Pending`;
+            }
+            if (typeof result.total_count !== 'undefined') {
+                const tabCount = document.getElementById('orders-tab-count');
+                if (tabCount) tabCount.textContent = `(${result.total_count})`;
+            }
+        } else {
+            showLiveToast(result.message || 'Gagal mengubah status order', 'error');
+        }
+    } catch (err) {
+        selectEl.classList.remove('select-saving');
+        showLiveToast('Koneksi terganggu saat menyimpan status: ' + err.message, 'error');
+    }
+}
+
+// 2. Hapus Order Realtime (Zero Reload - Khusus Super Admin)
+async function deleteOrderRealtime(ticketNo, btnEl) {
+    if (!ticketNo) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus data order tiket ${ticketNo}?\n\nBaris pendaftaran di Google Spreadsheet akan otomatis di-merahkan (DIHAPUS).`)) {
+        return;
+    }
+    
+    const row = document.getElementById(`order-row-${ticketNo}`) || btnEl.closest('tr');
+    if (row) {
+        row.style.transition = 'all 0.35s ease';
+        row.style.opacity = '0.4';
+        row.style.pointerEvents = 'none';
+    }
+    
+    const formData = new FormData();
+    formData.append('action', 'delete_order');
+    formData.append('ticket_no', ticketNo);
+    formData.append('ajax', '1');
+    
+    try {
+        const res = await fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+            if (row) {
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(20px)';
+                setTimeout(() => {
+                    row.remove();
+                    const tbody = document.getElementById('orders-tbody');
+                    if (tbody && tbody.children.length === 0) {
+                        const emptyState = document.getElementById('orders-empty-state');
+                        const tableWrapper = document.getElementById('orders-table-wrapper');
+                        if (emptyState) emptyState.style.display = 'block';
+                        if (tableWrapper) tableWrapper.style.display = 'none';
+                    }
+                }, 350);
+            }
+            showLiveToast(result.message || `Order tiket ${ticketNo} berhasil dihapus`, 'success');
+            
+            if (typeof result.pending_count !== 'undefined') {
+                const headerBadge = document.getElementById('header-pending-badge');
+                if (headerBadge) headerBadge.textContent = `${result.pending_count} Pending`;
+            }
+            if (typeof result.total_count !== 'undefined') {
+                const tabCount = document.getElementById('orders-tab-count');
+                if (tabCount) tabCount.textContent = `(${result.total_count})`;
+            }
+        } else {
+            if (row) {
+                row.style.opacity = '1';
+                row.style.pointerEvents = 'auto';
+            }
+            showLiveToast(result.message || 'Gagal menghapus order', 'error');
+        }
+    } catch (err) {
+        if (row) {
+            row.style.opacity = '1';
+            row.style.pointerEvents = 'auto';
+        }
+        showLiveToast('Koneksi terganggu saat menghapus order: ' + err.message, 'error');
+    }
+}
+
+// 3. Simpan Tarif PPN Realtime (Zero Reload)
+async function updatePpnRateRealtime(e) {
+    if (e) e.preventDefault();
+    const form = document.getElementById('form-ppn');
+    const input = document.getElementById('input-ppn-percent');
+    const btn = document.getElementById('btn-save-ppn');
+    
+    if (!input) return;
+    const newRate = parseFloat(input.value) || 0;
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan...';
+    }
+    
+    const formData = new FormData(form);
+    formData.set('action', 'update_ppn_rate');
+    formData.set('ajax', '1');
+    
+    try {
+        const res = await fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const result = await res.json();
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Simpan Tarif PPN';
+        }
+        
+        if (result.success) {
+            window.PPN_PERCENT = newRate;
+            // Update estimasi semua paket seketika
+            document.querySelectorAll('.pkg-main-card').forEach(card => {
+                const pkgId = card.id.replace('pkg-card-', '');
+                if (pkgId && typeof syncPkgLive === 'function') {
+                    syncPkgLive(pkgId);
+                }
+            });
+            showLiveToast(`⚙️ Tarif PPN sistem berhasil diubah ke ${newRate}% & seluruh estimasi harga paket otomatis diperbarui!`, 'success');
+        } else {
+            showLiveToast(result.message || 'Gagal memperbarui tarif PPN', 'error');
+        }
+    } catch (err) {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Simpan Tarif PPN';
+        }
+        showLiveToast('Terjadi kesalahan: ' + err.message, 'error');
+    }
+}
+
+// 4. Background Polling & Realtime Sync (Tiap 5 Detik)
+let knownTicketNumbers = new Set();
+let isPollingActive = false;
+
+function initKnownTickets() {
+    document.querySelectorAll('#orders-tbody tr').forEach(tr => {
+        const tId = tr.id.replace('order-row-', '');
+        if (tId) knownTicketNumbers.add(tId);
+    });
+}
+
+async function pollRealtimeOrders() {
+    if (isPollingActive) return;
+    isPollingActive = true;
+    
+    try {
+        const res = await fetch('dashboard.php?action=fetch_orders_realtime', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await res.json();
+        
+        if (data.success && Array.isArray(data.orders)) {
+            const tbody = document.getElementById('orders-tbody');
+            const emptyState = document.getElementById('orders-empty-state');
+            const tableWrapper = document.getElementById('orders-table-wrapper');
+            const isSuperAdmin = data.role === 'superadmin';
+            
+            // Update counter badges
+            const headerBadge = document.getElementById('header-pending-badge');
+            if (headerBadge) headerBadge.textContent = `${data.pending_count} Pending`;
+            const tabCount = document.getElementById('orders-tab-count');
+            if (tabCount) tabCount.textContent = `(${data.total_count})`;
+            
+            if (data.orders.length > 0) {
+                if (emptyState) emptyState.style.display = 'none';
+                if (tableWrapper) tableWrapper.style.display = 'block';
+            }
+            
+            // Periksa pendaftaran baru atau update status eksternal
+            let newOrderFound = false;
+            data.orders.forEach(order => {
+                const tId = String(order.ticket_no || '').trim();
+                if (!tId) return;
+                
+                const existingRow = document.getElementById(`order-row-${tId}`);
+                if (!existingRow) {
+                    newOrderFound = true;
+                    knownTicketNumbers.add(tId);
+                    
+                    const orderStatus = (order.status || 'PENDING').toUpperCase();
+                    const statusClass = orderStatus === 'SELESAI' ? 'status-selesai' : (orderStatus === 'BATAL' ? 'status-batal' : (orderStatus === 'DIPROSES' ? 'status-diproses' : 'status-pending'));
+                    
+                    const tr = document.createElement('tr');
+                    tr.id = `order-row-${tId}`;
+                    tr.className = 'row-new';
+                    
+                    const tikorHtml = order.tikor ? `<br><a href="https://www.google.com/maps?q=${encodeURIComponent(order.tikor)}" target="_blank" style="font-size:11px;color:#38bdf8;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:2px;" title="Buka Lokasi di Google Maps">📍 ${escapeHtml(order.tikor)}</a>` : '';
+                    const aksiHtml = isSuperAdmin ? `<td style="text-align:center;white-space:nowrap;"><button type="button" class="btn-action" onclick="deleteOrderRealtime('${tId}', this)" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(239,68,68,0.35);" title="Hapus order & tandai merah di Spreadsheet">🗑️ Hapus</button></td>` : '';
+                    
+                    tr.innerHTML = `
+                        <td><strong>${escapeHtml(order.nama || '-')}</strong><br><small>${escapeHtml(order.email || '-')}</small></td>
+                        <td><code style="font-size:11.5px;color:#38bdf8;">${escapeHtml(tId)}</code></td>
+                        <td>${escapeHtml(order.sales_code || '-')}<br><small>${escapeHtml(order.tl_code || '-')}</small></td>
+                        <td>${escapeHtml(order.home_id || '-')}${tikorHtml}</td>
+                        <td>${escapeHtml(order.submitted_at || '-')}</td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:6px;min-width:140px;">
+                                <select id="select-status-${tId}" class="order-status-select ${statusClass}" onchange="updateOrderStatusRealtime('${tId}', this.value, this)" aria-label="Status order ${tId}">
+                                    <option value="PENDING" ${orderStatus === 'PENDING' ? 'selected' : ''}>PENDING</option>
+                                    <option value="DIPROSES" ${orderStatus === 'DIPROSES' ? 'selected' : ''}>DIPROSES</option>
+                                    <option value="SELESAI" ${orderStatus === 'SELESAI' ? 'selected' : ''}>SELESAI</option>
+                                    <option value="BATAL" ${orderStatus === 'BATAL' ? 'selected' : ''}>BATAL</option>
+                                </select>
+                            </div>
+                        </td>
+                        ${aksiHtml}
+                    `;
+                    
+                    if (tbody) {
+                        tbody.insertBefore(tr, tbody.firstChild);
+                    }
+                } else {
+                    const select = document.getElementById(`select-status-${tId}`);
+                    if (select && !select.classList.contains('select-saving')) {
+                        const currentVal = select.value;
+                        const serverVal = (order.status || 'PENDING').toUpperCase();
+                        if (currentVal !== serverVal) {
+                            select.value = serverVal;
+                            select.className = `order-status-select status-${serverVal.toLowerCase()}`;
+                        }
+                    }
+                }
+            });
+            
+            if (newOrderFound) {
+                showLiveToast(`🔔 Pendaftaran Baru Masuk! Data otomatis diperbarui secara realtime.`, 'info');
+                if (typeof filterOrders === 'function') {
+                    filterOrders();
+                }
+            }
+        }
+    } catch (e) {
+        // Polling skip
+    } finally {
+        isPollingActive = false;
+    }
+}
+
+// 5. Filter & Pencarian Kata Kunci Order (Realtime Client-side Search)
+let currentStatusFilter = 'ALL';
+
+function filterStatusOrders(status, btnEl) {
+    currentStatusFilter = status;
+    document.querySelectorAll('.btn-filter-status').forEach(b => {
+        b.classList.remove('active');
+        const st = b.getAttribute('data-status');
+        if (st === 'PENDING') {
+            b.style.background = 'rgba(245,158,11,0.12)';
+            b.style.color = '#fbbf24';
+            b.style.borderColor = 'rgba(245,158,11,0.3)';
+        } else if (st === 'DIPROSES') {
+            b.style.background = 'rgba(14,165,233,0.12)';
+            b.style.color = '#38bdf8';
+            b.style.borderColor = 'rgba(14,165,233,0.3)';
+        } else if (st === 'SELESAI') {
+            b.style.background = 'rgba(16,185,129,0.12)';
+            b.style.color = '#6ee7b7';
+            b.style.borderColor = 'rgba(16,185,129,0.3)';
+        } else if (st === 'BATAL') {
+            b.style.background = 'rgba(239,68,68,0.12)';
+            b.style.color = '#fca5a5';
+            b.style.borderColor = 'rgba(239,68,68,0.3)';
+        } else {
+            b.style.background = 'rgba(255,255,255,0.06)';
+            b.style.color = '#94a3b8';
+            b.style.borderColor = 'var(--border)';
+        }
+    });
+    btnEl.classList.add('active');
+    btnEl.style.background = '#00a0df';
+    btnEl.style.color = '#fff';
+    btnEl.style.borderColor = '#00a0df';
+    filterOrders();
+}
+
+function clearSearchOrders() {
+    const input = document.getElementById('search-orders');
+    if (input) {
+        input.value = '';
+        const clearBtn = document.getElementById('btn-clear-search-orders');
+        if (clearBtn) clearBtn.style.display = 'none';
+        filterOrders();
+        input.focus();
+    }
+}
+
+function filterOrders() {
+    const input = document.getElementById('search-orders');
+    const query = input ? input.value.trim().toLowerCase() : '';
+    const clearBtn = document.getElementById('btn-clear-search-orders');
+    if (clearBtn) {
+        clearBtn.style.display = query ? 'flex' : 'none';
+    }
+    
+    const rows = document.querySelectorAll('#orders-tbody tr');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const select = row.querySelector('.order-status-select');
+        const rowStatus = select ? select.value.toUpperCase() : '';
+        
+        const matchesQuery = !query || text.includes(query);
+        const matchesStatus = currentStatusFilter === 'ALL' || rowStatus === currentStatusFilter;
+        
+        if (matchesQuery && matchesStatus) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    const notFoundEl = document.getElementById('orders-not-found');
+    const tableWrapper = document.getElementById('orders-table-wrapper');
+    const emptyState = document.getElementById('orders-empty-state');
+    
+    if (rows.length === 0) {
+        if (notFoundEl) notFoundEl.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'block';
+        if (tableWrapper) tableWrapper.style.display = 'none';
+    } else {
+        if (emptyState) emptyState.style.display = 'none';
+        if (visibleCount === 0) {
+            if (notFoundEl) notFoundEl.style.display = 'block';
+            if (tableWrapper) tableWrapper.style.display = 'none';
+        } else {
+            if (notFoundEl) notFoundEl.style.display = 'none';
+            if (tableWrapper) tableWrapper.style.display = 'block';
+        }
+    }
+}
+
+// Inisialisasi Realtime Sync saat halaman dibuka
+document.addEventListener('DOMContentLoaded', () => {
+    initKnownTickets();
+    setInterval(pollRealtimeOrders, 5000);
+});
 </script>
 
 </body>

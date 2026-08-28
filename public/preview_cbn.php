@@ -48,7 +48,8 @@ if ($requestedPkgId) {
     }
 }
 
-$monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+$ppnPercent   = (float)($settings['ppn_percent'] ?? 11);
+$monthNames   = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
 $currentMonth = $monthNames[(int)date('n')];
 $currentYear  = date('Y');
 
@@ -56,7 +57,7 @@ if ($targetPkg) {
     $price = (int)($targetPkg['price'] ?? 169000);
     $biayaTambahan = (int)($targetPkg['biaya_tambahan'] ?? 5000);
     $subtotal = $price + $biayaTambahan;
-    $ppn = (int)round($subtotal * 0.11);
+    $ppn = (int)round($subtotal * ($ppnPercent / 100));
     $total = $subtotal + $ppn;
 
     $cbnLines = $targetPkg['cbn_package'] ?? [];
@@ -103,7 +104,7 @@ if ($targetPkg) {
     $price = (int)($defaultPkg['price'] ?? 199000);
     $biayaTambahan = (int)($defaultPkg['biaya_tambahan'] ?? 5000);
     $subtotal = $price + $biayaTambahan;
-    $ppn = (int)round($subtotal * 0.11);
+    $ppn = (int)round($subtotal * ($ppnPercent / 100));
     $total = $subtotal + $ppn;
 
     $cbnLines = $defaultPkg['cbn_package'] ?? [];

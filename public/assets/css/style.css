@@ -1,3 +1,8 @@
+@media (max-width: 640px) {
+    .sales-picker-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
 /* ==============================================
    FORMGOOGLE - Formulir Pendaftaran Layanan CBN
    PT. Sinergi Emas Perdana
@@ -375,8 +380,15 @@ body::after {
     appearance: none;
 }
 
+.form-input option,
 .form-select option {
     background: #0f172a;
+    color: #f8fafc;
+}
+
+.form-input option:checked,
+.form-select option:checked {
+    background: #005696;
     color: #fff;
 }
 

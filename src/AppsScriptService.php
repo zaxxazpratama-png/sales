@@ -31,9 +31,11 @@ class AppsScriptService
         // Siapkan payload data
         $payload = [
             'sales_code'        => $data['sales_code']        ?? 'SEP-001',
+            'ticket_no'         => $data['ticket_no']         ?? '',
             'vendor'            => $data['vendor']            ?? 'PT. SINERGI EMAS PERDANA',
             'so_date'           => $data['so_date']           ?? date('d/m/Y'),
             'tl_code'           => $data['tl_code']           ?? '-',
+            'team_leader'      => $data['tl_code']           ?? '-',
             'ae_name'           => $data['ae_name']           ?? '-',
             'home_id'           => $data['home_id']           ?? 'PENDING',
             'nama_pelanggan'    => $data['nama_pelanggan']    ?? '',
@@ -80,6 +82,12 @@ class AppsScriptService
         $salesCode = $data['sales_code'] ?? 'SEP-001';
         $salesData = SalesManager::findByCode($salesCode);
         $payload['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
+        foreach (\App\AuthManager::getUsers() as $account) {
+            if (($account['role'] ?? '') === 'tl' && ($account['tl_code'] ?? '') === ($data['tl_code'] ?? '')) {
+                $payload['team_leader'] = $account['username'] ?? $data['tl_code'];
+                break;
+            }
+        }
         $salesTtdPath = !empty($salesData['ttd_path']) ? dirname(__DIR__) . '/public/' . $salesData['ttd_path'] : '';
         if (empty($salesTtdPath) || !file_exists($salesTtdPath)) {
             $salesTtdPath = dirname(__DIR__) . '/public/assets/img/ttd_sales_master.png';
@@ -97,9 +105,18 @@ class AppsScriptService
 
         // Konfigurasi dinamis dari Dashboard Admin
         $settings = SettingsManager::get();
-        $payload['spreadsheet_id']  = $settings['spreadsheet_id']  ?? '';
-        $payload['drive_folder_id'] = $settings['drive_folder_id'] ?? '';
-        $payload['notif_email']     = $settings['admin_email']      ?? '';
+        $masterEmail = trim((string)($settings['master_email'] ?? 'pujapangestu02@gmail.com'));
+        $adminEmail  = trim((string)($settings['admin_email'] ?? '1seopageone@gmail.com'));
+        $salesData   = SalesManager::findByCode($salesCode) ?: [];
+        $customerEmailEnabled = isset($salesData['email_customer_enabled']) ? (bool)$salesData['email_customer_enabled'] : true;
+
+        $payload['spreadsheet_id']            = $settings['spreadsheet_id']  ?? '';
+        $payload['drive_folder_id']           = $settings['drive_folder_id'] ?? '';
+        $payload['master_email']              = $masterEmail;
+        $payload['admin_email']               = $adminEmail;
+        $payload['notif_email']               = $adminEmail ?: $masterEmail;
+        $payload['customer_email_enabled']    = $customerEmailEnabled ? '1' : '0';
+        $payload['email_customer_enabled']    = $customerEmailEnabled ? '1' : '0';
 
         $jsonPayload = json_encode($payload);
 
@@ -140,5 +157,111 @@ class AppsScriptService
         }
 
         return $decoded;
+    }
+
+    /**
+     * Update status pendaftaran di Google Spreadsheet via Apps Script
+     *
+     * @param  string $ticketNo   Nomor tiket (contoh: CBN-TIN006-260826-1234)
+     * @param  string $newStatus  Status baru (PENDING / DIPROSES / SELESAI / BATAL)
+     * @param  array  $extraData  Informasi nama/ktp jika ada
+     * @return array
+     */
+    public function updateStatus(string $ticketNo, string $newStatus, array $extraData = []): array
+    {
+        $settings = SettingsManager::get();
+        $payload = [
+            'action'         => 'update_status',
+            'ticket_no'      => $ticketNo,
+            'status'         => strtoupper(trim($newStatus)),
+            'nama_pelanggan' => $extraData['nama'] ?? ($extraData['nama_pelanggan'] ?? ''),
+            'nomor_ktp'      => $extraData['nomor_ktp'] ?? '',
+            'spreadsheet_id' => $settings['spreadsheet_id'] ?? '',
+            'drive_folder_id'=> $settings['drive_folder_id'] ?? '',
+        ];
+
+        $jsonPayload = json_encode($payload);
+
+        $opts = [
+            'http' => [
+                'method'          => 'POST',
+                'header'          => "Content-Type: text/plain;charset=UTF-8\r\n" .
+                                     "Content-Length: " . strlen($jsonPayload) . "\r\n",
+                'content'         => $jsonPayload,
+                'follow_location' => 1,
+                'max_redirects'   => 5,
+                'timeout'         => 30,
+                'ignore_errors'   => true,
+            ],
+            'ssl' => [
+                'verify_peer'      => false,
+                'verify_peer_name' => false,
+            ]
+        ];
+
+        $context  = stream_context_create($opts);
+        $response = @file_get_contents($this->scriptUrl, false, $context);
+
+        if ($response === false) {
+            $error = error_get_last();
+            throw new \RuntimeException("Gagal terhubung ke Google Apps Script: " . ($error['message'] ?? 'Unknown network error'));
+        }
+
+        $decoded = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \RuntimeException("Response tidak valid dari Apps Script: " . substr(strip_tags($response), 0, 200));
+        }
+
+        return $decoded ?: ['status' => 'success'];
+    }
+
+    /**
+     * Hapus dan tandai baris merah di Google Spreadsheet via Apps Script (Khusus Super Admin)
+     *
+     * @param  string $ticketNo   Nomor tiket (contoh: CBN-TIN006-260826-1234)
+     * @param  array  $extraData  Informasi nama/ktp jika ada
+     * @return array
+     */
+    public function deleteOrder(string $ticketNo, array $extraData = []): array
+    {
+        $settings = SettingsManager::get();
+        $payload = [
+            'action'         => 'delete_order',
+            'ticket_no'      => $ticketNo,
+            'nama_pelanggan' => $extraData['nama'] ?? ($extraData['nama_pelanggan'] ?? ''),
+            'nomor_ktp'      => $extraData['nomor_ktp'] ?? '',
+            'spreadsheet_id' => $settings['spreadsheet_id'] ?? '',
+            'drive_folder_id'=> $settings['drive_folder_id'] ?? '',
+        ];
+
+        $jsonPayload = json_encode($payload);
+
+        $opts = [
+            'http' => [
+                'method'          => 'POST',
+                'header'          => "Content-Type: text/plain;charset=UTF-8\r\n" .
+                                     "Content-Length: " . strlen($jsonPayload) . "\r\n",
+                'content'         => $jsonPayload,
+                'follow_location' => 1,
+                'max_redirects'   => 5,
+                'timeout'         => 30,
+                'ignore_errors'   => true,
+            ],
+            'ssl' => [
+                'verify_peer'      => false,
+                'verify_peer_name' => false,
+            ]
+        ];
+
+        $context  = stream_context_create($opts);
+        $response = @file_get_contents($this->scriptUrl, false, $context);
+
+        if ($response === false) {
+            $error = error_get_last();
+            return ['status' => 'warning', 'message' => "Gagal terhubung ke Apps Script: " . ($error['message'] ?? 'Network error')];
+        }
+
+        $decoded = json_decode($response, true);
+        return $decoded ?: ['status' => 'success'];
     }
 }
