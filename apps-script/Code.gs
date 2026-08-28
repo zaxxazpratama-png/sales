@@ -241,9 +241,7 @@ function generateCbnDocumentHtml(data) {
   const salesSigImg   = data.ttd_sales_base64 || DEFAULT_TTD_SALES_B64;
   const spvSigImg     = data.ttd_spv_base64   || DEFAULT_TTD_SPV_B64;
   const salesName     = (data.sales_name || 'FIRMAN').toUpperCase();
-  const rawSpv        = String(data.spv_name || data.team_leader || data.tl_name || data.tl_code || 'SUHARTA').trim().toUpperCase();
-  const spvParts      = rawSpv.split(/[-_]/);
-  const spvName       = (spvParts.length > 1 && spvParts[0].startsWith('TIN')) ? spvParts.slice(1).join('-').trim() : rawSpv;
+  const spvName       = String(data.spv_name || data.team_leader || data.tl_name || data.tl_code || 'TIN006-SUHARTA').trim().toUpperCase();
   const defaultNotes  = data.default_notes || 'REGULER PROMO JULY 2026 - NAB';
   const notesText     = data.catatan || defaultNotes;
 
