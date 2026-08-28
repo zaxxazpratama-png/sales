@@ -110,6 +110,18 @@ body::after {
     gap: 14px;
 }
 
+.tin-brand-logo {
+    height: 42px;
+    max-height: 46px;
+    width: auto;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 5px 12px;
+    border-radius: 9px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
 .cbn-brand-logo {
     font-size: 32px;
     font-weight: 900;

@@ -59,18 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 24px;
             position: relative;
         }
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background: radial-gradient(ellipse 70% 50% at 50% 20%, rgba(0, 160, 223, 0.15) 0%, transparent 60%),
-                        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0, 86, 150, 0.2) 0%, transparent 60%);
-            pointer-events: none;
+            padding: 20px;
         }
         .login-card {
-            position: relative;
-            background: #111c38;
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(17, 28, 56, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 160, 223, 0.25);
             border-radius: 16px;
             padding: 40px;
             width: 100%;
@@ -81,15 +75,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
             margin-bottom: 28px;
         }
-        .brand-logo {
-            font-size: 34px;
-            font-weight: 900;
-            color: #ffffff;
-            font-family: 'Arial Black', sans-serif;
-            margin-bottom: 4px;
-            letter-spacing: -1.5px;
+        .brand-logo-img {
+            max-width: 140px;
+            max-height: 70px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 16px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 16px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(56, 189, 248, 0.3);
         }
-        .brand-logo span { color: #00a0df; }
         .brand-header h1 {
             font-size: 17px;
             font-weight: 700;
@@ -114,64 +111,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-group { margin-bottom: 18px; }
         label {
             display: block;
-            font-size: 12px;
-            font-weight: 700;
             color: #cbd5e1;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 7px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
         }
-        input {
+        input[type="text"], input[type="password"] {
             width: 100%;
             padding: 12px 14px;
             background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 8px;
             color: #ffffff;
-            font-family: inherit;
             font-size: 14px;
             outline: none;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
         }
-        input:focus {
+        input[type="text"]:focus, input[type="password"]:focus {
             border-color: #00a0df;
-            box-shadow: 0 0 0 3px rgba(0, 160, 223, 0.2);
-            background: rgba(255, 255, 255, 0.09);
+            background: rgba(0, 160, 223, 0.1);
+            box-shadow: 0 0 10px rgba(0, 160, 223, 0.3);
         }
         .btn-login {
             width: 100%;
             padding: 13px;
-            background: linear-gradient(135deg, #005696, #00a0df);
+            background: linear-gradient(135deg, #00a0df 0%, #005696 100%);
             border: none;
             border-radius: 8px;
-            color: white;
-            font-family: inherit;
-            font-size: 14px;
+            color: #ffffff;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 8px;
-            box-shadow: 0 6px 18px rgba(0, 160, 223, 0.3);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 160, 223, 0.4);
+            margin-top: 10px;
         }
         .btn-login:hover {
+            opacity: 0.92;
             transform: translateY(-1px);
-            box-shadow: 0 8px 24px rgba(0, 160, 223, 0.45);
         }
-        .btn-back-form {
-            display: block;
+        .footer-note {
             text-align: center;
-            color: #94a3b8;
-            text-decoration: none;
-            font-size: 12.5px;
-            margin-top: 20px;
-            transition: color 0.2s;
+            margin-top: 24px;
+            font-size: 11.5px;
+            color: #64748b;
         }
-        .btn-back-form:hover { color: #00a0df; }
 
         @media (max-width: 480px) {
             body { padding: 14px; }
             .login-card { padding: 26px 18px; border-radius: 12px; }
-            .brand-logo { font-size: 28px; }
+            .brand-logo-img { max-width: 120px; }
             .brand-header h1 { font-size: 15px; }
             .brand-header p { font-size: 11px; }
             .btn-login { padding: 11px; font-size: 13.5px; }
@@ -182,9 +171,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="login-card">
     <div class="brand-header">
-        <div class="brand-logo">cbn<span>.</span></div>
+        <img src="../assets/img/logo-tin.png" alt="PT. TALENTA INTEGRITAS NASIONAL" class="brand-logo-img">
         <h1>DASHBOARD ADMIN</h1>
-        <p>Kelola Tim Sales &amp; Form CBN &bull; PT. TIN</p>
+        <p>Kelola Tim Sales &amp; Form CBN &bull; PT. TALENTA INTEGRITAS NASIONAL</p>
     </div>
 
     <?php if ($error): ?>

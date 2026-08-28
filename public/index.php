@@ -106,6 +106,7 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Formulir Pendaftaran Layanan CBN - Internet Fiber Cepat & TV Berlangganan. Registrasi resmi PT. Talenta Integritas Nasional.">
     <title>Formulir Pendaftaran Layanan CBN - <?= htmlspecialchars($salesName ? $salesName . ' (' . $salesCode . ')' : 'PT. TIN') ?></title>
+    <link rel="icon" type="image/png" href="<?= $baseUrl ?>/assets/img/logo-tin.png">
     <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
@@ -115,7 +116,7 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
 <header class="site-header">
     <div class="header-inner">
         <div class="logo-wrap">
-            <div class="cbn-brand-logo">cbn<span>.</span></div>
+            <img src="<?= $baseUrl ?>/assets/img/logo-tin.png" alt="PT. TALENTA INTEGRITAS NASIONAL" class="tin-brand-logo">
             <div class="header-title">
                 <h1><?= htmlspecialchars($settings['app_title'] ?? 'FORMULIR PENDAFTARAN LAYANAN CBN') ?></h1>
                 <p><?= htmlspecialchars($settings['app_subtitle'] ?? 'CBN Service Application Form • Mitra Resmi: PT. Talenta Integritas Nasional') ?></p>

@@ -638,6 +638,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Tim Sales & Form CBN</title>
+    <link rel="icon" type="image/png" href="../assets/img/logo-tin.png">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -681,6 +682,17 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             display: flex; align-items: center; justify-content: space-between;
         }
         .brand-area { display: flex; align-items: center; gap: 12px; }
+        .topbar-logo-img {
+            height: 38px;
+            max-height: 42px;
+            width: auto;
+            object-fit: contain;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 4px 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
         .cbn-logo { font-size: 26px; font-weight: 900; color: #fff; font-family: 'Arial Black', sans-serif; }
         .cbn-logo span { color: var(--cbn-cyan); }
         .topbar-title { font-size: 15px; font-weight: 700; color: #fff; }
@@ -1405,9 +1417,9 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
 <!-- TOPBAR -->
 <header class="topbar">
     <div class="brand-area">
-        <div class="cbn-logo">cbn<span>.</span></div>
+        <img src="../assets/img/logo-tin.png" alt="PT. TALENTA INTEGRITAS NASIONAL" class="topbar-logo-img">
         <div>
-            <div class="topbar-title">PANEL PENGELOLAAN SALES & FORM</div>
+            <div class="topbar-title">PANEL PENGELOLAAN SALES &amp; FORM</div>
             <div class="topbar-sub"><?= htmlspecialchars($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL') ?></div>
         </div>
     </div>

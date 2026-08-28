@@ -18,6 +18,7 @@ $waHelpdesk = $settings['wa_helpdesk'] ?? '';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>404 - Halaman Tidak Ditemukan | Link Sales Tidak Valid</title>
+    <link rel="icon" type="image/png" href="<?= $baseUrl ?>/assets/img/logo-tin.png">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -48,6 +49,18 @@ $waHelpdesk = $settings['wa_helpdesk'] ?? '';
             padding: 48px 36px;
             max-width: 540px;
             box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+        }
+        .error-logo-img {
+            max-width: 140px;
+            max-height: 70px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 16px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 16px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(56, 189, 248, 0.3);
         }
         .cbn-logo {
             font-size: 38px;
@@ -123,7 +136,7 @@ $waHelpdesk = $settings['wa_helpdesk'] ?? '';
 <body>
 
 <div class="error-card">
-    <div class="cbn-logo">cbn<span>.</span></div>
+    <img src="<?= $baseUrl ?>/assets/img/logo-tin.png" alt="PT. TALENTA INTEGRITAS NASIONAL" class="error-logo-img">
     <div class="error-badge">404 NOT FOUND</div>
     
     <h1>Link Sales Tidak Ditemukan</h1>
