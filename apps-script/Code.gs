@@ -665,12 +665,12 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
   // Jika sheet masih baru / kosong, buat default header
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
-      'Timestamp', 'Sales Code', 'Vendor', 'Nama Pelanggan', 'STATUS',
+      'Timestamp', 'TEAM LEADER', 'Sales Code', 'Vendor', 'Nama Pelanggan', 'STATUS',
       'Nomor KTP', 'TTL', 'Jenis Kelamin', 'Telepon Rumah', 'No. WhatsApp / HP',
       'Alamat Pemasangan', 'RT', 'RW', 'Kode Pos', 'Status Rumah', 'Home ID',
-      'Titik GPS', 'Paket CBN (Service)', 'Add-On TV', 'Perangkat Tambahan',
+      'Titik GPS', 'Link Google Maps', 'Paket CBN (Service)', 'Add-On TV', 'STB', 'Perangkat Tambahan',
       'Akun Email CBN', 'Jadwal Pasang', 'Waktu Pasang', 'Catatan',
-      'Estimasi Total Biaya', 'Link PDF Surat CBN', 'Link Foto KTP', 'No. Tiket', 'Team Leader'
+      'Estimasi Total Biaya', 'Link PDF Surat CBN', 'Link Foto KTP', 'No. Tiket'
     ]);
   }
 
@@ -689,12 +689,12 @@ function appendToSheet(params, pdfUrl, ktpUrl, sheetId) {
       statusColIdx = i + 1;
     } else if (h.includes('TIMESTAMP')) {
       val = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    } else if (h.includes('LEADER') || h.includes('SPV') || h === 'TEAM LEADER' || h === 'TL') {
+      val = params.team_leader || params.tl_code || 'TIN006-SUHARTA';
     } else if (h.includes('TIKET') || h === 'NO. TIKET' || h === 'TICKET_NO') {
       val = params.ticket_no || '';
     } else if (h.includes('SALES')) {
       val = params.sales_code || 'SEP-001';
-    } else if (h.includes('LEADER') || h.includes('SPV')) {
-      val = params.team_leader || params.tl_code || '-';
     } else if (h.includes('VENDOR') || h.includes('PT')) {
       val = params.vendor || params.company_name || 'PT. TALENTA INTEGRITAS NASIONAL';
     } else if (h.includes('NAMA') || h.includes('PELANGGAN')) {

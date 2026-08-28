@@ -85,13 +85,16 @@ class AppsScriptService
         $salesData = SalesManager::findByCode($salesCode);
         $payload['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
 
-        $tlCode = $data['tl_code'] ?? ($salesData['tl_code'] ?? '');
+        $tlCode = !empty($data['tl_code']) && $data['tl_code'] !== '-' ? $data['tl_code'] : ($salesData['tl_code'] ?? 'TIN006-SUHARTA');
         $tlAccount = \App\AuthManager::getTlByCode($tlCode);
-        $tlAdminEmail = '';
-        if ($tlAccount) {
-            $payload['team_leader'] = $tlAccount['username'] ?? $tlCode;
-            $tlAdminEmail = trim((string)($tlAccount['admin_email'] ?? ''));
+        if (!$tlAccount) {
+            $tlAccount = \App\AuthManager::getUserByUsername($tlCode);
         }
+        $tlUsername = $tlAccount['username'] ?? $tlCode;
+        $tlAdminEmail = !empty($tlAccount['admin_email']) ? trim($tlAccount['admin_email']) : '';
+
+        $payload['team_leader'] = $tlUsername;
+        $payload['tl_code']     = $tlCode;
 
         $salesTtdPath = !empty($salesData['ttd_path']) ? dirname(__DIR__) . '/public/' . $salesData['ttd_path'] : '';
         if (empty($salesTtdPath) || !file_exists($salesTtdPath)) {
