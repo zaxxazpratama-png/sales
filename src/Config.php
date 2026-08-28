@@ -1,8 +1,6 @@
 <?php
 namespace App;
 
-use Dotenv\Dotenv;
-
 class Config
 {
     private static bool $loaded = false;
@@ -14,10 +12,26 @@ class Config
 
         // Load .env dari root project (2 level di atas /src)
         $rootPath = dirname(__DIR__);
+        $envFile  = $rootPath . '/.env';
         
-        if (file_exists($rootPath . '/.env')) {
-            $dotenv = Dotenv::createImmutable($rootPath);
-            $dotenv->safeLoad();
+        if (file_exists($envFile)) {
+            $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if ($lines) {
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if (empty($line) || str_starts_with($line, '#')) continue;
+                    $parts = explode('=', $line, 2);
+                    if (count($parts) === 2) {
+                        $key = trim($parts[0]);
+                        $val = trim($parts[1]);
+                        $val = trim($val, "\"'");
+                        if (!isset($_ENV[$key])) {
+                            $_ENV[$key] = $val;
+                            putenv("$key=$val");
+                        }
+                    }
+                }
+            }
         }
 
         self::$data = [

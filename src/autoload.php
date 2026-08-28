@@ -24,5 +24,7 @@ spl_autoload_register(function ($class) {
 // Load composer vendor autoloader jika ada
 $vendorAutoload = dirname(__DIR__) . '/vendor/autoload.php';
 if (file_exists($vendorAutoload)) {
-    require_once $vendorAutoload;
+    try {
+        @include_once $vendorAutoload;
+    } catch (\Throwable $e) {}
 }
