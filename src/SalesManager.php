@@ -35,6 +35,9 @@ class SalesManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
+                // Bersihkan data dummy legacy jika masih ada di database MySQL
+                $pdo->exec("DELETE FROM sales WHERE sales_code IN ('SEP-001','SEP-002','SEP-003','SEP-004','SEP-005','SEP-006','SEP-007','SEP-008','SEP-009','SEP-010')");
+
                 $stmt = $pdo->query("SELECT id, sales_code, nama_sales, no_wa, email, tl_code, ttd_path, status, email_customer_enabled, created_at FROM sales ORDER BY created_at ASC, id ASC");
                 $rows = $stmt->fetchAll();
                 if ($rows !== false) {
@@ -58,7 +61,11 @@ class SalesManager
             return [];
         }
         $data = json_decode(file_get_contents($path), true);
-        return is_array($data) ? $data : [];
+        if (!is_array($data)) {
+            return [];
+        }
+        // Filter out legacy dummy items
+        return array_values(array_filter($data, fn($item) => !in_array(strtoupper($item['sales_code'] ?? ''), ['SEP-001','SEP-002','SEP-003','SEP-004','SEP-005','SEP-006','SEP-007','SEP-008','SEP-009','SEP-010'])));
     }
 
     /**

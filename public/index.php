@@ -79,7 +79,7 @@ foreach ($validTlCodes as $code) {
     $salesByLeader[$code] = [];
 }
 
-// Kelompokkan sales yang aktif ke Team Leader yang terdaftar
+// Kelompokkan sales yang aktif HANYA ke Team Leader resminya masing-masing
 foreach ($allSales as $sales) {
     $salesTl = strtoupper(trim($sales['tl_code'] ?? ''));
     if (in_array($salesTl, $validTlCodes, true)) {
@@ -87,18 +87,7 @@ foreach ($allSales as $sales) {
             'code' => $sales['sales_code'],
             'name' => $sales['nama_sales'],
         ];
-    } elseif (!empty($validTlCodes)) {
-        // Jika sales belum memiliki TL valid, masukkan ke TL terdaftar pertama
-        $salesByLeader[$validTlCodes[0]][] = [
-            'code' => $sales['sales_code'],
-            'name' => $sales['nama_sales'],
-        ];
     }
-}
-
-// Hapus key TL yang kosong jika ada
-if (empty($salesByLeader) && !empty($allSales)) {
-    $salesByLeader['TIN-SUHARTA'] = array_map(fn($s) => ['code' => $s['sales_code'], 'name' => $s['nama_sales']], $allSales);
 }
 
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
