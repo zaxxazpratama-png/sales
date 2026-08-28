@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tambah kolom admin_email jika tabel users sudah ada dari versi sebelumnya
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `admin_email` VARCHAR(150) NOT NULL DEFAULT '' AFTER `tl_code`;
+
 -- Data Akun Default
 INSERT INTO `users` (`id`, `username`, `password`, `role`, `tl_code`, `admin_email`, `status`, `created_at`) VALUES
 ('usr_superadmin', 'superadmin', '$2y$10$RmRfNIJe0xhlkMlQnRcOi.1IYXHxoB8gM2m0PhSnLrLqkGixlv39C', 'superadmin', '', '', 'active', '2026-08-20 10:00:00'),
