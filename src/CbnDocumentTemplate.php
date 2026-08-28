@@ -119,8 +119,13 @@ class CbnDocumentTemplate
         $catatan     = !empty($data['catatan']) ? trim($data['catatan']) : $defaultNotes;
         $tglTtd      = trim($data['so_date'] ?? date('d/m/Y'));
         $signatureImg= '';
-        $spvName = strtoupper(trim((string)($data['team_leader'] ?? $data['tl_name'] ?? $data['tl_code'] ?? '')));
-        $spvName = preg_replace('/^TIN006[-_]/i', '', $spvName);
+        $salesName   = strtoupper(trim((string)($data['sales_name'] ?? 'FIRMAN')));
+        $rawSpv      = strtoupper(trim((string)($data['spv_name'] ?? $data['team_leader'] ?? $data['tl_name'] ?? $data['tl_code'] ?? 'SUHARTA')));
+        $spvParts    = preg_split('/[-_]/', $rawSpv);
+        $spvName     = (count($spvParts) > 1 && str_starts_with($spvParts[0], 'TIN')) ? implode('-', array_slice($spvParts, 1)) : $rawSpv;
+
+        $salesSigBase64 = $data['ttd_sales_base64'] ?? '';
+        $spvSigBase64   = $data['ttd_spv_base64'] ?? '';
 
         $fmtRp = function($val, $def = '') {
             if (empty($val) && $val !== '0' && $val !== 0) return $def;

@@ -40,12 +40,15 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                // Pastikan kolom admin_email ada di tabel users
+                // Pastikan kolom admin_email & ttd_path ada di tabel users
                 try {
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
                 } catch (\Exception $ignored) {}
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN ttd_path VARCHAR(255) NOT NULL DEFAULT '' AFTER admin_email");
+                } catch (\Exception $ignored) {}
 
-                $stmt = $pdo->query("SELECT id, username, password, role, tl_code, admin_email, status, created_at FROM users ORDER BY created_at ASC");
+                $stmt = $pdo->query("SELECT id, username, password, role, tl_code, admin_email, ttd_path, status, created_at FROM users ORDER BY created_at ASC");
                 $dbUsers = $stmt->fetchAll();
                 if ($dbUsers !== false) {
                     return $dbUsers;
@@ -145,11 +148,12 @@ class AuthManager
         return null;
     }
 
-    public static function addTeamLeader(string $username, string $password, string $tlCode, string $adminEmail = ''): bool
+    public static function addTeamLeader(string $username, string $password, string $tlCode, string $adminEmail = '', string $ttdPath = ''): bool
     {
         $username   = trim($username);
         $tlCode     = strtoupper(trim($tlCode));
         $adminEmail = trim($adminEmail);
+        $ttdPath    = trim($ttdPath);
         if ($username === '' || $password === '' || $tlCode === '') {
             throw new \InvalidArgumentException('Username, password, dan kode team leader wajib diisi.');
         }
@@ -160,9 +164,12 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                // Pastikan kolom admin_email ada di tabel users
+                // Pastikan kolom admin_email & ttd_path ada di tabel users
                 try {
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $colIgnored) {}
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN ttd_path VARCHAR(255) NOT NULL DEFAULT '' AFTER admin_email");
                 } catch (\Exception $colIgnored) {}
 
                 $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR tl_code = ? LIMIT 1");
@@ -171,8 +178,8 @@ class AuthManager
                     throw new \InvalidArgumentException('Username atau kode team leader sudah digunakan.');
                 }
 
-                $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, tl_code, admin_email, status, created_at) VALUES (?, ?, ?, 'tl', ?, ?, 'active', NOW())");
-                $insertStmt->execute([$id, $username, $hash, $tlCode, $adminEmail]);
+                $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, tl_code, admin_email, ttd_path, status, created_at) VALUES (?, ?, ?, 'tl', ?, ?, ?, 'active', NOW())");
+                $insertStmt->execute([$id, $username, $hash, $tlCode, $adminEmail, $ttdPath]);
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
             } catch (\Exception $e) {
@@ -197,6 +204,7 @@ class AuthManager
                 'role'        => 'tl',
                 'tl_code'     => $tlCode,
                 'admin_email' => $adminEmail,
+                'ttd_path'    => $ttdPath,
                 'status'      => 'active',
                 'created_at'  => date('Y-m-d H:i:s'),
             ];
@@ -205,7 +213,7 @@ class AuthManager
         return true;
     }
 
-    public static function updateTeamLeader(string $id, string $username, string $password, string $tlCode, string $adminEmail = '', string $status = 'active'): bool
+    public static function updateTeamLeader(string $id, string $username, string $password, string $tlCode, string $adminEmail = '', string $status = 'active', ?string $ttdPath = null): bool
     {
         $username   = trim($username);
         $tlCode     = strtoupper(trim($tlCode));
@@ -218,9 +226,12 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                // Pastikan kolom admin_email ada di tabel users
+                // Pastikan kolom admin_email & ttd_path ada di tabel users
                 try {
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $colIgnored) {}
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN ttd_path VARCHAR(255) NOT NULL DEFAULT '' AFTER admin_email");
                 } catch (\Exception $colIgnored) {}
 
                 $checkStmt = $pdo->prepare("SELECT id FROM users WHERE (username = ? OR tl_code = ?) AND id != ? AND username != ? LIMIT 1");
@@ -229,14 +240,23 @@ class AuthManager
                     throw new \InvalidArgumentException('Username atau kode team leader sudah digunakan.');
                 }
 
+                $params = [$username, $tlCode, $adminEmail, $status];
+                $sql = "UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ?";
                 if ($password !== '') {
-                    $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ? OR (tl_code = ? AND tl_code != '')) AND role = 'tl'");
-                    $stmt->execute([$username, $hash, $tlCode, $adminEmail, $status, $id, $id, $tlCode]);
-                } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ? OR (tl_code = ? AND tl_code != '')) AND role = 'tl'");
-                    $stmt->execute([$username, $tlCode, $adminEmail, $status, $id, $id, $tlCode]);
+                    $sql .= ", password = ?";
+                    $params[] = password_hash($password, PASSWORD_DEFAULT);
                 }
+                if ($ttdPath !== null) {
+                    $sql .= ", ttd_path = ?";
+                    $params[] = trim($ttdPath);
+                }
+                $sql .= " WHERE (id = ? OR username = ? OR (tl_code = ? AND tl_code != '')) AND role = 'tl'";
+                $params[] = $id;
+                $params[] = $id;
+                $params[] = $tlCode;
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
             } catch (\Exception $e) {
@@ -260,6 +280,9 @@ class AuthManager
                 if ($password !== '') {
                     $user['password'] = password_hash($password, PASSWORD_DEFAULT);
                 }
+                if ($ttdPath !== null) {
+                    $user['ttd_path'] = trim($ttdPath);
+                }
                 continue;
             }
         }
@@ -281,9 +304,12 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                // Pastikan kolom admin_email ada
+                // Pastikan kolom admin_email & ttd_path ada
                 try {
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $ignored) {}
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN ttd_path VARCHAR(255) NOT NULL DEFAULT '' AFTER admin_email");
                 } catch (\Exception $ignored) {}
 
                 $stmt = $pdo->prepare("SELECT * FROM users WHERE role = 'tl' AND UPPER(tl_code) = ? LIMIT 1");
@@ -310,9 +336,12 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                // Pastikan kolom admin_email ada
+                // Pastikan kolom admin_email & ttd_path ada
                 try {
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $ignored) {}
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN ttd_path VARCHAR(255) NOT NULL DEFAULT '' AFTER admin_email");
                 } catch (\Exception $ignored) {}
 
                 $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1");
@@ -332,7 +361,7 @@ class AuthManager
         return null;
     }
 
-    public static function updateProfile(string $currentUsername, string $newUsername, string $newPassword = '', ?string $adminEmail = null): array
+    public static function updateProfile(string $currentUsername, string $newUsername, string $newPassword = '', ?string $adminEmail = null, ?string $ttdPath = null): array
     {
         $currentUsername = trim($currentUsername);
         $newUsername     = trim($newUsername);
@@ -343,9 +372,12 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                // Pastikan kolom admin_email ada
+                // Pastikan kolom admin_email & ttd_path ada
                 try {
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $colIgnored) {}
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN ttd_path VARCHAR(255) NOT NULL DEFAULT '' AFTER admin_email");
                 } catch (\Exception $colIgnored) {}
 
                 $checkStmt = $pdo->prepare("SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND LOWER(username) != LOWER(?) LIMIT 1");
@@ -358,9 +390,9 @@ class AuthManager
                 if (!$user) {
                     $id = 'usr_' . time() . random_int(100, 999);
                     $hash = $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT);
-                    $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, admin_email, status, created_at) VALUES (?, ?, ?, 'superadmin', ?, 'active', NOW())");
-                    $insertStmt->execute([$id, $newUsername, $hash, $adminEmail ?? '']);
-                    return ['id' => $id, 'username' => $newUsername, 'role' => 'superadmin', 'admin_email' => $adminEmail ?? '', 'status' => 'active'];
+                    $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, admin_email, ttd_path, status, created_at) VALUES (?, ?, ?, 'superadmin', ?, ?, 'active', NOW())");
+                    $insertStmt->execute([$id, $newUsername, $hash, $adminEmail ?? '', $ttdPath ?? '']);
+                    return ['id' => $id, 'username' => $newUsername, 'role' => 'superadmin', 'admin_email' => $adminEmail ?? '', 'ttd_path' => $ttdPath ?? '', 'status' => 'active'];
                 }
 
                 $params = [$newUsername];
@@ -372,6 +404,10 @@ class AuthManager
                 if ($adminEmail !== null) {
                     $sql .= ", admin_email = ?";
                     $params[] = trim($adminEmail);
+                }
+                if ($ttdPath !== null) {
+                    $sql .= ", ttd_path = ?";
+                    $params[] = trim($ttdPath);
                 }
                 $sql .= " WHERE LOWER(username) = LOWER(?) OR (id = ?)";
                 $params[] = $currentUsername;
@@ -404,6 +440,7 @@ class AuthManager
                 'password'    => $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT),
                 'role'        => 'superadmin',
                 'admin_email' => $adminEmail ?? '',
+                'ttd_path'    => $ttdPath ?? '',
                 'status'      => 'active',
             ];
             $users[] = $userObj;
@@ -414,6 +451,9 @@ class AuthManager
         $users[$foundIndex]['username'] = $newUsername;
         if ($adminEmail !== null) {
             $users[$foundIndex]['admin_email'] = trim($adminEmail);
+        }
+        if ($ttdPath !== null) {
+            $users[$foundIndex]['ttd_path'] = trim($ttdPath);
         }
         if ($newPassword !== '') {
             $users[$foundIndex]['password'] = password_hash($newPassword, PASSWORD_DEFAULT);

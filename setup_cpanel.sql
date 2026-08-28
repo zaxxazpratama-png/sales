@@ -19,14 +19,16 @@ CREATE TABLE IF NOT EXISTS `users` (
     `role` VARCHAR(50) NOT NULL DEFAULT 'admin',
     `tl_code` VARCHAR(50) NOT NULL DEFAULT '',
     `admin_email` VARCHAR(150) NOT NULL DEFAULT '',
+    `ttd_path` VARCHAR(255) NOT NULL DEFAULT '',
     `status` ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tambah kolom admin_email jika tabel users sudah ada dari versi sebelumnya
+-- Tambah kolom admin_email & ttd_path jika tabel users sudah ada dari versi sebelumnya
 ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `admin_email` VARCHAR(150) NOT NULL DEFAULT '' AFTER `tl_code`;
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `ttd_path` VARCHAR(255) NOT NULL DEFAULT '' AFTER `admin_email`;
 
 -- Data Akun Default
 INSERT INTO `users` (`id`, `username`, `password`, `role`, `tl_code`, `admin_email`, `status`, `created_at`) VALUES

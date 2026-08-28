@@ -75,12 +75,6 @@ class AppsScriptService
             'default_notes'     => $settings['default_notes'] ?? 'REGULER PROMO JULY 2026 - NAB',
         ];
 
-        // Attach Base64 SPV Signature & Sales Signature
-        $spvFile = dirname(__DIR__) . '/public/assets/img/ttd_spv_master.png';
-        if (file_exists($spvFile)) {
-            $payload['ttd_spv_base64'] = 'data:image/png;base64,' . base64_encode(file_get_contents($spvFile));
-        }
-
         $salesCode = $data['sales_code'] ?? 'SEP-001';
         $salesData = SalesManager::findByCode($salesCode);
         $payload['sales_name'] = $salesData['nama_sales'] ?? 'FIRMAN';
@@ -90,12 +84,23 @@ class AppsScriptService
         if (!$tlAccount) {
             $tlAccount = \App\AuthManager::getUserByUsername($tlCode);
         }
-        $tlUsername = $tlAccount['username'] ?? $tlCode;
+        $tlUsername   = $tlAccount['username'] ?? $tlCode;
         $tlAdminEmail = !empty($tlAccount['admin_email']) ? trim($tlAccount['admin_email']) : '';
 
         $payload['team_leader'] = $tlUsername;
+        $payload['spv_name']    = $tlUsername;
         $payload['tl_code']     = $tlCode;
 
+        // Resolve SPV Signature (Team Leader specific signature first, fallback to Master SPV)
+        $tlTtdPath = !empty($tlAccount['ttd_path']) ? dirname(__DIR__) . '/public/' . $tlAccount['ttd_path'] : '';
+        if (empty($tlTtdPath) || !file_exists($tlTtdPath)) {
+            $tlTtdPath = !empty($settings['ttd_spv_path']) ? dirname(__DIR__) . '/public/' . $settings['ttd_spv_path'] : dirname(__DIR__) . '/public/assets/img/ttd_spv_master.png';
+        }
+        if (file_exists($tlTtdPath)) {
+            $payload['ttd_spv_base64'] = 'data:image/png;base64,' . base64_encode(file_get_contents($tlTtdPath));
+        }
+
+        // Resolve Sales Signature (Sales specific signature first, fallback to Master Sales)
         $salesTtdPath = !empty($salesData['ttd_path']) ? dirname(__DIR__) . '/public/' . $salesData['ttd_path'] : '';
         if (empty($salesTtdPath) || !file_exists($salesTtdPath)) {
             $salesTtdPath = dirname(__DIR__) . '/public/assets/img/ttd_sales_master.png';

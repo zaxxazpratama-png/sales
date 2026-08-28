@@ -84,11 +84,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'add_team_leader' && $currentRole === 'superadmin') {
         try {
+            $tlCode = strtoupper(trim($_POST['tl_code'] ?? ''));
+            $ttdPath = '';
+            if (!empty($_FILES['tl_ttd']['name']) && $_FILES['tl_ttd']['error'] === UPLOAD_ERR_OK) {
+                $cleanCode = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $tlCode ?: ($_POST['tl_username'] ?? 'tl')));
+                $fileName = 'ttd_spv_' . $cleanCode . '.png';
+                $target = dirname(__DIR__) . '/assets/img/' . $fileName;
+                \App\ImageHelper::makeTransparentSignature($_FILES['tl_ttd']['tmp_name'], $target);
+                $ttdPath = 'assets/img/' . $fileName;
+            }
             AuthManager::addTeamLeader(
                 $_POST['tl_username'] ?? '',
                 $_POST['tl_password'] ?? '',
-                $_POST['tl_code'] ?? '',
-                $_POST['tl_admin_email'] ?? ''
+                $tlCode,
+                $_POST['tl_admin_email'] ?? '',
+                $ttdPath
             );
             $msgSuccess = 'Akun team leader berhasil dibuat.';
         } catch (\Exception $e) {
@@ -100,25 +110,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $tlId = $_POST['tl_id'] ?? '';
             $oldTlCode = '';
+            $existingTl = null;
             foreach (AuthManager::getUsers() as $user) {
-                if (($user['id'] ?? $user['username'] ?? '') === $tlId) {
+                if (($user['id'] ?? $user['username'] ?? '') === $tlId || ($user['username'] ?? '') === $tlId) {
+                    $existingTl = $user;
                     $oldTlCode = $user['tl_code'] ?? '';
                     break;
                 }
             }
             $newTlCode = strtoupper(trim($_POST['tl_code'] ?? ''));
+            $ttdPath = null;
+            if (!empty($_FILES['tl_ttd']['name']) && $_FILES['tl_ttd']['error'] === UPLOAD_ERR_OK) {
+                $cleanCode = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $newTlCode ?: ($existingTl['username'] ?? 'tl')));
+                $fileName = 'ttd_spv_' . $cleanCode . '.png';
+                $target = dirname(__DIR__) . '/assets/img/' . $fileName;
+                \App\ImageHelper::makeTransparentSignature($_FILES['tl_ttd']['tmp_name'], $target);
+                $ttdPath = 'assets/img/' . $fileName;
+            }
             AuthManager::updateTeamLeader(
                 $tlId,
                 $_POST['tl_username'] ?? '',
                 $_POST['tl_password'] ?? '',
                 $newTlCode,
                 $_POST['tl_admin_email'] ?? '',
-                $_POST['tl_status'] ?? 'active'
+                $_POST['tl_status'] ?? 'active',
+                $ttdPath
             );
             if ($oldTlCode !== '' && $oldTlCode !== $newTlCode) {
                 SalesManager::reassignTeamLeader($oldTlCode, $newTlCode);
             }
-            $msgSuccess = 'Data team leader berhasil diperbarui.';
+            $msgSuccess = 'Data team leader & TTD SPV berhasil diperbarui.';
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
@@ -137,12 +158,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new \Exception('Kode Sales dan Nama Sales wajib diisi.');
             }
 
+            $ttdPath = '';
+            if (!empty($_FILES['ttd_sales']['name']) && $_FILES['ttd_sales']['error'] === UPLOAD_ERR_OK) {
+                $fileName = 'ttd_sales_' . strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $salesCode)) . '.png';
+                $target = dirname(__DIR__) . '/assets/img/' . $fileName;
+                \App\ImageHelper::makeTransparentSignature($_FILES['ttd_sales']['tmp_name'], $target);
+                $ttdPath = 'assets/img/' . $fileName;
+            }
+
             SalesManager::add([
                 'sales_code' => $salesCode,
                 'nama_sales' => $namaSales,
                 'no_wa'      => $noWa,
                 'email'      => $email,
                 'tl_code'    => $tlCode,
+                'ttd_path'   => $ttdPath,
                 'status'     => 'active'
             ]);
 
@@ -237,10 +267,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($newUsername === '') {
                 throw new \InvalidArgumentException('Username Team Leader tidak boleh kosong.');
             }
-            $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword, $newAdminEmail);
+
+            $ttdPath = null;
+            if (!empty($_FILES['tl_ttd']['name']) && $_FILES['tl_ttd']['error'] === UPLOAD_ERR_OK) {
+                $cleanCode = strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $currentTlCode ?: $newUsername));
+                $fileName = 'ttd_spv_' . $cleanCode . '.png';
+                $target = dirname(__DIR__) . '/assets/img/' . $fileName;
+                \App\ImageHelper::makeTransparentSignature($_FILES['tl_ttd']['tmp_name'], $target);
+                $ttdPath = 'assets/img/' . $fileName;
+            }
+
+            $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword, $newAdminEmail, $ttdPath);
             $_SESSION['admin_user'] = $updated['username'];
             $currentUser = $updated['username'];
-            $msgSuccess = "Profil dan Email Admin Team Leader <strong>{$currentUser}</strong> berhasil diperbarui!";
+            $msgSuccess = "Profil, Email Admin & Tanda Tangan SPV Team Leader <strong>{$currentUser}</strong> berhasil diperbarui!";
         } catch (\Exception $e) {
             $msgError = $e->getMessage();
         }
@@ -1980,7 +2020,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     <div class="panel-desc">Buat akun TL dan tentukan Email Admin khusus untuk masing-masing Team Leader penerima notifikasi order.</div>
                 </div>
             </div>
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="add_team_leader">
                 <div class="form-grid-2">
                     <div class="form-group">
@@ -2000,18 +2040,30 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                         <input type="email" name="tl_admin_email" class="form-control" placeholder="admin.suharta@gmail.com" required>
                         <small style="color:var(--text-muted);font-size:11px;">Notifikasi email order dari sales di bawah TL ini akan dikirim ke email ini.</small>
                     </div>
+                    <div class="form-group" style="grid-column:span 2;">
+                        <label>Upload Tanda Tangan SPV / Team Leader (PNG/JPG)</label>
+                        <input type="file" name="tl_ttd" class="form-control" accept="image/*">
+                        <small style="color:var(--text-muted);font-size:11px;">Tanda tangan ini akan otomatis terpasang pada formulir PDF surat CBN di kolom SPV untuk tim TL ini.</small>
+                    </div>
                 </div>
                 <button type="submit" class="btn-primary">Buat Akun Team Leader</button>
             </form>
             <?php if ($teamLeaders): ?>
                 <div class="table-responsive" style="margin-top:20px;">
                     <table class="admin-table">
-                        <thead><tr><th>Username</th><th>Kode TL</th><th>Email Admin Notifikasi</th><th>Status</th><th>Aksi</th></tr></thead>
+                        <thead><tr><th>Username</th><th>Kode TL</th><th>Email Admin Notifikasi</th><th>TTD SPV</th><th>Status</th><th>Aksi</th></tr></thead>
                         <tbody><?php foreach ($teamLeaders as $leader): ?>
                             <tr>
                                 <td><strong><?= htmlspecialchars($leader['username']) ?></strong></td>
                                 <td><span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#38bdf8;"><?= htmlspecialchars($leader['tl_code'] ?? '-') ?></span></td>
                                 <td><span style="color:#6ee7b7;font-weight:600;"><?= htmlspecialchars(!empty($leader['admin_email']) ? $leader['admin_email'] : '-') ?></span></td>
+                                <td>
+                                    <?php if (!empty($leader['ttd_path'])): ?>
+                                        <img src="../<?= htmlspecialchars($leader['ttd_path']) ?>?v=<?= time() ?>" style="max-height:30px;background:#fff;padding:2px;border-radius:4px;" alt="TTD">
+                                    <?php else: ?>
+                                        <span style="color:var(--text-muted);font-size:11px;">(Default Master)</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td><span class="status-badge <?= ($leader['status'] ?? 'active') === 'active' ? 'status-active' : 'status-inactive' ?>"><?= ($leader['status'] ?? 'active') === 'active' ? 'Aktif' : 'Non-aktif' ?></span></td>
                                 <td><button type="button" class="btn-action" onclick="openEditTeamLeader(<?= htmlspecialchars(json_encode($leader)) ?>)">Edit Data</button></td>
                             </tr>
@@ -2082,7 +2134,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     <div style="margin-top:12px;display:flex;align-items:center;gap:14px;background:rgba(0,0,0,0.3);padding:12px 16px;border-radius:8px;border:1px solid var(--border);">
                         <img src="../<?= htmlspecialchars($settings['ttd_spv_path']) ?>?v=<?= time() ?>" style="max-height:60px;max-width:160px;background:#fff;padding:6px;border-radius:6px;" alt="TTD SPV">
                         <div>
-                            <div style="font-size:12.5px;font-weight:700;color:#6ee7b7;">✓ Tanda Tangan SPV Aktif</div>
+                            <div style="font-size:12.5px;font-weight:700;color:#6ee7b7;">✓ Tanda Tangan SPV Master Aktif</div>
                             <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">File: <?= htmlspecialchars($settings['ttd_spv_path']) ?></div>
                         </div>
                     </div>
@@ -2099,25 +2151,25 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             <div class="panel-header">
                 <div>
                     <div class="panel-title">Profil & Keamanan Akun Team Leader</div>
-                    <div class="panel-desc">Kelola username dan password login akun Team Leader Anda secara mandiri.</div>
+                    <div class="panel-desc">Kelola username, password login, serta tanda tangan SPV Team Leader Anda secara mandiri.</div>
                 </div>
                 <span class="status-badge status-active">Kode TL: <?= htmlspecialchars($currentTlCode) ?></span>
             </div>
 
             <div style="background:rgba(0,160,223,0.1);border:1px solid rgba(0,160,223,0.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;">
                 <div style="font-size:13px;color:#cbd5e1;line-height:1.6;">
-                    👤 Anda sedang login sebagai <strong>Team Leader</strong> dengan kode <strong><?= htmlspecialchars($currentTlCode) ?></strong>. Anda dapat mengganti username dan password akun Anda di bawah ini kapan saja.
+                    👤 Anda sedang login sebagai <strong>Team Leader</strong> dengan kode <strong><?= htmlspecialchars($currentTlCode) ?></strong>. Anda dapat mengganti username, password, dan tanda tangan SPV Anda di bawah ini.
                 </div>
             </div>
 
-            <form method="POST">
+            <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="update_tl_profile">
 
                 <div class="form-grid-2">
                     <div class="form-group">
                         <label>Username Login Team Leader *</label>
                         <input type="text" name="tl_username" class="form-control" value="<?= htmlspecialchars($currentUser) ?>" required>
-                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Username yang Anda gunakan untuk login ke panel ini.</small>
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Nama ini akan dicetak di formulir PDF Surat CBN pada kolom Sales SPV.</small>
                     </div>
 
                     <div class="form-group">
@@ -2138,15 +2190,24 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                         <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Kode penugasan tim sales Anda (diatur oleh Super Admin).</small>
                     </div>
 
-                    <div class="form-group">
-                        <label>Role Akun</label>
-                        <input type="text" readonly class="form-control" value="Team Leader / SPV" style="background:rgba(0,0,0,0.3);color:#86efac;font-weight:700;">
-                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Hak akses khusus pimpinan tim sales.</small>
+                    <div class="form-group" style="grid-column:span 2;">
+                        <label>Upload / Ganti Tanda Tangan SPV Anda (PNG/JPG)</label>
+                        <input type="file" name="tl_ttd" class="form-control" accept="image/*">
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Background kertas putih otomatis di-convert menjadi transparan dan dicetak di formulir tiket PDF.</small>
+                        <?php if (!empty($currentTlAccount['ttd_path'])): ?>
+                        <div style="margin-top:10px;display:flex;align-items:center;gap:14px;background:rgba(0,0,0,0.3);padding:10px 14px;border-radius:8px;border:1px solid var(--border);">
+                            <img src="../<?= htmlspecialchars($currentTlAccount['ttd_path']) ?>?v=<?= time() ?>" style="max-height:48px;background:#fff;padding:4px;border-radius:4px;" alt="TTD SPV">
+                            <div>
+                                <div style="font-size:12px;font-weight:700;color:#6ee7b7;">✓ Tanda Tangan SPV Aktif</div>
+                                <div style="font-size:10.5px;color:var(--text-muted);"><?= htmlspecialchars($currentTlAccount['ttd_path']) ?></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <button type="submit" class="btn-primary" style="margin-top:14px;padding:12px 28px;">
-                    💾 Simpan Perubahan Profil Team Leader
+                    💾 Simpan Perubahan Profil & TTD Team Leader
                 </button>
             </form>
         </div>
@@ -2162,7 +2223,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             <div class="modal-title">Edit Data Team Leader</div>
             <button type="button" class="modal-close" onclick="closeModal('modal-edit-team-leader')">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="action" value="edit_team_leader">
             <input type="hidden" id="edit-tl-id" name="tl_id">
             <div class="form-group">
@@ -2180,6 +2241,14 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             <div class="form-group">
                 <label>Email Admin Notifikasi Order TL</label>
                 <input type="email" id="edit-tl-admin-email" name="tl_admin_email" class="form-control" placeholder="admin.tl@gmail.com">
+            </div>
+            <div class="form-group">
+                <label>Tanda Tangan SPV / Team Leader (PNG/JPG)</label>
+                <input type="file" name="tl_ttd" class="form-control" accept="image/*">
+                <div id="edit-tl-ttd-preview" style="margin-top:8px;display:none;">
+                    <img id="img-ttd-tl" src="" style="max-height:50px;border:1px solid var(--border);border-radius:4px;padding:4px;background:white;">
+                    <div style="font-size:10px;color:var(--text-muted);">Tanda tangan SPV saat ini</div>
+                </div>
             </div>
             <div class="form-group">
                 <label>Status</label>
@@ -2200,7 +2269,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
             <div class="modal-title">Tambah Sales Baru</div>
             <button type="button" class="modal-close" onclick="closeModal('modal-add-sales')">&times;</button>
         </div>
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="action" value="add_sales">
 
             <div class="form-group">
@@ -2225,7 +2294,13 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
 
             <div class="form-group">
                 <label>Kode Team Leader (TL)</label>
-                <input type="text" name="tl_code" class="form-control" placeholder="TL-MEDAN-01" value="TL-MEDAN-01">
+                <input type="text" name="tl_code" class="form-control" placeholder="TL-MEDAN-01" value="<?= htmlspecialchars($currentRole === 'tl' ? $currentTlCode : 'TL-MEDAN-01') ?>">
+            </div>
+
+            <div class="form-group">
+                <label>Upload Tanda Tangan Sales (PNG/JPG)</label>
+                <input type="file" name="ttd_sales" class="form-control" accept="image/*">
+                <small style="color:var(--text-muted);font-size:11px;">Background putih otomatis transparan murni.</small>
             </div>
 
             <button type="submit" class="btn-primary" style="width:100%;margin-top:8px;">Simpan Sales Baru</button>
@@ -2335,6 +2410,16 @@ function openEditTeamLeader(leader) {
     document.getElementById('edit-tl-code').value = leader.tl_code || '';
     document.getElementById('edit-tl-admin-email').value = leader.admin_email || '';
     document.getElementById('edit-tl-status').value = leader.status || 'active';
+
+    const ttdPreview = document.getElementById('edit-tl-ttd-preview');
+    if (ttdPreview) {
+        if (leader.ttd_path) {
+            document.getElementById('img-ttd-tl').src = '../' + leader.ttd_path + '?v=' + Date.now();
+            ttdPreview.style.display = 'block';
+        } else {
+            ttdPreview.style.display = 'none';
+        }
+    }
     document.getElementById('modal-edit-team-leader').classList.add('active');
 }
 
