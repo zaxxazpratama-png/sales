@@ -274,8 +274,11 @@ class CbnDocumentTemplate
       <div class="cbn-fld" style="top:43.85%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars($routerQty) ?></div>
     <?php endif; ?>
 
-    <?php if ($totalSmartbox >= 1): ?>
+    <?php if ($totalSmartbox >= 1): 
+      $sbLabel = (int)($data['smartbox_v3_qty'] ?? 0) > 0 ? 'Android V3' : 'Android';
+    ?>
       <div class="cbn-fld" style="top:46.00%;left:49.85%;font-size:10pt;font-weight:900;color:#000;">&#10004;</div>
+      <div class="cbn-fld" style="top:45.95%;left:60.50%;font-size:8.5pt;font-weight:bold;color:#000;"><?= htmlspecialchars($sbLabel) ?></div>
       <div class="cbn-fld" style="top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;"><?= htmlspecialchars((string)$totalSmartbox) ?></div>
     <?php endif; ?>
 

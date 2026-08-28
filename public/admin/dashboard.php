@@ -35,6 +35,7 @@ Config::load();
 $currentRole   = $_SESSION['admin_role'] ?? 'admin';
 $currentTlCode = $_SESSION['admin_tl_code'] ?? '';
 $currentUser   = $_SESSION['admin_user'] ?? 'admin';
+$currentTlAccount = ($currentRole === 'tl' && $currentTlCode) ? AuthManager::getTlByCode($currentTlCode) : null;
 $activeTab     = $_SESSION['active_admin_tab'] ?? 'sales-tab';
 
 $msgSuccess = '';
@@ -302,13 +303,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 SettingsManager::update($settings);
                 $msgSuccess = "Pengaturan profil & sistem berhasil disimpan!";
             } else {
-                $newUsername = trim($_POST['tl_username'] ?? '');
-                $newPassword = $_POST['tl_password'] ?? '';
+                $newUsername   = trim($_POST['tl_username'] ?? '');
+                $newPassword   = $_POST['tl_password'] ?? '';
+                $newAdminEmail = trim($_POST['tl_admin_email'] ?? '');
                 if ($newUsername !== '') {
-                    $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword);
+                    $updated = AuthManager::updateProfile($currentUser, $newUsername, $newPassword, $newAdminEmail);
                     $_SESSION['admin_user'] = $updated['username'];
                     $currentUser = $updated['username'];
-                    $msgSuccess = 'Profil Team Leader berhasil diperbarui!';
+                    $msgSuccess = 'Profil Team Leader & Email Admin berhasil diperbarui!';
                 }
             }
         } catch (\Exception $e) {
@@ -2135,6 +2137,12 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                         <label>Ganti Password Login Team Leader</label>
                         <input type="password" name="tl_password" class="form-control" minlength="6" placeholder="Biarkan kosong jika tidak ingin mengubah">
                         <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Minimal 6 karakter jika ingin mengganti password baru.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email Admin Notifikasi Order Team Leader</label>
+                        <input type="email" name="tl_admin_email" class="form-control" value="<?= htmlspecialchars($currentTlAccount['admin_email'] ?? '') ?>" placeholder="admin.tl@gmail.com">
+                        <small style="color:var(--text-muted);font-size:11px;margin-top:3px;">Notifikasi email pesanan dari seluruh tim sales Anda (kode <?= htmlspecialchars($currentTlCode) ?>) akan dikirimkan ke email ini.</small>
                     </div>
 
                     <div class="form-group">

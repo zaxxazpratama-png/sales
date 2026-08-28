@@ -311,10 +311,11 @@ class AuthManager
         return null;
     }
 
-    public static function updateProfile(string $currentUsername, string $newUsername, string $newPassword = ''): array
+    public static function updateProfile(string $currentUsername, string $newUsername, string $newPassword = '', string $adminEmail = ''): array
     {
         $currentUsername = trim($currentUsername);
         $newUsername     = trim($newUsername);
+        $adminEmail      = trim($adminEmail);
         if ($newUsername === '') {
             throw new \InvalidArgumentException('Username tidak boleh kosong.');
         }
@@ -322,6 +323,11 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
+                // Pastikan kolom admin_email ada
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $colIgnored) {}
+
                 $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND username != ? LIMIT 1");
                 $checkStmt->execute([$newUsername, $currentUsername]);
                 if ($checkStmt->fetch()) {
@@ -332,18 +338,18 @@ class AuthManager
                 if (!$user) {
                     $id = 'usr_' . time() . random_int(100, 999);
                     $hash = $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT);
-                    $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, status, created_at) VALUES (?, ?, ?, 'superadmin', 'active', NOW())");
-                    $insertStmt->execute([$id, $newUsername, $hash]);
-                    return ['id' => $id, 'username' => $newUsername, 'role' => 'superadmin', 'status' => 'active'];
+                    $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, admin_email, status, created_at) VALUES (?, ?, ?, 'superadmin', ?, 'active', NOW())");
+                    $insertStmt->execute([$id, $newUsername, $hash, $adminEmail]);
+                    return ['id' => $id, 'username' => $newUsername, 'role' => 'superadmin', 'admin_email' => $adminEmail, 'status' => 'active'];
                 }
 
                 if ($newPassword !== '') {
                     $hash = password_hash($newPassword, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ? WHERE username = ?");
-                    $stmt->execute([$newUsername, $hash, $currentUsername]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, admin_email = ? WHERE username = ?");
+                    $stmt->execute([$newUsername, $hash, $adminEmail, $currentUsername]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ? WHERE username = ?");
-                    $stmt->execute([$newUsername, $currentUsername]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, admin_email = ? WHERE username = ?");
+                    $stmt->execute([$newUsername, $adminEmail, $currentUsername]);
                 }
 
                 return self::getUserByUsername($newUsername) ?: [];
@@ -368,10 +374,11 @@ class AuthManager
 
         if ($foundIndex === -1) {
             $userObj = [
-                'username' => $newUsername,
-                'password' => $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT),
-                'role'     => 'superadmin',
-                'status'   => 'active',
+                'username'    => $newUsername,
+                'password'    => $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT),
+                'role'        => 'superadmin',
+                'admin_email' => $adminEmail,
+                'status'      => 'active',
             ];
             $users[] = $userObj;
             self::saveUsers($users);
@@ -379,6 +386,7 @@ class AuthManager
         }
 
         $users[$foundIndex]['username'] = $newUsername;
+        $users[$foundIndex]['admin_email'] = $adminEmail;
         if ($newPassword !== '') {
             $users[$foundIndex]['password'] = password_hash($newPassword, PASSWORD_DEFAULT);
         }

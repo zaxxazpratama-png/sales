@@ -209,6 +209,12 @@ function generateCbnDocumentHtml(data) {
   const smartboxQty   = parseInt(data.smartbox_qty || '0', 10) || 0;
   const smartboxV3Qty = parseInt(data.smartbox_v3_qty || '0', 10) || 0;
   const totalSmartbox = smartboxQty + smartboxV3Qty;
+  let smartboxLabel   = '';
+  if (smartboxV3Qty > 0) {
+    smartboxLabel = 'Android V3';
+  } else if (smartboxQty > 0) {
+    smartboxLabel = 'Android';
+  }
 
   const usernameCbn = (data.username_cbn || (nama.split(' ')[0] || 'user')).toLowerCase().trim();
   
@@ -362,6 +368,7 @@ function generateCbnDocumentHtml(data) {
     ` : ''}
     ${totalSmartbox >= 1 ? `
       <div class='fld' style='top:46.00%;left:49.85%;font-size:10pt;font-weight:900;'>&#10004;</div>
+      <div class='fld' style='top:45.95%;left:60.50%;font-size:8.5pt;font-weight:bold;color:#000;'>${smartboxLabel}</div>
       <div class='fld' style='top:45.95%;left:79.06%;width:3.42%;text-align:center;font-size:9.5pt;font-weight:bold;'>${totalSmartbox}</div>
     ` : ''}
 
