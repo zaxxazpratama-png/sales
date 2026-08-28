@@ -17,11 +17,18 @@ class Config
         
         if (file_exists($rootPath . '/.env')) {
             $dotenv = Dotenv::createImmutable($rootPath);
-            $dotenv->load();
+            $dotenv->safeLoad();
         }
 
         self::$data = [
-            // Apps Script Config (tanpa kartu kredit)
+            // Database MySQL (cPanel / Server / Cloud)
+            'db_host'         => $_ENV['DB_HOST'] ?? 'localhost',
+            'db_port'         => (int)($_ENV['DB_PORT'] ?? 3306),
+            'db_database'     => $_ENV['DB_DATABASE'] ?? '',
+            'db_username'     => $_ENV['DB_USERNAME'] ?? '',
+            'db_password'     => $_ENV['DB_PASSWORD'] ?? '',
+
+            // Apps Script Config
             'apps_script_url' => $_ENV['APPS_SCRIPT_URL'] ?? '',
 
             // Mail Config (opsional)
@@ -29,14 +36,15 @@ class Config
             'mail_port'       => (int)($_ENV['MAIL_PORT'] ?? 587),
             'mail_username'   => $_ENV['MAIL_USERNAME'] ?? '',
             'mail_password'   => $_ENV['MAIL_PASSWORD'] ?? '',
-            'mail_from_name'  => $_ENV['MAIL_FROM_NAME'] ?? 'Sales Order Form',
+            'mail_from_name'  => $_ENV['MAIL_FROM_NAME'] ?? 'PT. TALENTA INTEGRITAS NASIONAL',
             'mail_from_email' => $_ENV['MAIL_FROM_EMAIL'] ?? '',
             'mail_to_email'   => $_ENV['MAIL_TO_EMAIL'] ?? '',
-            'mail_to_name'    => $_ENV['MAIL_TO_NAME'] ?? 'Admin',
+            'mail_to_name'    => $_ENV['MAIL_TO_NAME'] ?? 'Admin TIN',
 
             // App Config
-            'app_name'  => $_ENV['APP_NAME'] ?? 'Sales Order Form',
-            'app_debug' => strtolower($_ENV['APP_DEBUG'] ?? 'false') === 'true',
+            'app_name'        => $_ENV['APP_NAME'] ?? 'Sales Order Form - PT. TALENTA INTEGRITAS NASIONAL',
+            'app_url'         => $_ENV['APP_URL'] ?? 'https://idpanel.site',
+            'app_debug'       => strtolower($_ENV['APP_DEBUG'] ?? 'false') === 'true',
         ];
 
         self::$loaded = true;

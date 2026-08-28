@@ -1,29 +1,54 @@
+# ==============================================================================
+# FORMGOOGLE - cPanel / Apache Configuration
+# Domain: idpanel.site
+# ==============================================================================
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /ALATTEMPUR/FORMGOOGLE/
 
-    # Allow direct access to existing static asset files
-    RewriteCond %{REQUEST_URI} ^/ALATTEMPUR/FORMGOOGLE/assets/ [OR]
-    RewriteCond %{REQUEST_URI} ^/ALATTEMPUR/FORMGOOGLE/public/assets/
+    # Keamanan: Blokir akses langsung ke file sensitif
+    RewriteRule ^\.env - [F,L,NC]
+    RewriteRule ^composer\.(json|lock) - [F,L,NC]
+    RewriteRule ^package(-lock)?\.json - [F,L,NC]
+    RewriteRule ^data/.*\.json$ - [F,L,NC]
+    RewriteRule ^logs/ - [F,L,NC]
+    RewriteRule ^credentials/ - [F,L,NC]
+    RewriteRule ^\.git - [F,L,NC]
+
+    # 1. Static Assets (CSS, JS, Images, Fonts, PDF)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 2. Redirect assets/* ke public/assets/* jika belum resolved
     RewriteRule ^assets/(.*)$ public/assets/$1 [L]
 
-    # Admin routes
+    # 3. Admin Panel Routes
     RewriteRule ^admin/?$ public/admin/index.php [L]
+    RewriteRule ^admin/dashboard(\.php)?$ public/admin/dashboard.php [L]
     RewriteRule ^admin/(.*)$ public/admin/$1 [L]
+    RewriteRule ^dashboard(\.php)?$ public/admin/dashboard.php [L]
 
-    # Specific PHP endpoints
+    # 4. Endpoints Spesifik
     RewriteRule ^submit\.php$ public/submit.php [L]
     RewriteRule ^preview_cbn\.php$ public/preview_cbn.php [L]
     RewriteRule ^404/?$ public/404.php [L]
 
-    # /s/KODE_SALES -> public/index.php?sales=KODE_SALES
+    # 5. Route Sales: /s/KODE_SALES -> public/index.php?sales=KODE_SALES
     RewriteRule ^s/([a-zA-Z0-9_\-]+)/?$ public/index.php?sales=$1 [QSA,L]
 
-    # /KODE_SALES (e.g. /SEP-001, /SEP-002) -> public/index.php?sales=KODE_SALES
+    # 6. Route Sales: /KODE_SALES (misal /SEP-001 atau /TIN-001) -> public/index.php?sales=KODE_SALES
+    RewriteCond %{REQUEST_URI} !^/(api|public|assets|vendor|data|logs|credentials) [NC]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^([a-zA-Z0-9_\-]+)/?$ public/index.php?sales=$1 [QSA,L]
 
-    # Block direct /public/ access and fallback to 404
-    RewriteRule ^public/?$ public/404.php [L]
-    RewriteRule ^$ public/404.php [L]
+    # 7. Root Request -> public/index.php
+    RewriteRule ^$ public/index.php [L]
 </IfModule>
 
+# Prevent directory browsing
+Options -Indexes
+
+# Custom Error Pages
+ErrorDocument 404 /public/404.php

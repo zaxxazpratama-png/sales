@@ -1,9 +1,11 @@
 <?php
 namespace App;
 
+use PDO;
+
 /**
  * OrdersManager
- * Handle baca/tulis orders.json dengan fallback /tmp untuk Vercel serverless
+ * Handle data orders dengan dual-engine: MySQL database di cPanel + fallback JSON di serverless/lokal.
  */
 class OrdersManager
 {
@@ -30,10 +32,23 @@ class OrdersManager
 
     /**
      * Ambil semua orders
-     * Prioritas: /tmp (data runtime) → file asli
+     * Prioritas: Database MySQL -> /tmp -> /data/orders.json
      */
     public static function getAll(): array
     {
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->query("SELECT * FROM orders ORDER BY submitted_at DESC, id DESC");
+                $rows = $stmt->fetchAll();
+                if ($rows !== false) {
+                    return $rows;
+                }
+            } catch (\Exception $e) {
+                error_log("DB Orders getAll Error: " . $e->getMessage());
+            }
+        }
+
         $tmpPath    = sys_get_temp_dir() . '/formgoogle_data/orders.json';
         $sourcePath = self::getSourcePath();
 
@@ -47,7 +62,7 @@ class OrdersManager
     }
 
     /**
-     * Simpan semua orders ke writable path
+     * Simpan semua orders ke writable path JSON
      */
     public static function saveAll(array $orders): void
     {
@@ -64,6 +79,33 @@ class OrdersManager
      */
     public static function add(array $order): void
     {
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("INSERT INTO orders (ticket_no, nama, nomor_ktp, telp, email, alamat, home_id, tikor, paket, total, sales_code, tl_code, jadwal, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $order['ticket_no'] ?? '',
+                    $order['nama'] ?? '',
+                    $order['nomor_ktp'] ?? '',
+                    $order['telp'] ?? '',
+                    $order['email'] ?? '',
+                    $order['alamat'] ?? '',
+                    $order['home_id'] ?? '',
+                    $order['tikor'] ?? '',
+                    $order['paket'] ?? '',
+                    $order['total'] ?? '',
+                    $order['sales_code'] ?? '',
+                    $order['tl_code'] ?? '',
+                    $order['jadwal'] ?? '',
+                    $order['status'] ?? 'PENDING',
+                    $order['submitted_at'] ?? date('Y-m-d H:i:s'),
+                ]);
+                return;
+            } catch (\Exception $e) {
+                error_log("DB Orders add Error: " . $e->getMessage());
+            }
+        }
+
         $orders   = self::getAll();
         $orders[] = $order;
         self::saveAll($orders);
@@ -71,10 +113,28 @@ class OrdersManager
 
     /**
      * Update status order berdasarkan ticket_no
-     * Return array order yang diupdate, atau null jika tidak ditemukan
      */
     public static function updateStatus(string $ticketNo, string $newStatus, ?string $tlCode = null): ?array
     {
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                if ($tlCode !== null && $tlCode !== '') {
+                    $stmt = $pdo->prepare("UPDATE orders SET status = ?, updated_at = NOW() WHERE ticket_no = ? AND tl_code = ?");
+                    $stmt->execute([$newStatus, $ticketNo, $tlCode]);
+                } else {
+                    $stmt = $pdo->prepare("UPDATE orders SET status = ?, updated_at = NOW() WHERE ticket_no = ?");
+                    $stmt->execute([$newStatus, $ticketNo]);
+                }
+
+                $fetchStmt = $pdo->prepare("SELECT * FROM orders WHERE ticket_no = ? LIMIT 1");
+                $fetchStmt->execute([$ticketNo]);
+                return $fetchStmt->fetch() ?: null;
+            } catch (\Exception $e) {
+                error_log("DB Orders updateStatus Error: " . $e->getMessage());
+            }
+        }
+
         $orders      = self::getAll();
         $targetOrder = null;
 
@@ -82,7 +142,6 @@ class OrdersManager
             if (($ord['ticket_no'] ?? '') !== $ticketNo) {
                 continue;
             }
-            // Jika ada filter TL, pastikan hanya TL yang punya order ini
             if ($tlCode !== null && ($ord['tl_code'] ?? '') !== $tlCode) {
                 continue;
             }
@@ -101,10 +160,26 @@ class OrdersManager
 
     /**
      * Hapus order berdasarkan ticket_no
-     * Return order yang dihapus, atau null jika tidak ditemukan
      */
     public static function delete(string $ticketNo): ?array
     {
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                $fetchStmt = $pdo->prepare("SELECT * FROM orders WHERE ticket_no = ? LIMIT 1");
+                $fetchStmt->execute([$ticketNo]);
+                $deleted = $fetchStmt->fetch() ?: null;
+
+                if ($deleted) {
+                    $delStmt = $pdo->prepare("DELETE FROM orders WHERE ticket_no = ?");
+                    $delStmt->execute([$ticketNo]);
+                }
+                return $deleted;
+            } catch (\Exception $e) {
+                error_log("DB Orders delete Error: " . $e->getMessage());
+            }
+        }
+
         $orders      = self::getAll();
         $deleted     = null;
         $newOrders   = [];

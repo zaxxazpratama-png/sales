@@ -1,33 +1,26 @@
 <?php
 namespace App;
 
+use PDO;
+
 class SettingsManager
 {
     private static string $filePath = '';
 
-    /**
-     * Path file asli (read-only di serverless, writable di lokal)
-     */
     private static function getSourcePath(): string
     {
         return dirname(__DIR__) . '/data/settings.json';
     }
 
-    /**
-     * Path untuk write: gunakan /tmp jika filesystem read-only (serverless),
-     * otherwise gunakan path asli
-     */
     private static function getWritePath(): string
     {
         if (empty(self::$filePath)) {
             $sourcePath = self::getSourcePath();
             $dir        = dirname($sourcePath);
 
-            // Cek apakah direktori bisa ditulis
             if (is_writable($dir)) {
                 self::$filePath = $sourcePath;
             } else {
-                // Fallback ke /tmp untuk environment serverless (Lambda, dll)
                 $tmpDir = sys_get_temp_dir() . '/formgoogle_data';
                 if (!is_dir($tmpDir)) {
                     mkdir($tmpDir, 0755, true);
@@ -39,15 +32,31 @@ class SettingsManager
     }
 
     /**
-     * Ambil seluruh konfigurasi pengaturan.
-     * Prioritas: /tmp (data runtime) → file asli (default)
+     * Ambil konfigurasi pengaturan.
+     * Prioritas: Database MySQL -> /tmp -> file asli /data/settings.json
      */
     public static function get(): array
     {
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = 'app_config' LIMIT 1");
+                $stmt->execute();
+                $row = $stmt->fetch();
+                if ($row && !empty($row['setting_value'])) {
+                    $decoded = json_decode($row['setting_value'], true);
+                    if (is_array($decoded)) {
+                        return $decoded;
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log("DB Settings get Error: " . $e->getMessage());
+            }
+        }
+
         $tmpPath    = sys_get_temp_dir() . '/formgoogle_data/settings.json';
         $sourcePath = self::getSourcePath();
 
-        // Gunakan /tmp jika ada (data yang sudah diupdate di runtime)
         $path = (file_exists($tmpPath)) ? $tmpPath : $sourcePath;
 
         if (!file_exists($path)) {
@@ -66,6 +75,18 @@ class SettingsManager
     {
         $current = self::get();
         $merged  = array_merge($current, $newData);
+        $jsonStr = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        $pdo = Database::getConnection();
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("INSERT INTO settings (setting_key, setting_value, updated_at) VALUES ('app_config', ?, NOW()) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()");
+                $stmt->execute([$jsonStr]);
+            } catch (\Exception $e) {
+                error_log("DB Settings update Error: " . $e->getMessage());
+            }
+        }
+
         $path    = self::getWritePath();
         $dir     = dirname($path);
 
@@ -73,10 +94,7 @@ class SettingsManager
             mkdir($dir, 0755, true);
         }
 
-        return (bool) file_put_contents(
-            $path,
-            json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-        );
+        return (bool) file_put_contents($path, $jsonStr);
     }
 
     /**
