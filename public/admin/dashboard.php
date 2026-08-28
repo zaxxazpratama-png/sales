@@ -2,7 +2,7 @@
 /**
  * FORMGOOGLE - Admin Dashboard
  * Manajemen Tim Sales, Link Generator, dan Pengaturan Form Dinamis
- * PT. Sinergi Emas Perdana
+ * PT. Talenta Integritas Nasional
  */
 require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -1347,7 +1347,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
         <div class="cbn-logo">cbn<span>.</span></div>
         <div>
             <div class="topbar-title">PANEL PENGELOLAAN SALES & FORM</div>
-            <div class="topbar-sub">PT. Sinergi Emas Perdana</div>
+            <div class="topbar-sub"><?= htmlspecialchars($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL') ?></div>
         </div>
     </div>
     <div class="topbar-right">
@@ -1658,7 +1658,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     <div class="form-group">
                         <label>Nama Perusahaan / Mitra</label>
                         <input type="text" name="company_name" class="form-control" 
-                            value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA') ?>" required>
+                            value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL') ?>" required>
                     </div>
                 </div>
 
@@ -2058,7 +2058,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                 <div class="form-grid-2">
                     <div class="form-group">
                         <label>Nama Perusahaan / Vendor</label>
-                        <input type="text" name="company_name" class="form-control" value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA') ?>" required>
+                        <input type="text" name="company_name" class="form-control" value="<?= htmlspecialchars($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL') ?>" required>
                     </div>
 
                     <div class="form-group">

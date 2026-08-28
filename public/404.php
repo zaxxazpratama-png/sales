@@ -9,7 +9,7 @@ use App\SettingsManager;
 http_response_code(404);
 $settings = SettingsManager::get();
 $callCenter = $settings['call_center'] ?? '1500 780';
-$companyName = $settings['company_name'] ?? 'PT. SINERGI EMAS PERDANA';
+$companyName = $settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL';
 $waHelpdesk = $settings['wa_helpdesk'] ?? '';
 ?>
 <!DOCTYPE html>

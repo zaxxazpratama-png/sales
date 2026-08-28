@@ -32,7 +32,7 @@ class AppsScriptService
         $payload = [
             'sales_code'        => $data['sales_code']        ?? 'SEP-001',
             'ticket_no'         => $data['ticket_no']         ?? '',
-            'vendor'            => $data['vendor']            ?? 'PT. SINERGI EMAS PERDANA',
+            'vendor'            => $data['vendor']            ?? 'PT. TALENTA INTEGRITAS NASIONAL',
             'so_date'           => $data['so_date']           ?? date('d/m/Y'),
             'tl_code'           => $data['tl_code']           ?? '-',
             'team_leader'      => $data['tl_code']           ?? '-',

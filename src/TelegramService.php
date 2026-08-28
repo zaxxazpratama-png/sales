@@ -64,7 +64,7 @@ class TelegramService
             $msg .= "👤 <b>INFO SALES:</b>\n";
             $msg .= "• Kode Sales: <code>{$salesCode}</code>\n";
             $msg .= "• Nama Sales: <b>{$salesName}</b>\n";
-            $msg .= "• Mitra: PT. Sinergi Emas Perdana\n\n";
+            $msg .= "• Mitra: PT. Talenta Integritas Nasional\n\n";
 
             $msg .= "📝 <b>DATA PELANGGAN:</b>\n";
             $msg .= "• Nama Lengkap: <b>{$nama}</b>\n";

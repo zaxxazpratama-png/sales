@@ -22,7 +22,7 @@ class GoogleDriveService
         }
 
         $client = new Client();
-        $client->setApplicationName('Sales Order Form - PT. SEP');
+        $client->setApplicationName('Sales Order Form - PT. TIN');
         $client->setScopes([Drive::DRIVE_FILE]);
         $client->setAuthConfig($credentialsPath);
 

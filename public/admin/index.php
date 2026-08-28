@@ -1,7 +1,7 @@
 <?php
 /**
  * FORMGOOGLE - Admin Panel Login
- * PT. Sinergi Emas Perdana
+ * PT. Talenta Integritas Nasional
  */
 require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -184,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="brand-header">
         <div class="brand-logo">cbn<span>.</span></div>
         <h1>DASHBOARD ADMIN</h1>
-        <p>Kelola Tim Sales & Form CBN &bull; PT. SEP</p>
+        <p>Kelola Tim Sales &amp; Form CBN &bull; PT. TIN</p>
     </div>
 
     <?php if ($error): ?>

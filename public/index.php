@@ -1,7 +1,7 @@
 <?php
 /**
  * FORMGOOGLE - Formulir Pendaftaran Layanan CBN
- * PT. Sinergi Emas Perdana
+ * PT. Talenta Integritas Nasional
  * 
  * Otomatisasi Input Form -> Simpan ke Spreadsheet -> Generate PDF Formulir Resmi CBN -> Kirim ke Email
  */
@@ -75,8 +75,8 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Formulir Pendaftaran Layanan CBN - Internet Fiber Cepat & TV Berlangganan. Registrasi resmi PT. Sinergi Emas Perdana.">
-    <title>Formulir Pendaftaran Layanan CBN - <?= htmlspecialchars($salesName ? $salesName . ' (' . $salesCode . ')' : 'PT. SEP') ?></title>
+    <meta name="description" content="Formulir Pendaftaran Layanan CBN - Internet Fiber Cepat & TV Berlangganan. Registrasi resmi PT. Talenta Integritas Nasional.">
+    <title>Formulir Pendaftaran Layanan CBN - <?= htmlspecialchars($salesName ? $salesName . ' (' . $salesCode . ')' : 'PT. TIN') ?></title>
     <link rel="stylesheet" href="<?= $baseUrl ?>/assets/css/style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
@@ -89,7 +89,7 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
             <div class="cbn-brand-logo">cbn<span>.</span></div>
             <div class="header-title">
                 <h1><?= htmlspecialchars($settings['app_title'] ?? 'FORMULIR PENDAFTARAN LAYANAN CBN') ?></h1>
-                <p><?= htmlspecialchars($settings['app_subtitle'] ?? 'CBN Service Application Form • Mitra Resmi: PT. Sinergi Emas Perdana') ?></p>
+                <p><?= htmlspecialchars($settings['app_subtitle'] ?? 'CBN Service Application Form • Mitra Resmi: PT. Talenta Integritas Nasional') ?></p>
             </div>
         </div>
         <div class="header-right">
@@ -204,7 +204,7 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
             <div style="background: rgba(255,255,255,0.03); padding: 14px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
                 <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Sales Consultant</div>
                 <div style="color: #fff; font-weight: 600; font-size: 13.5px;"><?= htmlspecialchars(is_array($success) ? ($success['sales_name'] ?? $salesName) : $salesName) ?> (<?= htmlspecialchars($salesCode) ?>)</div>
-                <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;">PT. Sinergi Emas Perdana</div>
+                <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;"><?= htmlspecialchars($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL') ?></div>
             </div>
         </div>
 

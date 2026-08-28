@@ -24,7 +24,7 @@ class GoogleSheetService
         }
 
         $client = new Client();
-        $client->setApplicationName('Sales Order Form - PT. SEP');
+        $client->setApplicationName('Sales Order Form - PT. TIN');
         $client->setScopes([Sheets::SPREADSHEETS]);
         $client->setAuthConfig($credentialsPath);
 
