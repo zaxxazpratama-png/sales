@@ -154,6 +154,9 @@ class AuthManager
             throw new \InvalidArgumentException('Username, password, dan kode team leader wajib diisi.');
         }
 
+        $id = 'usr_' . time() . random_int(100, 999);
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
@@ -168,10 +171,8 @@ class AuthManager
                     throw new \InvalidArgumentException('Username atau kode team leader sudah digunakan.');
                 }
 
-                $id = 'usr_' . time() . random_int(100, 999);
-                $hash = password_hash($password, PASSWORD_DEFAULT);
                 $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, tl_code, admin_email, status, created_at) VALUES (?, ?, ?, 'tl', ?, ?, 'active', NOW())");
-                return $insertStmt->execute([$id, $username, $hash, $tlCode, $adminEmail]);
+                $insertStmt->execute([$id, $username, $hash, $tlCode, $adminEmail]);
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
             } catch (\Exception $e) {
@@ -179,24 +180,29 @@ class AuthManager
             }
         }
 
-        // Fallback JSON
+        // Always sync JSON
         $users = self::getUsers();
+        $exists = false;
         foreach ($users as $user) {
             if (($user['username'] ?? '') === $username || ($user['tl_code'] ?? '') === $tlCode) {
-                throw new \InvalidArgumentException('Username atau kode team leader sudah digunakan.');
+                $exists = true;
+                break;
             }
         }
-        $users[] = [
-            'id'          => (string)(time() . random_int(100, 999)),
-            'username'    => $username,
-            'password'    => password_hash($password, PASSWORD_DEFAULT),
-            'role'        => 'tl',
-            'tl_code'     => $tlCode,
-            'admin_email' => $adminEmail,
-            'status'      => 'active',
-            'created_at'  => date('Y-m-d H:i:s'),
-        ];
-        return self::saveUsers($users);
+        if (!$exists) {
+            $users[] = [
+                'id'          => $id,
+                'username'    => $username,
+                'password'    => $hash,
+                'role'        => 'tl',
+                'tl_code'     => $tlCode,
+                'admin_email' => $adminEmail,
+                'status'      => 'active',
+                'created_at'  => date('Y-m-d H:i:s'),
+            ];
+            self::saveUsers($users);
+        }
+        return true;
     }
 
     public static function updateTeamLeader(string $id, string $username, string $password, string $tlCode, string $adminEmail = '', string $status = 'active'): bool
@@ -225,11 +231,11 @@ class AuthManager
 
                 if ($password !== '') {
                     $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ?) AND role = 'tl'");
-                    return $stmt->execute([$username, $hash, $tlCode, $adminEmail, $status, $id, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ? OR (tl_code = ? AND tl_code != '')) AND role = 'tl'");
+                    $stmt->execute([$username, $hash, $tlCode, $adminEmail, $status, $id, $id, $tlCode]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ?) AND role = 'tl'");
-                    return $stmt->execute([$username, $tlCode, $adminEmail, $status, $id, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ? OR (tl_code = ? AND tl_code != '')) AND role = 'tl'");
+                    $stmt->execute([$username, $tlCode, $adminEmail, $status, $id, $id, $tlCode]);
                 }
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
@@ -238,14 +244,14 @@ class AuthManager
             }
         }
 
-        // Fallback JSON
+        // Always sync JSON
         $users = self::getUsers();
         $found = false;
         foreach ($users as $index => &$user) {
             if (($user['role'] ?? '') !== 'tl') {
                 continue;
             }
-            if (($user['id'] ?? $user['username'] ?? '') === $id || ($user['username'] ?? '') === $id) {
+            if (($user['id'] ?? $user['username'] ?? '') === $id || ($user['username'] ?? '') === $id || ($user['tl_code'] ?? '') === $tlCode) {
                 $found               = true;
                 $user['username']    = $username;
                 $user['tl_code']     = $tlCode;
@@ -256,16 +262,13 @@ class AuthManager
                 }
                 continue;
             }
-            if (($user['username'] ?? '') === $username || ($user['tl_code'] ?? '') === $tlCode) {
-                throw new \InvalidArgumentException('Username atau kode team leader sudah digunakan.');
-            }
         }
         unset($user);
 
-        if (!$found) {
-            throw new \InvalidArgumentException('Akun team leader tidak ditemukan.');
+        if ($found) {
+            self::saveUsers($users);
         }
-        return self::saveUsers($users);
+        return true;
     }
 
     public static function getTlByCode(string $tlCode): ?array
@@ -312,7 +315,7 @@ class AuthManager
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
                 } catch (\Exception $ignored) {}
 
-                $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1");
                 $stmt->execute([$username]);
                 $res = $stmt->fetch();
                 return $res ?: null;
@@ -322,7 +325,7 @@ class AuthManager
         }
 
         foreach (self::getUsers() as $user) {
-            if (($user['username'] ?? '') === $username) {
+            if (strtolower($user['username'] ?? '') === strtolower($username)) {
                 return $user;
             }
         }
@@ -345,7 +348,7 @@ class AuthManager
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
                 } catch (\Exception $colIgnored) {}
 
-                $checkStmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND username != ? LIMIT 1");
+                $checkStmt = $pdo->prepare("SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND LOWER(username) != LOWER(?) LIMIT 1");
                 $checkStmt->execute([$newUsername, $currentUsername]);
                 if ($checkStmt->fetch()) {
                     throw new \InvalidArgumentException('Username "' . $newUsername . '" sudah digunakan oleh pengguna lain.');
@@ -370,13 +373,12 @@ class AuthManager
                     $sql .= ", admin_email = ?";
                     $params[] = trim($adminEmail);
                 }
-                $sql .= " WHERE username = ?";
+                $sql .= " WHERE LOWER(username) = LOWER(?) OR (id = ?)";
                 $params[] = $currentUsername;
+                $params[] = $user['id'] ?? $currentUsername;
 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
-
-                return self::getUserByUsername($newUsername) ?: [];
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
             } catch (\Exception $e) {
@@ -384,14 +386,14 @@ class AuthManager
             }
         }
 
-        // Fallback JSON
+        // Always sync JSON
         $users      = self::getUsers();
         $foundIndex = -1;
 
         foreach ($users as $index => $user) {
-            if (($user['username'] ?? '') === $currentUsername) {
+            if (strtolower($user['username'] ?? '') === strtolower($currentUsername)) {
                 $foundIndex = $index;
-            } elseif (($user['username'] ?? '') === $newUsername) {
+            } elseif (strtolower($user['username'] ?? '') === strtolower($newUsername)) {
                 throw new \InvalidArgumentException('Username "' . $newUsername . '" sudah digunakan oleh pengguna lain.');
             }
         }
