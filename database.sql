@@ -50,16 +50,16 @@ CREATE TABLE IF NOT EXISTS `sales` (
 
 -- Data Sales Bawaan
 INSERT INTO `sales` (`id`, `sales_code`, `nama_sales`, `no_wa`, `email`, `tl_code`, `ttd_path`, `status`, `email_customer_enabled`, `created_at`) VALUES
-('1', 'SEP-001', 'FIRMAN', '081265753141', 'puja.pangestu@gmail.com', 'TL-MEDAN-01', 'assets/img/ttd_sales_master.png', 'active', 1, '2026-08-20 10:00:00'),
-('2', 'SEP-002', 'Budi Santoso', '081234567801', 'budi.santoso@gmail.com', 'TL-MEDAN-01', 'assets/img/ttd_sales_sep_002.png', 'active', 1, '2026-08-20 10:30:00'),
-('3', 'SEP-003', 'Dimas Pratama', '081234567802', 'dimas.pratama@gmail.com', 'TL-MEDAN-01', 'assets/img/ttd_sales_sep_003.png', 'active', 1, '2026-08-20 11:00:00'),
-('4', 'SEP-004', 'Rian Hidayat', '081234567803', 'rian.hidayat@gmail.com', 'TL-MEDAN-02', '', 'active', 1, '2026-08-20 11:30:00'),
-('5', 'SEP-005', 'Siti Rahma', '081234567804', 'siti.rahma@gmail.com', 'TL-MEDAN-02', '', 'active', 1, '2026-08-20 12:00:00'),
-('6', 'SEP-006', 'Andi Wijaya', '081234567805', 'andi.wijaya@gmail.com', 'TL-MEDAN-02', '', 'active', 1, '2026-08-20 12:30:00'),
-('7', 'SEP-007', 'Dewi Lestari', '081234567806', 'dewi.lestari@gmail.com', 'TL-MEDAN-03', '', 'active', 1, '2026-08-20 13:00:00'),
-('8', 'SEP-008', 'Fajar Ramadhan', '081234567807', 'fajar.ramadhan@gmail.com', 'TL-MEDAN-03', '', 'active', 1, '2026-08-20 13:30:00'),
-('9', 'SEP-009', 'Eko Prasetyo', '081234567808', 'eko.prasetyo@gmail.com', 'TL-MEDAN-03', '', 'active', 1, '2026-08-20 14:00:00'),
-('10', 'SEP-010', 'Mega Putri', '081234567809', 'mega.putri@gmail.com', 'TL-MEDAN-03', '', 'active', 1, '2026-08-20 14:30:00'),
+('1', 'SEP-001', 'FIRMAN', '081265753141', 'puja.pangestu@gmail.com', 'TIN-SUHARTA', 'assets/img/ttd_sales_master.png', 'active', 1, '2026-08-20 10:00:00'),
+('2', 'SEP-002', 'Budi Santoso', '081234567801', 'budi.santoso@gmail.com', 'TIN-SUHARTA', 'assets/img/ttd_sales_sep_002.png', 'active', 1, '2026-08-20 10:30:00'),
+('3', 'SEP-003', 'Dimas Pratama', '081234567802', 'dimas.pratama@gmail.com', 'TIN-SUHARTA', 'assets/img/ttd_sales_sep_003.png', 'active', 1, '2026-08-20 11:00:00'),
+('4', 'SEP-004', 'Rian Hidayat', '081234567803', 'rian.hidayat@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 11:30:00'),
+('5', 'SEP-005', 'Siti Rahma', '081234567804', 'siti.rahma@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 12:00:00'),
+('6', 'SEP-006', 'Andi Wijaya', '081234567805', 'andi.wijaya@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 12:30:00'),
+('7', 'SEP-007', 'Dewi Lestari', '081234567806', 'dewi.lestari@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 13:00:00'),
+('8', 'SEP-008', 'Fajar Ramadhan', '081234567807', 'fajar.ramadhan@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 13:30:00'),
+('9', 'SEP-009', 'Eko Prasetyo', '081234567808', 'eko.prasetyo@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 14:00:00'),
+('10', 'SEP-010', 'Mega Putri', '081234567809', 'mega.putri@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-20 14:30:00'),
 ('1787732705404', 'TIN-SUHARTA-TES', 'FERDI', '08774411225588', 'salesferdi@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-26 10:25:05'),
 ('1787758487866', 'MAZALI', 'MAZALI RESMI', '081265757896', 'mazali@gmail.com', 'TIN-SUHARTA', '', 'active', 1, '2026-08-26 17:34:47')
 ON DUPLICATE KEY UPDATE `nama_sales` = VALUES(`nama_sales`);
