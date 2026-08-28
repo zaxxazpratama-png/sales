@@ -4,7 +4,7 @@
  * Manajemen Tim Sales, Link Generator, dan Pengaturan Form Dinamis
  * PT. Talenta Integritas Nasional
  */
-require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
+require_once dirname(__DIR__, 2) . '/src/autoload.php';
 
 use App\Config;
 use App\SalesManager;

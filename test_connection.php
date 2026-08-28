@@ -5,7 +5,7 @@
  */
 header('Content-Type: text/html; charset=utf-8');
 
-require_once __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/src/autoload.php';
 
 use App\Config;
 use App\Database;

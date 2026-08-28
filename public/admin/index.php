@@ -3,7 +3,7 @@
  * FORMGOOGLE - Admin Panel Login
  * PT. Talenta Integritas Nasional
  */
-require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
+require_once dirname(__DIR__, 2) . '/src/autoload.php';
 
 use App\SettingsManager;
 use App\AuthManager;

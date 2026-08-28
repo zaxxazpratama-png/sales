@@ -7,10 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$autoload = dirname(__DIR__) . '/vendor/autoload.php';
-if (file_exists($autoload)) {
-    require_once $autoload;
-}
+require_once dirname(__DIR__) . '/src/autoload.php';
 
 use App\CbnDocumentTemplate;
 use App\SettingsManager;

@@ -5,7 +5,7 @@
  * 
  * Otomatisasi Input Form -> Simpan ke Spreadsheet -> Generate PDF Formulir Resmi CBN -> Kirim ke Email
  */
-require_once dirname(__DIR__) . '/vendor/autoload.php';
+require_once dirname(__DIR__) . '/src/autoload.php';
 
 use App\SalesManager;
 use App\SettingsManager;

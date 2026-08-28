@@ -2,7 +2,7 @@
 /**
  * 404 Not Found - Akses Tanpa Link Sales Resmi
  */
-require_once dirname(__DIR__) . '/vendor/autoload.php';
+require_once dirname(__DIR__) . '/src/autoload.php';
 
 use App\SettingsManager;
 

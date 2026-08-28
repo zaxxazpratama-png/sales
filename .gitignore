@@ -1,5 +1,4 @@
-# Dependencies
-/vendor/
+# Dependencies (vendor included for direct cPanel deployment)
 
 # Environment file (SENSITIVE)
 .env

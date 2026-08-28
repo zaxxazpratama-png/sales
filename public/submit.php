@@ -17,11 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // ===== AUTOLOAD =====
-$autoload = dirname(__DIR__) . '/vendor/autoload.php';
-if (!file_exists($autoload)) {
-    die('<b>Error:</b> File autoload composer tidak ditemukan.');
-}
-require_once $autoload;
+require_once dirname(__DIR__) . '/src/autoload.php';
 
 use App\Config;
 use App\Validator;
