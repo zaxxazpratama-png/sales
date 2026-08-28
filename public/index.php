@@ -130,14 +130,14 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
 
     <!-- Banner Verifikasi Sales Khusus (Persistent & Terkunci) -->
     <?php if ($activeSales): ?>
-    <div style="background: linear-gradient(135deg, rgba(0, 86, 150, 0.35), rgba(0, 160, 223, 0.2)); border: 1px solid rgba(0, 160, 223, 0.45); border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 15px rgba(0, 160, 223, 0.2);">
-        <div style="display:flex;align-items:center;gap:12px;">
+    <div style="background: linear-gradient(135deg, rgba(0, 86, 150, 0.35), rgba(0, 160, 223, 0.2)); border: 1px solid rgba(0, 160, 223, 0.45); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; box-shadow: 0 4px 15px rgba(0, 160, 223, 0.2); max-width: 100%; box-sizing: border-box;">
+        <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px;">
             <div style="background: #00a0df; color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0;">SLS</div>
             <div>
-                <div style="font-size: 14px; font-weight: 800; color: #fff;">
+                <div style="font-size: 14px; font-weight: 800; color: #fff; word-break: break-word;">
                     Pendaftaran Resmi Melalui Sales: <?= htmlspecialchars($activeSales['nama_sales']) ?>
                 </div>
-                <div style="font-size: 12px; color: #cbd5e1;">
+                <div style="font-size: 12px; color: #cbd5e1; word-break: break-word;">
                     Kode Sales: <strong style="color: #67e8f9;"><?= htmlspecialchars($activeSales['sales_code']) ?></strong> 
                     <?php if (!empty($activeSales['no_wa'])): ?>
                         &bull; WhatsApp: <a href="https://wa.me/<?= preg_replace('/\D/', '', $activeSales['no_wa']) ?>" target="_blank" style="color:#67e8f9;text-decoration:underline;"><?= htmlspecialchars($activeSales['no_wa']) ?></a>
@@ -145,14 +145,14 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                 </div>
             </div>
         </div>
-        <span style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 20px; letter-spacing: 0.5px;">VERIFIED SALES</span>
+        <span style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; font-size: 11px; font-weight: 800; padding: 5px 12px; border-radius: 20px; letter-spacing: 0.5px; white-space: nowrap;">VERIFIED SALES</span>
     </div>
     <?php endif; ?>
 
     <!-- Alert Notifikasi Sukses / Error -->
     <!-- Alert & Kartu Tiket Pendaftaran Sukses -->
     <?php if ($success): ?>
-    <div class="ticket-card" style="background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95)); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 28px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; overflow: hidden;">
+    <div class="ticket-card" style="background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95)); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; overflow: hidden; max-width: 100%; box-sizing: border-box;">
         <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #10b981, #3b82f6);"></div>
         
         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 20px; margin-bottom: 22px;">
@@ -215,12 +215,12 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
     <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
-    <div class="alert alert-error" role="alert" style="border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+    <div class="alert alert-error" role="alert" style="border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 12px; padding: 16px 18px; margin-bottom: 24px; word-break: break-word; overflow-wrap: anywhere; box-sizing: border-box; max-width: 100%;">
         <div style="display:flex;align-items:flex-start;gap:12px;">
-            <span style="font-size:22px;line-height:1;">⚠️</span>
-            <div style="flex:1;">
+            <span style="font-size:22px;line-height:1;flex-shrink:0;">⚠️</span>
+            <div style="flex:1;min-width:0;word-break:break-word;overflow-wrap:anywhere;">
                 <strong style="font-size:14px;color:#fca5a5;display:block;margin-bottom:6px;">Mohon lengkapi dan perbaiki data formulir berikut:</strong>
-                <ul style="margin:0;padding-left:20px;color:#fecaca;font-size:13px;line-height:1.7;">
+                <ul style="margin:0;padding-left:18px;color:#fecaca;font-size:13px;line-height:1.7;word-break:break-word;overflow-wrap:anywhere;">
                     <?php foreach ($errors as $fieldKey => $msg): ?>
                         <li><strong><?= htmlspecialchars(is_array($msg) ? implode(', ', $msg) : $msg) ?></strong></li>
                     <?php endforeach; ?>

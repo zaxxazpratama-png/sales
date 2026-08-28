@@ -1,42 +1,43 @@
 <?php
 namespace App;
 
+/**
+ * AppsScriptService
+ * Mengirim data form pendaftaran ke Google Apps Script via HTTP POST (cURL / Stream)
+ * Mengembalikan array response dari Apps Script (URL PDF Google Drive, no baris, dsb).
+ */
 class AppsScriptService
 {
     private string $scriptUrl;
 
-    public function __construct()
+    public function __construct(string $scriptUrl = '')
     {
         Config::load();
         $settings = SettingsManager::get();
-        $this->scriptUrl = $settings['apps_script_url'] ?? Config::get('apps_script_url', '');
 
-        if (empty($this->scriptUrl)) {
-            throw new \RuntimeException(
-                'APPS_SCRIPT_URL belum diatur di Dashboard Admin atau file .env. ' .
-                'Silakan atur URL Web App Google Apps Script di Dashboard Admin.'
-            );
-        }
+        // 1. Cek parameter langsung -> 2. Cek settings.json (dashboard) -> 3. Cek .env -> 4. Fallback URL Default
+        $this->scriptUrl = $scriptUrl
+            ?: ($settings['apps_script_url'] ?? '')
+            ?: Config::get('apps_script_url', '')
+            ?: 'https://script.google.com/macros/s/AKfycbwIRsM7AJx9q7CdJle7T6LAeTQnllIK8PIBwNQB_LwO42pZrhBgxUTTj12mLGJVHmog/exec';
     }
 
     /**
-     * Kirim data form CBN + file KTP + Signature ke Google Apps Script via JSON POST
-     *
-     * @param  array  $data      Data form yang sudah divalidasi
-     * @param  array  $fileInfo  ['tmp_path'=>..., 'name'=>..., 'mime'=>...]
-     * @return array             Response dari Apps Script
+     * Kirim data pendaftaran dan file KTP (base64) ke Apps Script
      */
     public function send(array $data, array $fileInfo = []): array
     {
+        $settings = SettingsManager::get();
+
         // Siapkan payload data
         $payload = [
             'sales_code'        => $data['sales_code']        ?? 'SEP-001',
             'ticket_no'         => $data['ticket_no']         ?? '',
-            'vendor'            => $data['vendor']            ?? 'PT. TALENTA INTEGRITAS NASIONAL',
+            'vendor'            => $data['vendor']            ?? ($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL'),
             'so_date'           => $data['so_date']           ?? date('d/m/Y'),
             'tl_code'           => $data['tl_code']           ?? '-',
-            'team_leader'      => $data['tl_code']           ?? '-',
-            'ae_name'           => $data['ae_name']           ?? '-',
+            'team_leader'       => $data['team_leader']       ?? ($data['tl_code'] ?? '-'),
+            'ae_name'           => $data['ae_name']           ?? ($data['sales_name'] ?? ($data['sales_code'] ?? '-')),
             'home_id'           => $data['home_id']           ?? 'PENDING',
             'nama_pelanggan'    => $data['nama_pelanggan']    ?? '',
             'nomor_ktp'         => $data['nomor_ktp']         ?? '',
@@ -104,10 +105,8 @@ class AppsScriptService
         }
 
         // Konfigurasi dinamis dari Dashboard Admin
-        $settings = SettingsManager::get();
         $masterEmail = trim((string)($settings['master_email'] ?? 'pujapangestu02@gmail.com'));
         $adminEmail  = trim((string)($settings['admin_email'] ?? '1seopageone@gmail.com'));
-        $salesData   = SalesManager::findByCode($salesCode) ?: [];
         $customerEmailEnabled = isset($salesData['email_customer_enabled']) ? (bool)$salesData['email_customer_enabled'] : true;
 
         $payload['spreadsheet_id']            = $settings['spreadsheet_id']  ?? '';
@@ -120,31 +119,8 @@ class AppsScriptService
 
         $jsonPayload = json_encode($payload);
 
-        // Kirim via Stream Context (Native PHP HTTPS POST + Auto Redirect)
-        $opts = [
-            'http' => [
-                'method'          => 'POST',
-                'header'          => "Content-Type: text/plain;charset=UTF-8\r\n" .
-                                     "Content-Length: " . strlen($jsonPayload) . "\r\n",
-                'content'         => $jsonPayload,
-                'follow_location' => 1,
-                'max_redirects'   => 5,
-                'timeout'         => 60,
-                'ignore_errors'   => true,
-            ],
-            'ssl' => [
-                'verify_peer'      => false,
-                'verify_peer_name' => false,
-            ]
-        ];
-
-        $context  = stream_context_create($opts);
-        $response = @file_get_contents($this->scriptUrl, false, $context);
-
-        if ($response === false) {
-            $error = error_get_last();
-            throw new \RuntimeException("Gagal terhubung ke Google Apps Script: " . ($error['message'] ?? 'Unknown network error'));
-        }
+        // Eksekusi HTTP Request via cURL (Standar cPanel) dengan fallback stream
+        $response = $this->postJson($this->scriptUrl, $jsonPayload, 60);
 
         $decoded = json_decode($response, true);
 
@@ -161,11 +137,6 @@ class AppsScriptService
 
     /**
      * Update status pendaftaran di Google Spreadsheet via Apps Script
-     *
-     * @param  string $ticketNo   Nomor tiket (contoh: CBN-TIN006-260826-1234)
-     * @param  string $newStatus  Status baru (PENDING / DIPROSES / SELESAI / BATAL)
-     * @param  array  $extraData  Informasi nama/ktp jika ada
-     * @return array
      */
     public function updateStatus(string $ticketNo, string $newStatus, array $extraData = []): array
     {
@@ -181,31 +152,7 @@ class AppsScriptService
         ];
 
         $jsonPayload = json_encode($payload);
-
-        $opts = [
-            'http' => [
-                'method'          => 'POST',
-                'header'          => "Content-Type: text/plain;charset=UTF-8\r\n" .
-                                     "Content-Length: " . strlen($jsonPayload) . "\r\n",
-                'content'         => $jsonPayload,
-                'follow_location' => 1,
-                'max_redirects'   => 5,
-                'timeout'         => 30,
-                'ignore_errors'   => true,
-            ],
-            'ssl' => [
-                'verify_peer'      => false,
-                'verify_peer_name' => false,
-            ]
-        ];
-
-        $context  = stream_context_create($opts);
-        $response = @file_get_contents($this->scriptUrl, false, $context);
-
-        if ($response === false) {
-            $error = error_get_last();
-            throw new \RuntimeException("Gagal terhubung ke Google Apps Script: " . ($error['message'] ?? 'Unknown network error'));
-        }
+        $response = $this->postJson($this->scriptUrl, $jsonPayload, 30);
 
         $decoded = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -217,12 +164,8 @@ class AppsScriptService
 
     /**
      * Hapus dan tandai baris merah di Google Spreadsheet via Apps Script (Khusus Super Admin)
-     *
-     * @param  string $ticketNo   Nomor tiket (contoh: CBN-TIN006-260826-1234)
-     * @param  array  $extraData  Informasi nama/ktp jika ada
-     * @return array
      */
-    public function deleteOrder(string $ticketNo, array $extraData = []): array
+    public function deleteRow(string $ticketNo, array $extraData = []): array
     {
         $settings = SettingsManager::get();
         $payload = [
@@ -235,7 +178,55 @@ class AppsScriptService
         ];
 
         $jsonPayload = json_encode($payload);
+        $response = $this->postJson($this->scriptUrl, $jsonPayload, 30);
 
+        $decoded = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \RuntimeException("Response tidak valid dari Apps Script: " . substr(strip_tags($response), 0, 200));
+        }
+
+        return $decoded ?: ['status' => 'success'];
+    }
+
+    /**
+     * Kirim HTTP POST JSON payload ke Google Apps Script menggunakan cURL (dengan fallback stream)
+     */
+    private function postJson(string $url, string $jsonPayload, int $timeout = 60): string
+    {
+        // 1. Prioritaskan cURL (Kompatibel dengan semua server cPanel / Linux)
+        if (function_exists('curl_init')) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $url,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonPayload,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS      => 5,
+                CURLOPT_TIMEOUT        => $timeout,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: text/plain;charset=UTF-8',
+                    'Content-Length: ' . strlen($jsonPayload)
+                ]
+            ]);
+
+            $response  = curl_exec($ch);
+            $curlError = curl_error($ch);
+            $httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($response !== false && !empty($response)) {
+                return $response;
+            }
+
+            if (!empty($curlError)) {
+                error_log("[AppsScriptService] cURL error: " . $curlError . " (HTTP " . $httpCode . ")");
+            }
+        }
+
+        // 2. Fallback via file_get_contents (Stream Context)
         $opts = [
             'http' => [
                 'method'          => 'POST',
@@ -244,7 +235,7 @@ class AppsScriptService
                 'content'         => $jsonPayload,
                 'follow_location' => 1,
                 'max_redirects'   => 5,
-                'timeout'         => 30,
+                'timeout'         => $timeout,
                 'ignore_errors'   => true,
             ],
             'ssl' => [
@@ -254,14 +245,13 @@ class AppsScriptService
         ];
 
         $context  = stream_context_create($opts);
-        $response = @file_get_contents($this->scriptUrl, false, $context);
+        $response = @file_get_contents($url, false, $context);
 
         if ($response === false) {
             $error = error_get_last();
-            return ['status' => 'warning', 'message' => "Gagal terhubung ke Apps Script: " . ($error['message'] ?? 'Network error')];
+            throw new \RuntimeException("Gagal terhubung ke Google Apps Script: " . ($error['message'] ?? 'Periksa koneksi internet server / cURL'));
         }
 
-        $decoded = json_decode($response, true);
-        return $decoded ?: ['status' => 'success'];
+        return $response;
     }
 }
