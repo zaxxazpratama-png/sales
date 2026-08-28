@@ -48,15 +48,16 @@ if (!$valid) {
 }
 
 $data = $validator->getData();
-$salesCode = $data['sales_code'] ?? ($salesCode ?? 'SEP-001');
+$salesCode = strtoupper(trim($data['sales_code'] ?? ($salesCode ?? 'SEP-001')));
 $salesData = \App\SalesManager::findByCode($salesCode);
 
 // Pastikan Data Perusahaan, Vendor, SO Date, Team Leader & Nama Sales terisi akurat
 $settings = \App\SettingsManager::get();
 $vendorName = !empty($settings['company_name']) ? $settings['company_name'] : 'PT. TALENTA INTEGRITAS NASIONAL';
-$tlCode = !empty($salesData['tl_code']) ? $salesData['tl_code'] : (!empty($data['tl_code']) ? $data['tl_code'] : 'TL-01');
+$tlCode = !empty($salesData['tl_code']) ? strtoupper(trim($salesData['tl_code'])) : (!empty($data['tl_code']) ? strtoupper(trim($data['tl_code'])) : 'TL-01');
 $aeName = $salesData['nama_sales'] ?? ($data['sales_name'] ?? ($salesData['sales_code'] ?? 'FIRMAN'));
 
+$data['sales_code']  = $salesCode;
 $data['vendor']      = $vendorName;
 $data['so_date']     = date('d/m/Y');
 $data['tl_code']     = $tlCode;

@@ -47,7 +47,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_orders_realtime') {
     header('Content-Type: application/json; charset=utf-8');
     $allOrders = OrdersManager::getAll();
     if ($currentRole === 'tl') {
-        $allOrders = array_values(array_filter($allOrders, fn($ord) => ($ord['tl_code'] ?? '') === $currentTlCode));
+        $mySalesList = SalesManager::getAll();
+        $mySalesCodes = array_map(fn($s) => strtoupper(trim($s['sales_code'] ?? '')), 
+            array_filter($mySalesList, fn($s) => strtoupper(trim($s['tl_code'] ?? '')) === strtoupper(trim($currentTlCode)))
+        );
+        $allOrders = array_values(array_filter($allOrders, function($ord) use ($currentTlCode, $mySalesCodes) {
+            $ordTl = strtoupper(trim($ord['tl_code'] ?? ''));
+            $ordSales = strtoupper(trim($ord['sales_code'] ?? ''));
+            return ($ordTl !== '' && $ordTl === strtoupper(trim($currentTlCode))) || in_array($ordSales, $mySalesCodes);
+        }));
     }
     // Sort newest first
     usort($allOrders, function($a, $b) {
@@ -524,7 +532,12 @@ $codeGsContent = file_exists($codeGsPath) ? file_get_contents($codeGsPath) : '';
 // Load Orders untuk Status Tracking
 $ordersList = OrdersManager::getAll();
 if ($currentRole === 'tl') {
-    $ordersList = array_values(array_filter($ordersList, fn($order) => ($order['tl_code'] ?? '') === $currentTlCode));
+    $mySalesCodes = array_map(fn($s) => strtoupper(trim($s['sales_code'] ?? '')), $salesList);
+    $ordersList = array_values(array_filter($ordersList, function($order) use ($currentTlCode, $mySalesCodes) {
+        $ordTl = strtoupper(trim($order['tl_code'] ?? ''));
+        $ordSales = strtoupper(trim($order['sales_code'] ?? ''));
+        return ($ordTl !== '' && $ordTl === strtoupper(trim($currentTlCode))) || in_array($ordSales, $mySalesCodes);
+    }));
 }
 $ordersList = array_reverse($ordersList); // Terbaru di atas
 
