@@ -10,6 +10,7 @@ use App\Config;
 use App\SalesManager;
 use App\SettingsManager;
 use App\AuthManager;
+use App\OrdersManager;
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -44,8 +45,7 @@ $msgError   = '';
 // ========================================================
 if (isset($_GET['action']) && $_GET['action'] === 'fetch_orders_realtime') {
     header('Content-Type: application/json; charset=utf-8');
-    $ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
-    $allOrders = file_exists($ordersFile) ? (json_decode(file_get_contents($ordersFile), true) ?: []) : [];
+    $allOrders = OrdersManager::getAll();
     if ($currentRole === 'tl') {
         $allOrders = array_values(array_filter($allOrders, fn($ord) => ($ord['tl_code'] ?? '') === $currentTlCode));
     }
@@ -382,53 +382,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $allowedStatuses = ['PENDING', 'DIPROSES', 'SELESAI', 'BATAL'];
         if (!in_array($newStatus, $allowedStatuses)) $newStatus = 'PENDING';
 
-        $ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
-        if (file_exists($ordersFile)) {
-            $orders = json_decode(file_get_contents($ordersFile), true) ?: [];
-            $targetOrder = null;
-            foreach ($orders as &$ord) {
-                if (($ord['ticket_no'] ?? '') === $ticketNo
-                    && ($currentRole !== 'tl' || ($ord['tl_code'] ?? '') === $currentTlCode)) {
-                    $ord['status']     = $newStatus;
-                    $ord['updated_at'] = date('Y-m-d H:i:s');
-                    $targetOrder       = $ord;
-                    break;
-                }
-            }
-            unset($ord);
-            file_put_contents($ordersFile, json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $targetOrder = OrdersManager::updateStatus($ticketNo, $newStatus, $currentRole === 'tl' ? $currentTlCode : null);
 
-            // Sinkronkan status langsung ke Google Spreadsheet via Apps Script
-            $gsheetSynced = false;
-            $settings = SettingsManager::get();
-            try {
-                if (!empty($settings['apps_script_url'])) {
-                    $service = new \App\AppsScriptService();
-                    $service->updateStatus($ticketNo, $newStatus, $targetOrder ?: []);
-                    $gsheetSynced = true;
-                }
-            } catch (\Exception $syncErr) {
-                error_log("GSheet Status Sync Error: " . $syncErr->getMessage());
+        // Sinkronkan status langsung ke Google Spreadsheet via Apps Script
+        $gsheetSynced = false;
+        $settings = SettingsManager::get();
+        try {
+            if (!empty($settings['apps_script_url'])) {
+                $service = new \App\AppsScriptService();
+                $service->updateStatus($ticketNo, $newStatus, $targetOrder ?: []);
+                $gsheetSynced = true;
             }
+        } catch (\Exception $syncErr) {
+            error_log("GSheet Status Sync Error: " . $syncErr->getMessage());
+        }
 
-            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-                header('Content-Type: application/json; charset=utf-8');
-                $allOrders = json_decode(file_get_contents($ordersFile), true) ?: [];
-                if ($currentRole === 'tl') {
-                    $allOrders = array_values(array_filter($allOrders, fn($o) => ($o['tl_code'] ?? '') === $currentTlCode));
-                }
-                $pendingCount = count(array_filter($allOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
-                echo json_encode([
-                    'success'       => true,
-                    'ticket_no'     => $ticketNo,
-                    'status'        => $newStatus,
-                    'status_class'  => 'status-' . strtolower($newStatus),
-                    'pending_count' => $pendingCount,
-                    'total_count'   => count($allOrders),
-                    'message'       => "Status order {$ticketNo} diubah ke {$newStatus}" . ($gsheetSynced ? " (Tersinkron ke Spreadsheet)" : "")
-                ], JSON_UNESCAPED_UNICODE);
-                exit;
+        if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+            header('Content-Type: application/json; charset=utf-8');
+            $allOrders = OrdersManager::getAll();
+            if ($currentRole === 'tl') {
+                $allOrders = array_values(array_filter($allOrders, fn($o) => ($o['tl_code'] ?? '') === $currentTlCode));
             }
+            $pendingCount = count(array_filter($allOrders, fn($o) => strtoupper($o['status'] ?? 'PENDING') === 'PENDING'));
+            echo json_encode([
+                'success'       => true,
+                'ticket_no'     => $ticketNo,
+                'status'        => $newStatus,
+                'status_class'  => 'status-' . strtolower($newStatus),
+                'pending_count' => $pendingCount,
+                'total_count'   => count($allOrders),
+                'message'       => "Status order {$ticketNo} diubah ke {$newStatus}" . ($gsheetSynced ? " (Tersinkron ke Spreadsheet)" : "")
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
             $syncInfo = $gsheetSynced ? " (Otomatis Tersinkron ke Google Spreadsheet)" : "";
             $msgSuccess = "Status order <strong>{$ticketNo}</strong> berhasil diubah ke <strong>{$newStatus}</strong>{$syncInfo}.";
@@ -454,19 +440,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgError = 'Hanya Super Admin yang berhak menghapus data order.';
         } else {
             $ticketNo = trim($_POST['ticket_no'] ?? '');
-            $ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
-            if (file_exists($ordersFile) && $ticketNo) {
-                $orders = json_decode(file_get_contents($ordersFile), true) ?: [];
-                $deletedOrder = null;
-                $newOrders = [];
-                foreach ($orders as $ord) {
-                    if (($ord['ticket_no'] ?? '') === $ticketNo) {
-                        $deletedOrder = $ord;
-                    } else {
-                        $newOrders[] = $ord;
-                    }
-                }
-                file_put_contents($ordersFile, json_encode($newOrders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $deletedOrder = OrdersManager::delete($ticketNo);
 
                 // Sinkronkan ke Google Spreadsheet untuk merahkan baris yang terhapus
                 $settings = SettingsManager::get();
@@ -550,8 +524,7 @@ $codeGsPath    = dirname(__DIR__, 2) . '/apps-script/Code.gs';
 $codeGsContent = file_exists($codeGsPath) ? file_get_contents($codeGsPath) : '';
 
 // Load Orders untuk Status Tracking
-$ordersFile = dirname(__DIR__, 2) . '/data/orders.json';
-$ordersList = file_exists($ordersFile) ? (json_decode(file_get_contents($ordersFile), true) ?: []) : [];
+$ordersList = OrdersManager::getAll();
 if ($currentRole === 'tl') {
     $ordersList = array_values(array_filter($ordersList, fn($order) => ($order['tl_code'] ?? '') === $currentTlCode));
 }

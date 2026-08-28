@@ -27,6 +27,7 @@ use App\Config;
 use App\Validator;
 use App\AppsScriptService;
 use App\TelegramService;
+use App\OrdersManager;
 
 Config::load();
 
@@ -107,26 +108,23 @@ try {
     ];
 
     // ---- Simpan Order ke JSON Lokal untuk Status Tracking ----
-    $ordersFile = dirname(__DIR__) . '/data/orders.json';
-    $orders = file_exists($ordersFile) ? (json_decode(file_get_contents($ordersFile), true) ?: []) : [];
-    $orders[] = [
-        'ticket_no'   => $ticketNumber,
-        'nama'        => $data['nama_pelanggan'],
-        'nomor_ktp'   => $data['nomor_ktp'] ?? '',
-        'telp'        => $data['telp'] ?? '',
-        'email'       => $data['email_pelanggan'] ?? '',
-        'alamat'      => $data['alamat'] . (!empty($data['kelurahan']) ? ', Kel. ' . $data['kelurahan'] : '') . (!empty($data['kecamatan']) ? ', Kec. ' . $data['kecamatan'] : ''),
-        'home_id'     => $data['home_id'] ?? '',
-        'tikor'       => $data['tikor'] ?? '',
-        'paket'       => $data['service'] ?? '',
-        'total'       => $data['biaya_total'] ?? '',
-        'sales_code'  => $data['sales_code'] ?? $salesCode,
-        'tl_code'     => $data['tl_code'] ?? '',
-        'jadwal'      => ($data['jadwal_tanggal'] ?? '') . (!empty($data['jadwal_waktu']) ? ' (' . $data['jadwal_waktu'] . ')' : ''),
-        'status'      => 'PENDING',
-        'submitted_at'=> date('Y-m-d H:i:s'),
-    ];
-    file_put_contents($ordersFile, json_encode($orders, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    OrdersManager::add([
+        'ticket_no'    => $ticketNumber,
+        'nama'         => $data['nama_pelanggan'],
+        'nomor_ktp'    => $data['nomor_ktp'] ?? '',
+        'telp'         => $data['telp'] ?? '',
+        'email'        => $data['email_pelanggan'] ?? '',
+        'alamat'       => $data['alamat'] . (!empty($data['kelurahan']) ? ', Kel. ' . $data['kelurahan'] : '') . (!empty($data['kecamatan']) ? ', Kec. ' . $data['kecamatan'] : ''),
+        'home_id'      => $data['home_id'] ?? '',
+        'tikor'        => $data['tikor'] ?? '',
+        'paket'        => $data['service'] ?? '',
+        'total'        => $data['biaya_total'] ?? '',
+        'sales_code'   => $data['sales_code'] ?? $salesCode,
+        'tl_code'      => $data['tl_code'] ?? '',
+        'jadwal'       => ($data['jadwal_tanggal'] ?? '') . (!empty($data['jadwal_waktu']) ? ' (' . $data['jadwal_waktu'] . ')' : ''),
+        'status'       => 'PENDING',
+        'submitted_at' => date('Y-m-d H:i:s'),
+    ]);
 
     $redirectTarget = !empty($data['sales_code']) ? $data['sales_code'] : ($salesCode ?? 'SEP-001');
     $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
@@ -142,12 +140,12 @@ try {
         unlink($uploadPath);
     }
 
-    // Log error
-    $logDir = dirname(__DIR__) . '/logs/';
+    // Log error ke /tmp (kompatibel Vercel serverless)
+    $logDir = sys_get_temp_dir() . '/formgoogle_logs/';
     if (!is_dir($logDir)) {
         mkdir($logDir, 0755, true);
     }
-    $logMsg = "[" . date('Y-m-d H:i:s') . "] " . $e->getMessage() . "\n";
+    $logMsg = '[' . date('Y-m-d H:i:s') . '] ' . $e->getMessage() . "\n";
     file_put_contents($logDir . 'error.log', $logMsg, FILE_APPEND);
 
     $errMsg = 'Gagal memproses pendaftaran ke Google Apps Script: ' . $e->getMessage() . '. Silakan periksa kembali konfigurasi atau coba beberapa saat lagi.';
