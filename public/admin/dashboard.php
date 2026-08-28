@@ -409,7 +409,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             SettingsManager::saveProvincePromo($targetProvince, $packages, $targetNotes);
             $msgSuccess = "Daftar paket layanan & catatan promo untuk <strong>{$targetProvince}</strong> berhasil diperbarui!";
+
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success'       => true,
+                    'province'      => $targetProvince,
+                    'packages'      => SettingsManager::getPackagesForProvince($targetProvince),
+                    'default_notes' => SettingsManager::getPromoNotesForProvince($targetProvince),
+                    'message'       => "Daftar paket layanan & catatan promo untuk {$targetProvince} berhasil disimpan secara realtime!"
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
         } catch (\Exception $e) {
+            if (!empty($_POST['ajax']) || !empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $msgError = $e->getMessage();
         }
     }
@@ -1833,31 +1850,34 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
         <div class="panel-card">
             <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
                 <div>
-                    <div class="panel-title" style="font-size:17px;font-weight:800;color:#fff;">Daftar Paket Internet CBN — Provinsi <?= htmlspecialchars($selectedProvince) ?></div>
+                    <div class="panel-title" id="panel-title-province" style="font-size:17px;font-weight:800;color:#fff;">Daftar Paket Internet CBN — Provinsi <span class="prov-name-text"><?= htmlspecialchars($selectedProvince) ?></span></div>
                     <div class="panel-desc">Setiap paket dapat diedit secara langsung (Nama, Kecepatan, Harga, Biaya Tambahan, Badge, dan teks CBN Package Auto-Claim) serta dapat di-preview langsung ke Surat Formulir CBN.</div>
                 </div>
-                <button type="submit" form="form-packages" class="btn-primary" style="padding:9px 18px;font-size:13px;box-shadow:0 4px 15px rgba(0,160,223,0.35);">
-                    💾 Simpan Semua Perubahan Provinsi <?= htmlspecialchars($selectedProvince) ?>
+                <button type="submit" form="form-packages" id="btn-save-packages-top" class="btn-primary" style="padding:9px 18px;font-size:13px;box-shadow:0 4px 15px rgba(0,160,223,0.35);">
+                    💾 Simpan Semua Perubahan Provinsi <span class="prov-name-text"><?= htmlspecialchars($selectedProvince) ?></span>
                 </button>
             </div>
 
-            <form method="POST" id="form-packages">
+            <form method="POST" id="form-packages" onsubmit="savePackagesRealtime(event)">
                 <input type="hidden" name="action" value="update_packages">
-                <input type="hidden" name="selected_province" value="<?= htmlspecialchars($selectedProvince) ?>">
+                <input type="hidden" name="ajax" value="1">
+                <input type="hidden" name="selected_province" id="input-selected-province" value="<?= htmlspecialchars($selectedProvince) ?>">
 
                 <!-- CATATAN PROMO KHUSUS PROVINSI -->
                 <div style="margin-bottom:20px;background:rgba(0,160,223,0.08);border:1px solid rgba(0,160,223,0.3);border-radius:10px;padding:14px 18px;">
                     <label style="font-size:13px;font-weight:700;color:#67e8f9;display:block;margin-bottom:6px;">
-                        📝 Catatan Promo Default untuk Provinsi <?= htmlspecialchars($selectedProvince) ?> (Notes Formulir PDF) *
+                        📝 Catatan Promo Default untuk Provinsi <span class="prov-name-text"><?= htmlspecialchars($selectedProvince) ?></span> (Notes Formulir PDF) *
                     </label>
-                    <input type="text" name="province_default_notes" class="form-control" 
+                    <input type="text" name="province_default_notes" id="input-province-default-notes" class="form-control" 
                            value="<?= htmlspecialchars($provinceNotes) ?>" 
                            placeholder="Contoh: REGULER PROMO <?= strtoupper($selectedProvince) ?> JULY 2026 - NAB" 
                            style="font-size:13px;font-weight:700;">
                     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-                        Catatan ini akan otomatis muncul pada kolom Notes di formulir PDF Surat CBN untuk pendaftar di provinsi <?= htmlspecialchars($selectedProvince) ?>.
+                        Catatan ini akan otomatis muncul pada kolom Notes di formulir PDF Surat CBN untuk pendaftar di provinsi <span class="prov-name-text"><?= htmlspecialchars($selectedProvince) ?></span>.
                     </div>
                 </div>
+
+                <div id="packages-cards-container">
 
                 <?php
                 $monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -2028,6 +2048,7 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
                     </div>
                 </div>
                 <?php endforeach; ?>
+                </div>
 
                 <div style="position:sticky;bottom:15px;z-index:90;background:rgba(10,17,40,0.95);backdrop-filter:blur(15px);padding:14px 20px;border-radius:12px;border:1px solid rgba(0,160,223,0.3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-top:15px;">
                     <span style="font-size:13px;color:#cbd5e1;">Pastikan semua perubahan sudah sesuai sebelum menyimpan.</span>
@@ -2042,15 +2063,16 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
         <div class="panel-card" id="tambah-paket-card">
             <div class="panel-header">
                 <div>
-                    <div class="panel-title" style="font-size:16px;font-weight:800;color:#fff;">➕ Tambah Paket CBN Baru</div>
+                    <div class="panel-title" style="font-size:16px;font-weight:800;color:#fff;">➕ Tambah Paket CBN Baru (<span class="prov-name-text"><?= htmlspecialchars($selectedProvince) ?></span>)</div>
                     <div class="panel-desc">Isi kolom di bawah untuk menambahkan paket internet baru ke dalam sistem dan formulir pendaftaran</div>
                 </div>
             </div>
 
-            <form method="POST">
+            <form method="POST" id="form-add-package" onsubmit="saveAddPackageRealtime(event)">
                 <input type="hidden" name="action" value="update_packages">
-                <input type="hidden" name="selected_province" value="<?= htmlspecialchars($selectedProvince) ?>">
-                <input type="hidden" name="province_default_notes" value="<?= htmlspecialchars($provinceNotes) ?>">
+                <input type="hidden" name="ajax" value="1">
+                <input type="hidden" name="selected_province" id="input-add-selected-province" value="<?= htmlspecialchars($selectedProvince) ?>">
+                <input type="hidden" name="province_default_notes" id="input-add-province-default-notes" value="<?= htmlspecialchars($provinceNotes) ?>">
 
                 <div class="pkg-grid-4">
                     <div class="form-group" style="margin-bottom:0;">
@@ -2511,12 +2533,30 @@ $pendingOrders = count(array_filter($ordersList, fn($o) => ($o['status'] ?? 'PEN
 <div id="toast" class="toast">Link berhasil disalin ke clipboard!</div>
 
 <script>
-const PPN_PERCENT = <?= (float)($settings['ppn_percent'] ?? 11) ?>;
+let PPN_PERCENT = <?= (float)($settings['ppn_percent'] ?? 11) ?>;
+window.PPN_PERCENT = PPN_PERCENT;
 
-function changeProvince(prov) {
-    window.location.href = '?provinsi=' + encodeURIComponent(prov) + '&tab=packages-tab';
-}
+// Data Seluruh 38 Promo & Paket Provinsi untuk Admin Realtime Management
+window.CURRENT_SELECTED_PROVINCE = <?= json_encode($selectedProvince) ?>;
+window.ADMIN_ALL_PROVINCE_PROMOS = <?php
+    $monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+    $curMonth   = $monthNames[(int)date('n')];
+    $curYear    = date('Y');
+    $allAdminPromos = [];
+    foreach ($allProvinces as $prov) {
+        $pPkgs  = SettingsManager::getPackagesForProvince($prov);
+        $pNotes = SettingsManager::getPromoNotesForProvince($prov);
+        $allAdminPromos[$prov] = [
+            'packages'      => $pPkgs,
+            'default_notes' => $pNotes,
+        ];
+    }
+    echo json_encode($allAdminPromos, JSON_UNESCAPED_UNICODE);
+?>;
 
+// ========================================================
+// PERSISTENT TABS & ZERO-RELOAD PROVINCE SWITCHER
+// ========================================================
 function switchTab(tabId, btn) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -2525,11 +2565,277 @@ function switchTab(tabId, btn) {
     
     if (btn) {
         btn.classList.add('active');
-    } else if (typeof event !== 'undefined' && event && event.target && event.target.classList) {
-        event.target.classList.add('active');
     } else {
         const matchingBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
         if (matchingBtn) matchingBtn.classList.add('active');
+    }
+
+    try {
+        localStorage.setItem('admin_active_tab', tabId);
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tabId);
+        window.history.replaceState(null, null, url.toString());
+    } catch(e) {}
+}
+
+function changeProvince(prov) {
+    window.CURRENT_SELECTED_PROVINCE = prov;
+    const provSelect = document.getElementById('select-province-filter');
+    if (provSelect) provSelect.value = prov;
+
+    try {
+        localStorage.setItem('admin_active_province', prov);
+        const url = new URL(window.location.href);
+        url.searchParams.set('provinsi', prov);
+        url.searchParams.set('tab', 'packages-tab');
+        window.history.replaceState(null, null, url.toString());
+    } catch(e) {}
+
+    renderAdminProvincePromo(prov);
+}
+
+function renderAdminProvincePromo(prov) {
+    const allPromos = window.ADMIN_ALL_PROVINCE_PROMOS || {};
+    const provData = allPromos[prov] || { packages: [], default_notes: 'REGULER PROMO JULY 2026 - NAB' };
+    const pkgs = provData.packages || [];
+    const notes = provData.default_notes || '';
+
+    // Update Label Nama Provinsi di Seluruh Tab
+    document.querySelectorAll('.prov-name-text').forEach(el => {
+        el.textContent = prov;
+    });
+
+    // Update Input Hidden & Notes
+    const hiddenProv = document.getElementById('input-selected-province');
+    if (hiddenProv) hiddenProv.value = prov;
+    const hiddenAddProv = document.getElementById('input-add-selected-province');
+    if (hiddenAddProv) hiddenAddProv.value = prov;
+    
+    const notesInput = document.getElementById('input-province-default-notes');
+    if (notesInput) notesInput.value = notes;
+    const addNotesInput = document.getElementById('input-add-province-default-notes');
+    if (addNotesInput) addNotesInput.value = notes;
+
+    // Render Package Cards
+    const container = document.getElementById('packages-cards-container');
+    if (container) {
+        if (pkgs.length === 0) {
+            container.innerHTML = `<div style="padding:24px;text-align:center;color:#94a3b8;border:1px dashed rgba(255,255,255,0.15);border-radius:10px;margin-bottom:14px;">Belum ada paket untuk provinsi ini. Silakan tambah paket baru di bawah atau salin dari provinsi lain.</div>`;
+        } else {
+            container.innerHTML = pkgs.map(pkg => renderPackageCardHtml(pkg, PPN_PERCENT)).join('');
+            pkgs.forEach(pkg => {
+                syncPkgLive(pkg.id);
+            });
+        }
+    }
+}
+
+function renderPackageCardHtml(pkg, ppnPercent) {
+    const pkgId = pkg.id;
+    const price = parseInt(pkg.price, 10) || 0;
+    const biayaTambahan = parseInt(pkg.biaya_tambahan, 10) || 5000;
+    const badgeColor = pkg.badge_color || '#005696';
+    const badgeText = pkg.badge || '';
+    const isActive = !!pkg.active;
+    const cbnLines = Array.isArray(pkg.cbn_package) ? pkg.cbn_package : (pkg.cbn_package ? [pkg.cbn_package] : []);
+    const cbnRaw = cbnLines.join("\n");
+    const subtotal = price + biayaTambahan;
+    const ppn = Math.round(subtotal * (ppnPercent / 100));
+    const total = subtotal + ppn;
+
+    return `
+        <div class="pkg-main-card" id="pkg-card-${pkgId}">
+            <div class="pkg-card-header">
+                <div class="pkg-header-info">
+                    <span style="font-size:18px;font-weight:900;color:#fff;" id="title-name-${pkgId}">🌐 ${escapeHtml(pkg.name)}</span>
+                    <span id="badge-preview-${pkgId}" style="background:${escapeHtml(badgeColor)};color:#fff;font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:12px;${badgeText ? '' : 'display:none;'}">
+                        ${escapeHtml(badgeText)}
+                    </span>
+                    <span id="status-pill-${pkgId}" style="background:${isActive ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'};color:${isActive ? '#6ee7b7' : '#fca5a5'};border:1px solid ${isActive ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'};font-size:10.5px;font-weight:800;padding:2px 10px;border-radius:12px;">
+                        ${isActive ? '● AKTIF' : '○ NON-AKTIF'}
+                    </span>
+                    <span style="font-size:12.5px;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:3px 10px;border-radius:8px;">
+                        🚀 <span id="summary-speed-${pkgId}">${escapeHtml(pkg.speed)}</span> • <strong style="color:#67e8f9;" id="summary-price-${pkgId}">Rp ${price.toLocaleString('id-ID')}/bln</strong>
+                    </span>
+                </div>
+                <div class="pkg-header-actions">
+                    <button type="button" class="pkg-btn-edit" onclick="toggleEditPackage('${pkgId}')">
+                        ✏️ Edit Paket
+                    </button>
+                    <a href="../preview_cbn.php?pkg_id=${encodeURIComponent(pkgId)}" target="_blank" class="pkg-btn-preview" title="Lihat tampilan paket ini pada Formulir Resmi CBN">
+                        🔍 Preview di Formulir CBN
+                    </a>
+                    <label class="pkg-btn-delete" title="Centang untuk menghapus paket ini saat klik simpan">
+                        <input type="checkbox" name="delete_pkg[]" value="${escapeHtml(pkgId)}" onchange="document.getElementById('pkg-card-${pkgId}').style.opacity=this.checked?'0.35':'1'">
+                        <span>🗑 Hapus</span>
+                    </label>
+                </div>
+            </div>
+            <div id="edit-panel-${pkgId}" class="pkg-edit-panel" style="display:block;">
+                <div class="pkg-grid-4">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Nama Paket *</label>
+                        <input type="text" name="pkg_name_${pkgId}" id="pkg-name-${pkgId}" class="form-control" value="${escapeHtml(pkg.name)}" style="padding:9px 12px;font-weight:700;" oninput="syncPkgLive('${pkgId}')" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Deskripsi Kecepatan *</label>
+                        <input type="text" name="pkg_speed_${pkgId}" id="pkg-speed-${pkgId}" class="form-control" value="${escapeHtml(pkg.speed)}" style="padding:9px 12px;" oninput="syncPkgLive('${pkgId}')" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Harga Paket Bulanan (Rp) *</label>
+                        <input type="text" name="pkg_price_${pkgId}" id="pkg-price-${pkgId}" class="form-control" value="${price.toLocaleString('id-ID')}" style="padding:9px 12px;font-weight:700;color:#67e8f9;" oninput="syncPkgLive('${pkgId}')" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Biaya Tambahan (Rp)</label>
+                        <input type="text" name="pkg_biaya_tambahan_${pkgId}" id="pkg-tambahan-${pkgId}" class="form-control" value="${biayaTambahan.toLocaleString('id-ID')}" style="padding:9px 12px;" oninput="syncPkgLive('${pkgId}')" placeholder="5000">
+                    </div>
+                </div>
+                <div class="pkg-grid-3" style="margin-top:12px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Badge Label (opsional)</label>
+                        <input type="text" name="pkg_badge_${pkgId}" id="pkg-badge-${pkgId}" class="form-control" value="${escapeHtml(badgeText)}" style="padding:9px 12px;" placeholder="Contoh: POPULAR / BEST VALUE" oninput="syncPkgLive('${pkgId}')">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Warna Badge</label>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input type="color" name="pkg_badge_color_${pkgId}" id="pkg-badge-color-${pkgId}" class="form-control" value="${escapeHtml(badgeColor)}" style="height:40px;width:55px;padding:2px 4px;cursor:pointer;" onchange="syncPkgLive('${pkgId}')">
+                            <input type="text" class="form-control" value="${escapeHtml(badgeColor)}" id="pkg-badge-color-text-${pkgId}" style="padding:9px 10px;font-family:monospace;font-size:12px;" oninput="document.getElementById('pkg-badge-color-${pkgId}').value=this.value; syncPkgLive('${pkgId}');">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;">Status Tampil di Form</label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;height:40px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:0 14px;">
+                            <input type="checkbox" name="pkg_active_${pkgId}" id="pkg-active-${pkgId}" ${isActive ? 'checked' : ''} onchange="syncPkgLive('${pkgId}')" style="width:17px;height:17px;accent-color:#10b981;">
+                            <span style="font-size:13px;font-weight:700;color:#e2e8f0;">Aktif & Tampilkan</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="pkg-grid-cbn" style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div>
+                        <label style="font-size:12px;font-weight:700;color:#cbd5e1;display:block;margin-bottom:4px;">
+                            🏷 Deskripsi CBN Package (satu baris = satu item ceklis):
+                        </label>
+                        <textarea name="pkg_cbn_package_${pkgId}" id="pkg-cbn-${pkgId}" class="form-control" rows="4" style="font-size:12px;line-height:1.5;resize:vertical;" oninput="syncPkgLive('${pkgId}')">${escapeHtml(cbnRaw)}</textarea>
+                    </div>
+                    <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">
+                        <div>
+                            <div style="font-size:11.5px;font-weight:700;color:#94a3b8;margin-bottom:6px;">PREVIEW ITEM TERCETAK DI FORMULIR CBN:</div>
+                            <div id="live-cbn-preview-${pkgId}"></div>
+                        </div>
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);font-size:11.5px;color:#94a3b8;">
+                            <div style="display:flex;justify-content:space-between;">
+                                <span>Paket:</span>
+                                <strong style="color:#e2e8f0;" id="live-calc-paket-${pkgId}">Rp ${price.toLocaleString('id-ID')}</strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;">
+                                <span>Biaya Tambahan:</span>
+                                <strong style="color:#e2e8f0;" id="live-calc-tambahan-${pkgId}">Rp ${biayaTambahan.toLocaleString('id-ID')}</strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;">
+                                <span>PPN (${ppnPercent}%):</span>
+                                <strong style="color:#fbbf24;" id="live-calc-ppn-${pkgId}">Rp ${ppn.toLocaleString('id-ID')}</strong>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.12);padding-top:5px;margin-top:2px;">
+                                <span style="font-weight:700;color:#fff;">TOTAL:</span>
+                                <strong style="color:#67e8f9;font-size:13.5px;" id="live-calc-total-${pkgId}">Rp ${total.toLocaleString('id-ID')}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ========================================================
+// REALTIME AJAX FORM SUBMISSIONS (ZERO PAGE RELOAD)
+// ========================================================
+async function savePackagesRealtime(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('form-packages');
+    if (!form) return;
+
+    const btnTop = document.getElementById('btn-save-packages-top');
+    const btnBottom = form.querySelector('button[type="submit"]');
+    const origTop = btnTop ? btnTop.innerHTML : '';
+    const origBottom = btnBottom ? btnBottom.innerHTML : '';
+
+    if (btnTop) { btnTop.disabled = true; btnTop.innerHTML = '⏳ Menyimpan...'; }
+    if (btnBottom) { btnBottom.disabled = true; btnBottom.innerHTML = '⏳ Menyimpan...'; }
+
+    const formData = new FormData(form);
+    formData.set('action', 'update_packages');
+    formData.set('ajax', '1');
+
+    try {
+        const res = await fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const result = await res.json();
+
+        if (btnTop) { btnTop.disabled = false; btnTop.innerHTML = origTop; }
+        if (btnBottom) { btnBottom.disabled = false; btnBottom.innerHTML = origBottom; }
+
+        if (result.success) {
+            if (window.ADMIN_ALL_PROVINCE_PROMOS && result.province) {
+                window.ADMIN_ALL_PROVINCE_PROMOS[result.province] = {
+                    packages: result.packages,
+                    default_notes: result.default_notes
+                };
+                renderAdminProvincePromo(result.province);
+            }
+            showLiveToast(result.message || 'Daftar paket & promo berhasil disimpan!', 'success');
+        } else {
+            showLiveToast(result.message || 'Gagal menyimpan perubahan paket', 'error');
+        }
+    } catch(err) {
+        if (btnTop) { btnTop.disabled = false; btnTop.innerHTML = origTop; }
+        if (btnBottom) { btnBottom.disabled = false; btnBottom.innerHTML = origBottom; }
+        showLiveToast('Terjadi kesalahan jaringan: ' + err.message, 'error');
+    }
+}
+
+async function saveAddPackageRealtime(event) {
+    if (event) event.preventDefault();
+    const form = document.getElementById('form-add-package');
+    if (!form) return;
+
+    const btn = form.querySelector('button[type="submit"]');
+    const origText = btn ? btn.innerHTML : '➕ Tambah Paket Baru';
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Menambahkan...'; }
+
+    const formData = new FormData(form);
+    formData.set('action', 'update_packages');
+    formData.set('ajax', '1');
+
+    try {
+        const res = await fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const result = await res.json();
+
+        if (btn) { btn.disabled = false; btn.innerHTML = origText; }
+
+        if (result.success) {
+            form.reset();
+            if (window.ADMIN_ALL_PROVINCE_PROMOS && result.province) {
+                window.ADMIN_ALL_PROVINCE_PROMOS[result.province] = {
+                    packages: result.packages,
+                    default_notes: result.default_notes
+                };
+                renderAdminProvincePromo(result.province);
+            }
+            showLiveToast(result.message || 'Paket baru berhasil ditambahkan!', 'success');
+        } else {
+            showLiveToast(result.message || 'Gagal menambahkan paket baru', 'error');
+        }
+    } catch(err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = origText; }
+        showLiveToast('Terjadi kesalahan jaringan: ' + err.message, 'error');
     }
 }
 
@@ -3184,10 +3490,25 @@ function filterOrders() {
     }
 }
 
-// Inisialisasi Realtime Sync saat halaman dibuka
+// Inisialisasi Realtime Sync & Restore Active Tab & Province saat halaman dibuka/refresh
 document.addEventListener('DOMContentLoaded', () => {
     initKnownTickets();
     setInterval(pollRealtimeOrders, 5000);
+
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tabFromUrl = urlParams.get('tab');
+        const savedTab = tabFromUrl || localStorage.getItem('admin_active_tab');
+        if (savedTab && document.getElementById(savedTab)) {
+            switchTab(savedTab);
+        }
+
+        const provFromUrl = urlParams.get('provinsi');
+        const savedProv = provFromUrl || localStorage.getItem('admin_active_province');
+        if (savedProv && window.ADMIN_ALL_PROVINCE_PROMOS && window.ADMIN_ALL_PROVINCE_PROMOS[savedProv]) {
+            changeProvince(savedProv);
+        }
+    } catch(e) {}
 });
 </script>
 
