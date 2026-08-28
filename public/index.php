@@ -176,9 +176,6 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
     <!-- Alert Notifikasi Sukses / Error -->
     <!-- Alert & Kartu Tiket Pendaftaran Sukses -->
     <?php if ($success): ?>
-    <?php
-        $waText = is_array($success) && !empty($success['wa_text']) ? $success['wa_text'] : '';
-    ?>
     <div class="ticket-card" style="background: linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95)); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); position: relative; overflow: hidden; max-width: 100%; box-sizing: border-box;">
         <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #10b981, #3b82f6);"></div>
         
@@ -197,12 +194,7 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                     NO. TIKET: <?= htmlspecialchars(is_array($success) ? ($success['ticket_no'] ?? '#CBN-ORDER') : '#CBN-ORDER') ?>
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <?php if (!empty($waText)): ?>
-                <button type="button" id="btn-copy-wa" onclick="copyWaText()" style="background: #10b981; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);">
-                    📋 Salin Format WhatsApp
-                </button>
-                <?php endif; ?>
+            <div>
                 <a href="preview_cbn.php" target="_blank" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;">
                     📄 Lihat Salinan PDF Formulir CBN
                 </a>
@@ -239,40 +231,6 @@ $baseUrl   = $cleanBase ?: ((strpos($_SERVER['REQUEST_URI'] ?? '', '/ALATTEMPUR/
                 <div style="color: #94a3b8; font-size: 11px; margin-top: 2px;"><?= htmlspecialchars($settings['company_name'] ?? 'PT. TALENTA INTEGRITAS NASIONAL') ?></div>
             </div>
         </div>
-
-        <?php if (!empty($waText)): ?>
-        <div style="margin-bottom: 20px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">📋 Format Teks Pendaftaran (Siap Kirim ke WhatsApp)</span>
-                <button type="button" onclick="copyWaText()" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 11.5px; padding: 5px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;">Salin Teks</button>
-            </div>
-            <textarea id="wa-text-content" readonly style="width: 100%; height: 160px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #e2e8f0; font-family: monospace; font-size: 12px; line-height: 1.55; padding: 10px; resize: vertical; box-sizing: border-box;"><?= htmlspecialchars($waText) ?></textarea>
-        </div>
-        <script>
-        function copyWaText() {
-            var txt = document.getElementById('wa-text-content');
-            if (txt) {
-                txt.select();
-                txt.setSelectionRange(0, 99999);
-                navigator.clipboard.writeText(txt.value).then(function() {
-                    var btn = document.getElementById('btn-copy-wa');
-                    if (btn) {
-                        var oldHtml = btn.innerHTML;
-                        btn.innerHTML = '✓ Format WA Berhasil Disalin!';
-                        btn.style.background = '#059669';
-                        setTimeout(function() {
-                            btn.innerHTML = oldHtml;
-                            btn.style.background = '#10b981';
-                        }, 2500);
-                    }
-                }).catch(function(err) {
-                    document.execCommand('copy');
-                    alert('Format teks WhatsApp berhasil disalin!');
-                });
-            }
-        }
-        </script>
-        <?php endif; ?>
 
         <div style="background: rgba(16, 185, 129, 0.08); border-left: 3px solid #10b981; padding: 12px 16px; border-radius: 6px; color: #cbd5e1; font-size: 12.5px; line-height: 1.6;">
             💡 <strong>Informasi Selanjutnya:</strong> Salinan resmi Formulir Pendaftaran PDF telah berhasil dikirimkan ke email Anda dan tercatat di sistem CBN. Tim teknisi akan menghubungi nomor telepon Anda sebelum kedatangan untuk konfirmasi kesiapan lokasi.
