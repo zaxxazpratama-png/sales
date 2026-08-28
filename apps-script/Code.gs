@@ -432,7 +432,7 @@ function sendAdminEmail(params, pdfUrl, ktpUrl, pdfBlob, recipientEmail) {
   let mapUrl = '';
   if (tikorClean && tikorClean !== '-') {
     mapUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(tikorClean);
-    tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">📍 ${tikorClean} (Buka Google Maps)</a>`;
+    tikorLink = `<a href="${mapUrl}" target="_blank" style="color:#005696;font-weight:bold;text-decoration:underline;">&#128205; ${tikorClean} (Buka Google Maps)</a>`;
   }
 
   const pdfLink = pdfUrl ? `<a href="${pdfUrl}" target="_blank" style="display:inline-block;background:#005696;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-weight:bold;">📄 Buka Surat Formulir PDF Resmi CBN</a>` : '<em>(PDF terlampir pada email ini)</em>';
@@ -476,7 +476,6 @@ Paket : ${params.service || '-'}`;
   td:first-child { color:#64748b; width:38%; font-weight:600; }
   td:last-child { color:#0f172a; }
   .badge { background:#00a0df; color:white; padding:2px 8px; border-radius:4px; font-weight:bold; font-size:12px; }
-  .text-box { background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:16px; font-family:'Courier New', Courier, monospace; font-size:13px; line-height:1.6; color:#0f172a; white-space:pre-wrap; margin-bottom:20px; }
   .foot { background:#f8fafc; padding:15px; text-align:center; font-size:12px; color:#64748b; border-top:1px solid #e2e8f0; }
 </style>
 </head>
@@ -487,10 +486,6 @@ Paket : ${params.service || '-'}`;
     <p style="margin:4px 0 0;font-size:13px;opacity:.9;">Tiket: ${params.ticket_no || '-'} &bull; ${vendorName}</p>
   </div>
   <div class="body">
-    <div class="sec">
-      <h3>FORMAT DATA PENDAFTARAN (DATA KETIK)</h3>
-      <div class="text-box">${textDataFormat}</div>
-    </div>
 
     <div class="sec">
       <h3>1. INFORMASI SALES ORDER</h3>

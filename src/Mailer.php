@@ -90,7 +90,7 @@ class Mailer
         $rawTikor   = trim($data['tikor'] ?? '');
         if ($rawTikor !== '' && $rawTikor !== '-') {
             $mapUrl = 'https://www.google.com/maps?q=' . urlencode($rawTikor);
-            $tikorDisplay = "<a href='{$mapUrl}' target='_blank' style='color:#005696;font-weight:bold;text-decoration:underline;'>📍 {$rawTikor} (Buka Google Maps)</a>";
+            $tikorDisplay = "<a href='{$mapUrl}' target='_blank' style='color:#005696;font-weight:bold;text-decoration:underline;'>&#128205; {$rawTikor} (Buka Google Maps)</a>";
             $tikorText = "{$rawTikor} ({$mapUrl})";
         } else {
             $tikorDisplay = '-';
@@ -130,7 +130,6 @@ class Mailer
   .body { padding: 24px 28px; }
   .section { margin-bottom: 22px; }
   .section h3 { color: #005696; border-bottom: 2px solid #00a0df; padding-bottom: 5px; margin-bottom: 12px; font-size: 13px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
-  .text-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 16px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.6; color: #0f172a; white-space: pre-wrap; margin-bottom: 20px; }
   table { width: 100%; border-collapse: collapse; }
   td { padding: 7px 10px; font-size: 13px; vertical-align: top; }
   td:first-child { color: #555; width: 38%; font-weight: 600; }
@@ -147,11 +146,6 @@ class Mailer
     <p>{$vendorName} &bull; {$timestamp}</p>
   </div>
   <div class="body">
-
-    <div class="section">
-      <h3>FORMAT DATA PENDAFTARAN (DATA KETIK)</h3>
-      <div class="text-box">{$textFormat}</div>
-    </div>
 
     <div class="section">
       <h3>1. INFORMASI SALES ORDER</h3>
