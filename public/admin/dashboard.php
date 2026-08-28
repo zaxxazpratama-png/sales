@@ -530,6 +530,7 @@ if ($currentRole === 'tl') {
 }
 $settings      = SettingsManager::get();
 $teamLeaders   = array_values(array_filter(AuthManager::getUsers(), fn($user) => ($user['role'] ?? '') === 'tl'));
+$currentTlAccount = ($currentRole === 'tl' && $currentTlCode) ? AuthManager::getTlByCode($currentTlCode) : null;
 $packages      = $settings['packages'] ?? [];
 $codeGsPath    = dirname(__DIR__, 2) . '/apps-script/Code.gs';
 $codeGsContent = file_exists($codeGsPath) ? file_get_contents($codeGsPath) : '';

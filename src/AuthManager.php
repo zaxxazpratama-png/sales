@@ -40,8 +40,16 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
-                $stmt = $pdo->query("SELECT id, username, password, role, tl_code, status, created_at FROM users ORDER BY created_at ASC");
-                return $stmt->fetchAll() ?: [];
+                // Pastikan kolom admin_email ada di tabel users
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $ignored) {}
+
+                $stmt = $pdo->query("SELECT id, username, password, role, tl_code, admin_email, status, created_at FROM users ORDER BY created_at ASC");
+                $dbUsers = $stmt->fetchAll();
+                if ($dbUsers !== false) {
+                    return $dbUsers;
+                }
             } catch (\Exception $e) {
                 error_log("DB getUsers Error: " . $e->getMessage());
             }
@@ -209,19 +217,19 @@ class AuthManager
                     $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
                 } catch (\Exception $colIgnored) {}
 
-                $checkStmt = $pdo->prepare("SELECT id FROM users WHERE (username = ? OR tl_code = ?) AND id != ? LIMIT 1");
-                $checkStmt->execute([$username, $tlCode, $id]);
+                $checkStmt = $pdo->prepare("SELECT id FROM users WHERE (username = ? OR tl_code = ?) AND id != ? AND username != ? LIMIT 1");
+                $checkStmt->execute([$username, $tlCode, $id, $id]);
                 if ($checkStmt->fetch()) {
                     throw new \InvalidArgumentException('Username atau kode team leader sudah digunakan.');
                 }
 
                 if ($password !== '') {
                     $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, admin_email = ?, status = ? WHERE id = ? AND role = 'tl'");
-                    return $stmt->execute([$username, $hash, $tlCode, $adminEmail, $status, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ?) AND role = 'tl'");
+                    return $stmt->execute([$username, $hash, $tlCode, $adminEmail, $status, $id, $id]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ? WHERE id = ? AND role = 'tl'");
-                    return $stmt->execute([$username, $tlCode, $adminEmail, $status, $id]);
+                    $stmt = $pdo->prepare("UPDATE users SET username = ?, tl_code = ?, admin_email = ?, status = ? WHERE (id = ? OR username = ?) AND role = 'tl'");
+                    return $stmt->execute([$username, $tlCode, $adminEmail, $status, $id, $id]);
                 }
             } catch (\InvalidArgumentException $iae) {
                 throw $iae;
@@ -237,7 +245,7 @@ class AuthManager
             if (($user['role'] ?? '') !== 'tl') {
                 continue;
             }
-            if (($user['id'] ?? $user['username'] ?? '') === $id) {
+            if (($user['id'] ?? $user['username'] ?? '') === $id || ($user['username'] ?? '') === $id) {
                 $found               = true;
                 $user['username']    = $username;
                 $user['tl_code']     = $tlCode;
@@ -270,6 +278,11 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
+                // Pastikan kolom admin_email ada
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $ignored) {}
+
                 $stmt = $pdo->prepare("SELECT * FROM users WHERE role = 'tl' AND UPPER(tl_code) = ? LIMIT 1");
                 $stmt->execute([$tlCode]);
                 $user = $stmt->fetch();
@@ -294,6 +307,11 @@ class AuthManager
         $pdo = Database::getConnection();
         if ($pdo) {
             try {
+                // Pastikan kolom admin_email ada
+                try {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN admin_email VARCHAR(150) NOT NULL DEFAULT '' AFTER tl_code");
+                } catch (\Exception $ignored) {}
+
                 $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
                 $stmt->execute([$username]);
                 $res = $stmt->fetch();
@@ -311,11 +329,10 @@ class AuthManager
         return null;
     }
 
-    public static function updateProfile(string $currentUsername, string $newUsername, string $newPassword = '', string $adminEmail = ''): array
+    public static function updateProfile(string $currentUsername, string $newUsername, string $newPassword = '', ?string $adminEmail = null): array
     {
         $currentUsername = trim($currentUsername);
         $newUsername     = trim($newUsername);
-        $adminEmail      = trim($adminEmail);
         if ($newUsername === '') {
             throw new \InvalidArgumentException('Username tidak boleh kosong.');
         }
@@ -339,18 +356,25 @@ class AuthManager
                     $id = 'usr_' . time() . random_int(100, 999);
                     $hash = $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT);
                     $insertStmt = $pdo->prepare("INSERT INTO users (id, username, password, role, admin_email, status, created_at) VALUES (?, ?, ?, 'superadmin', ?, 'active', NOW())");
-                    $insertStmt->execute([$id, $newUsername, $hash, $adminEmail]);
-                    return ['id' => $id, 'username' => $newUsername, 'role' => 'superadmin', 'admin_email' => $adminEmail, 'status' => 'active'];
+                    $insertStmt->execute([$id, $newUsername, $hash, $adminEmail ?? '']);
+                    return ['id' => $id, 'username' => $newUsername, 'role' => 'superadmin', 'admin_email' => $adminEmail ?? '', 'status' => 'active'];
                 }
 
+                $params = [$newUsername];
+                $sql = "UPDATE users SET username = ?";
                 if ($newPassword !== '') {
-                    $hash = password_hash($newPassword, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, admin_email = ? WHERE username = ?");
-                    $stmt->execute([$newUsername, $hash, $adminEmail, $currentUsername]);
-                } else {
-                    $stmt = $pdo->prepare("UPDATE users SET username = ?, admin_email = ? WHERE username = ?");
-                    $stmt->execute([$newUsername, $adminEmail, $currentUsername]);
+                    $sql .= ", password = ?";
+                    $params[] = password_hash($newPassword, PASSWORD_DEFAULT);
                 }
+                if ($adminEmail !== null) {
+                    $sql .= ", admin_email = ?";
+                    $params[] = trim($adminEmail);
+                }
+                $sql .= " WHERE username = ?";
+                $params[] = $currentUsername;
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
 
                 return self::getUserByUsername($newUsername) ?: [];
             } catch (\InvalidArgumentException $iae) {
@@ -377,7 +401,7 @@ class AuthManager
                 'username'    => $newUsername,
                 'password'    => $newPassword !== '' ? password_hash($newPassword, PASSWORD_DEFAULT) : password_hash('superadmin', PASSWORD_DEFAULT),
                 'role'        => 'superadmin',
-                'admin_email' => $adminEmail,
+                'admin_email' => $adminEmail ?? '',
                 'status'      => 'active',
             ];
             $users[] = $userObj;
@@ -386,7 +410,9 @@ class AuthManager
         }
 
         $users[$foundIndex]['username'] = $newUsername;
-        $users[$foundIndex]['admin_email'] = $adminEmail;
+        if ($adminEmail !== null) {
+            $users[$foundIndex]['admin_email'] = trim($adminEmail);
+        }
         if ($newPassword !== '') {
             $users[$foundIndex]['password'] = password_hash($newPassword, PASSWORD_DEFAULT);
         }
